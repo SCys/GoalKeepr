@@ -1,20 +1,24 @@
-from datetime import datetime, timezone
-from typing import ContextManager, List
+from datetime import timedelta
 
-from aiogram import Bot, types
+from aiogram import types
+from aiogram.bot.bot import Bot
 from aiogram.dispatcher.storage import FSMContext
-from aiogram.utils import markdown
+from aiogram.utils.exceptions import MessageToDeleteNotFound
 
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 WELCOME_TEXT = "欢迎 _%(title)s_ ，点击 **感叹号** 按钮后才能发言\n如果 *30秒* 内不操作即会将你剔除。"
+DELETED_AFTER = 60
+
+logger = manager.logger
 
 
+@manager.register("message", content_types=[types.ContentType.NEW_CHAT_MEMBERS])
 async def new_members(msg: types.Message, state: FSMContext):
     chat = msg.chat
     members = msg.new_chat_members
-    now = datetime.now(timezone.utc)
+    now = msg.date
 
     if chat.type not in SUPPORT_GROUP_TYPES:
         return
@@ -24,15 +28,11 @@ async def new_members(msg: types.Message, state: FSMContext):
         pass
 
     for member in members:
-        if member.is_bot:
+        if member.is_bot:  # 不删除 Bot
             continue
 
-        if None in [member.first_name, member.last_name]:
-            title = f"{member.first_name or ''}{member.last_name or ''}"
-        else:
-            title = " ".join([member.first_name, member.last_name])
-
-        print("new_member", chat.id, member.id, title)
+        title = manager.user_title(member)
+        logger.info("found new member:{} {}({})", chat.id, member.id, title)
 
         # mute it
         await chat.restrict(
@@ -44,8 +44,9 @@ async def new_members(msg: types.Message, state: FSMContext):
         )
 
         # send button
-        await msg.reply(
+        reply = await msg.reply(
             WELCOME_TEXT % {"title": title},
+            parse_mode="markdown",
             reply_markup=types.InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -57,7 +58,17 @@ async def new_members(msg: types.Message, state: FSMContext):
             ),
         )
 
+        await manager.lazy_session(
+            chat.id, msg.message_id, member.id, "new_member_check", now + timedelta(seconds=DELETED_AFTER)
+        )
+        await manager.lazy_delete_message(chat.id, msg.message_id, now + timedelta(seconds=DELETED_AFTER + 5))
+        await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER + 5))
 
+
+@manager.register(
+    "callback_query",
+    lambda q: q.message.reply_to_message is not None and q.message.reply_to_message.new_chat_members is not None,
+)
 async def new_member_callback(query: types.CallbackQuery):
     msg = query.message
     chat = msg.chat
@@ -68,11 +79,13 @@ async def new_member_callback(query: types.CallbackQuery):
     prev_msg = msg.reply_to_message
     if not prev_msg:
         print("no reply message")
+        await query.answer(show_alert=False)
         return
 
     members = prev_msg.new_chat_members
     if not members:
         print("no members")
+        await query.answer(show_alert=False)
         return
 
     member = query.from_user
@@ -83,6 +96,7 @@ async def new_member_callback(query: types.CallbackQuery):
 
     if not any([is_admin, is_self]):
         print("no admin and no self")
+        await query.answer(show_alert=False)
         return
 
     chooses = msg.reply_markup.inline_keyboard[0]
@@ -91,41 +105,124 @@ async def new_member_callback(query: types.CallbackQuery):
     third = chooses[2]
 
     if is_admin and not is_self:
+        # delete now
+        await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
+        await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
+
+        # accept
         if data == second.callback_data:
             for i in members:
-                await chat.restrict(
-                    i.id,
-                    can_send_messages=True,
-                    can_send_media_messages=True,
-                    can_send_other_messages=True,
-                    can_add_web_page_previews=True,
-                )
-                await msg.answer("welcome")
-                print("administrator accepted new members:", chat.id, i.id, is_admin, is_self)
+                await accepted_member(chat, msg, i)
 
+                logger.info(
+                    "chat {}({}) msg {} administrator {}({}) accept new member {}({})",
+                    chat.id,
+                    chat.title,
+                    msg.message_id,
+                    msg.from_user.id,
+                    manager.user_title(msg.from_user),
+                    i.id,
+                    manager.user_title(i),
+                )
+
+        # reject
         elif data == third.callback_data:
             for i in members:
                 await chat.kick(i.id, until_date=45)  # baned 45s
-                print("administrator reject new members:", chat.id, i.id, is_admin, is_self)
+                await chat.unban(i.id)
+
+                logger.warning(
+                    "chat {}({}) msg {} administrator {}({}) reject new member {}({})",
+                    chat.id,
+                    chat.title,
+                    msg.message_id,
+                    msg.from_user.id,
+                    manager.user_title(msg.from_user),
+                    i.id,
+                    manager.user_title(i),
+                )
 
         else:
-            print("administrator invalid choose:", chat.id, member)
-            await msg.reply("?")
+            logger.warning(
+                "chat {}({}) msg {} administrator {}({}) invalid data {}",
+                chat.id,
+                chat.title,
+                msg.message_id,
+                msg.from_user.id,
+                manager.user_title(msg.from_user),
+                data,
+            )
 
     elif is_self:
         if data == first.callback_data:
-            await chat.restrict(
+            await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
+            await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
+            await accepted_member(chat, msg, member)
+
+            logger.info(
+                "chat {}({}) msg {} administrator {}({}) clicked button",
+                chat.id,
+                chat.title,
+                msg.message_id,
                 member.id,
-                can_send_messages=True,
-                can_send_media_messages=True,
-                can_send_other_messages=True,
-                can_add_web_page_previews=True,
+                manager.user_title(member),
             )
 
-            print("welcome member:", member.id, chat.id)
-
-            await msg.answer("welcome")
-
         else:
-            print("member invalid choose:", chat.id, member.id, data)
+            logger.warning(
+                "chat {}({}) msg {} member {}({}) invalid data {}",
+                chat.id,
+                chat.title,
+                msg.message_id,
+                member.id,
+                manager.user_title(member),
+                data,
+            )
 
+    await query.answer(show_alert=False)
+
+
+@manager.register_event("new_member_check")
+async def new_mebmer_check(bot: Bot, chat_id: int, message_id: int, member_id: int):
+    chat = await bot.get_chat(chat_id)
+    member = await bot.get_chat_member(chat_id, member_id)
+
+    if not member.is_chat_member():
+        logger.warning("chat {}({}) member {}({}) is kicked", chat.id, chat.title, member_id, manager.user_title(member))
+        return
+
+    if member.can_send_messages:
+        logger.warning("chat {}({}) member {}({}) is accepted", chat.id, chat.title, member_id, manager.user_title(member))
+        return
+
+    await bot.kick_chat_member(chat_id, member_id, until_date=45)  # baned 45s
+    await bot.unban_chat_member(chat_id, member_id)
+    logger.info(
+        "chat {}({}) msg {} member {}({}) is kicked by timeout",
+        chat.id,
+        chat.title,
+        message_id,
+        member_id,
+        manager.user_title(member),
+    )
+
+
+async def accepted_member(chat, msg, member):
+    await chat.restrict(
+        member.id,
+        can_send_messages=True,
+        can_send_media_messages=True,
+        can_send_other_messages=True,
+        can_add_web_page_previews=True,
+    )
+
+    logger.info(
+        "chat {}({}) msg {} member {}({}) is accepted",
+        chat.id,
+        chat.title,
+        msg.message_id,
+        member.id,
+        manager.user_title(member),
+    )
+    resp = await msg.answer("欢迎 %(title)s 加入群组，先请阅读群规。" % {"title": manager.user_title(member)})
+    await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
