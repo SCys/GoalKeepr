@@ -8,7 +8,7 @@ from aiogram.utils.exceptions import MessageToDeleteNotFound
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
-WELCOME_TEXT = "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 **感叹号** 按钮后才能发言\n如果 *30秒* 内不操作即会将你剔除。"
+WELCOME_TEXT = "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 **感叹号** 按钮后才能发言\n如果 *30秒* 内不操作即会被送走。"
 DELETED_AFTER = 30
 
 logger = manager.logger
