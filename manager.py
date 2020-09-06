@@ -153,10 +153,21 @@ class Manager:
                 "insert into lazy_sessions(chat,msg,member,type,checkout_at) values($1,$2,$3,$4,$5)",
                 (chat, msg, member, type, deleted_at),
             )
-
             await conn.commit()
 
-            logger.debug("chat {} message {} member {} after {}", chat, msg, member, deleted_at)
+        logger.debug("chat {} message {} member {} after {}", chat, msg, member, deleted_at)
+
+    async def lazy_session_delete(self, chat: int, member: int, type: str):
+        """
+        延缓检查的会话
+        """
+        async with database.connection() as conn:
+            await conn.execute(
+                "delete from lazy_sessions where chat=$1 and member=$2 and type=$3", (chat, member, type),
+            )
+            await conn.commit()
+
+        logger.debug("chat {} member {} lazy session {} is deleted", chat, member, type)
 
 
 manager = Manager()

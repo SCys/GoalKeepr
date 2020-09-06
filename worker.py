@@ -4,7 +4,7 @@ import aiogram.utils.exceptions
 from aiogram.bot.bot import Bot
 
 import database
-from handlers.new_members import new_mebmer_check
+from handlers.new_members import new_member_check
 from manager import manager
 
 is_running = False
@@ -23,9 +23,13 @@ create table if not exists lazy_sessions(
 """
 
 logger = manager.logger
+logger.level = "DEBUG"
 
 
-async def lazy_delete_message(bot: Bot):
+async def lazy_messages(bot: Bot):
+    """
+    处理延迟删除信息
+    """
     async with database.connection() as conn:
         proxy = await conn.execute(
             "select id,chat,msg from lazy_delete_messages where deleted_at < datetime('now','localtime') order by deleted_at limit 500"
@@ -42,12 +46,15 @@ async def lazy_delete_message(bot: Bot):
                 pass
 
             await conn.execute("delete from lazy_delete_messages where id=$1", (row[0],))
-            logger.info("[worker]message is deleted:{} {}", row[1], row[2])
+            logger.debug("[worker]message is deleted:{} {}", row[1], row[2])
 
         await conn.commit()
 
 
-async def lazy_session(bot: Bot):
+async def lazy_sessions(bot: Bot):
+    """
+    处理延迟会话
+    """
     async with database.connection() as conn:
         proxy = await conn.execute(
             "select id,chat,msg,member,type from lazy_sessions where checkout_at < datetime('now','localtime') order by checkout_at limit 500"
@@ -81,20 +88,21 @@ async def main():
     manager.setup()
 
     bot = manager.bot
+    Bot.set_current(bot)
 
     async with database.connection() as conn:
         await conn.execute(SQL_CREATE_MESSAGES)
         await conn.execute(SQL_CREATE_NEW_MEMBER_SESSION)
 
     for name, func in manager.events.items():
-        logger.info('[worker]event:{} => {}', name, func)
+        logger.info("[worker]event:{} => {}", name, func)
 
     is_running = True
     while is_running:
         await asyncio.sleep(0.25)
 
-        await lazy_delete_message(bot)
-        await lazy_session(bot)
+        await lazy_messages(bot)
+        await lazy_sessions(bot)
 
     print("worker closed")
 

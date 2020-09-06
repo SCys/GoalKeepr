@@ -7,7 +7,7 @@ from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 
-DELETED_AFTER = 120
+DELETED_AFTER = 5
 logger = manager.logger
 
 
@@ -39,10 +39,10 @@ async def k(msg: types.Message, state: FSMContext):
         return
 
     member = await chat.get_member(replyMsg.from_user.id)
-    await kick_member(chat, msg, administrator, replyMsg.from_user)
+    resp = await kick_member(chat, msg, administrator, replyMsg.from_user)
 
-    await manager.lazy_delete_message(chat.id, msg.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
-    await manager.lazy_delete_message(chat.id, replyMsg.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+    for i in [msg, resp, replyMsg]:
+        await manager.lazy_delete_message(chat.id, i.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
 
 
 async def kick_member(chat: types.Chat, msg, administrator, member: types.User):
@@ -60,7 +60,7 @@ async def kick_member(chat: types.Chat, msg, administrator, member: types.User):
         "chat {}({}) msg {} member {}({}) is kicked", chat.id, chat.title, msg.message_id, id, manager.user_title(member)
     )
 
-    resp = await msg.answer(
+    return await msg.answer(
         "用户 **%(title)s** 已经由 **%(administrator)s** 剔除，%(deleted_after)d 秒自毁。"
         % {
             "title": manager.user_title(member),
@@ -72,5 +72,3 @@ async def kick_member(chat: types.Chat, msg, administrator, member: types.User):
         disable_notification=True,
     )
 
-    await manager.lazy_delete_message(chat.id, msg.message_id, DELETED_AFTER)
-    await manager.lazy_delete_message(chat.id, resp.message_id, DELETED_AFTER)

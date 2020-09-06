@@ -8,8 +8,8 @@ from aiogram.utils.exceptions import MessageToDeleteNotFound
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
-WELCOME_TEXT = "欢迎 _%(title)s_ ，点击 **感叹号** 按钮后才能发言\n如果 *30秒* 内不操作即会将你剔除。"
-DELETED_AFTER = 60
+WELCOME_TEXT = "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 **感叹号** 按钮后才能发言\n如果 *30秒* 内不操作即会将你剔除。"
+DELETED_AFTER = 30
 
 logger = manager.logger
 
@@ -45,7 +45,7 @@ async def new_members(msg: types.Message, state: FSMContext):
 
         # send button
         reply = await msg.reply(
-            WELCOME_TEXT % {"title": title},
+            WELCOME_TEXT % {"title": title, "user_id": member.id},
             parse_mode="markdown",
             reply_markup=types.InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -104,6 +104,7 @@ async def new_member_callback(query: types.CallbackQuery):
     second = chooses[1]
     third = chooses[2]
 
+    # operator is admin
     if is_admin and not is_self:
         # delete now
         await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
@@ -153,6 +154,7 @@ async def new_member_callback(query: types.CallbackQuery):
                 data,
             )
 
+    # user is chat member
     elif is_self:
         if data == first.callback_data:
             await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
@@ -160,7 +162,7 @@ async def new_member_callback(query: types.CallbackQuery):
             await accepted_member(chat, msg, member)
 
             logger.info(
-                "chat {}({}) msg {} administrator {}({}) clicked button",
+                "chat {}({}) msg {} user {}({}) clicked button",
                 chat.id,
                 chat.title,
                 msg.message_id,
@@ -183,17 +185,21 @@ async def new_member_callback(query: types.CallbackQuery):
 
 
 @manager.register_event("new_member_check")
-async def new_mebmer_check(bot: Bot, chat_id: int, message_id: int, member_id: int):
+async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: int):
     chat = await bot.get_chat(chat_id)
-    member = await bot.get_chat_member(chat_id, member_id)
+    member = await chat.get_member(member_id)
+
+    if member.is_chat_admin():
+        logger.info("chat {}({}) member {}({}) is admin", chat.id, chat.title, member_id, manager.user_title(member))
+        return
 
     if not member.is_chat_member():
         logger.warning("chat {}({}) member {}({}) is kicked", chat.id, chat.title, member_id, manager.user_title(member))
         return
 
-    if member.can_send_messages:
-        logger.warning("chat {}({}) member {}({}) is accepted", chat.id, chat.title, member_id, manager.user_title(member))
-        return
+    # if member.can_send_messages or member.can_post_messages:
+    #     logger.info("chat {}({}) member {}({}) is accepted", chat.id, chat.title, member_id, manager.user_title(member))
+    #     return
 
     await bot.kick_chat_member(chat_id, member_id, until_date=45)  # baned 45s
     await bot.unban_chat_member(chat_id, member_id)
@@ -224,5 +230,11 @@ async def accepted_member(chat, msg, member):
         member.id,
         manager.user_title(member),
     )
-    resp = await msg.answer("欢迎 %(title)s 加入群组，先请阅读群规。" % {"title": manager.user_title(member)})
+
+    resp = await msg.answer(
+        "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(member), "user_id": member.id},
+        parse_mode="markdown",
+    )
     await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+    await manager.lazy_session_delete(chat.id, member.id, "new_member_check")
+
