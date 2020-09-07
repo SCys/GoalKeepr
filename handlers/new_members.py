@@ -1,4 +1,5 @@
 from datetime import timedelta
+import random
 
 from aiogram import types
 from aiogram.bot.bot import Bot
@@ -8,10 +9,25 @@ from aiogram.utils.exceptions import MessageToDeleteNotFound
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
-WELCOME_TEXT = "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 **感叹号** 按钮后才能发言\n如果 *30秒* 内不操作即会被送走。"
+WELCOME_TEXT = "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 *%(icon)s* 按钮后才能发言\n如果 *30秒* 内不操作即会被送走。"
 DELETED_AFTER = 30
 
 logger = manager.logger
+
+ICONS = {
+    "爱心": "❤️️",
+    "感叹号": "❗",
+    "问号": "❓",
+    "壹": "1⃣",
+    "贰": "2⃣",
+    "叁": "3⃣",
+    "肆": "4⃣",
+    "伍": "5⃣",
+    "陆": "6⃣",
+    "柒": "7⃣",
+    "捌": "8⃣",
+    "玖": "9⃣",
+}
 
 
 @manager.register("message", content_types=[types.ContentType.NEW_CHAT_MEMBERS])
@@ -25,7 +41,10 @@ async def new_members(msg: types.Message, state: FSMContext):
 
     # ignore from administrator
     if msg.from_user and await manager.is_admin(chat, msg.from_user):
-        pass
+        logger.info(
+            "chat {} msg {} administrator {} added user {}", chat.id, msg.message_id, msg.from_user.id, [i.id for i in members]
+        )
+        return
 
     for member in members:
         if member.is_bot:  # 不删除 Bot
@@ -43,19 +62,20 @@ async def new_members(msg: types.Message, state: FSMContext):
             can_add_web_page_previews=False,
         )
 
+        # 动态图标
+        icon_key, icon_value = random.choice(list(ICONS.items()))
+        icons = [
+            types.InlineKeyboardButton(text=icon_value, callback_data="__".join([str(member.id), str(now), "!"])),
+            types.InlineKeyboardButton(text="✔", callback_data="__".join([str(member.id), str(now), "O"])),
+            types.InlineKeyboardButton(text="❌", callback_data="__".join([str(member.id), str(now), "X"])),
+        ]
+        random.shuffle(icons)
+
         # send button
         reply = await msg.reply(
-            WELCOME_TEXT % {"title": title, "user_id": member.id},
+            WELCOME_TEXT % {"title": title, "user_id": member.id, "icon": icon_key},
             parse_mode="markdown",
-            reply_markup=types.InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        types.InlineKeyboardButton(text="❗", callback_data="__".join([str(member.id), str(now), "!"])),
-                        types.InlineKeyboardButton(text="✔", callback_data="__".join([str(member.id), str(now), "O"])),
-                        types.InlineKeyboardButton(text="❌", callback_data="__".join([str(member.id), str(now), "X"])),
-                    ],
-                ]
-            ),
+            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[icons,]),
         )
 
         await manager.lazy_session(
@@ -99,19 +119,16 @@ async def new_member_callback(query: types.CallbackQuery):
         await query.answer(show_alert=False)
         return
 
-    chooses = msg.reply_markup.inline_keyboard[0]
-    first = chooses[0]
-    second = chooses[1]
-    third = chooses[2]
+    # chooses = msg.reply_markup.inline_keyboard[0]
 
     # operator is admin
     if is_admin and not is_self:
-        # delete now
-        await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
-        await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
-
         # accept
-        if data == second.callback_data:
+        if data.endswith("__O"):
+            # delete now
+            await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
+            await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
+
             for i in members:
                 await accepted_member(chat, msg, i)
 
@@ -127,7 +144,11 @@ async def new_member_callback(query: types.CallbackQuery):
                 )
 
         # reject
-        elif data == third.callback_data:
+        elif data.endswith("__X"):
+            # delete now
+            await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
+            await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
+
             for i in members:
                 await chat.kick(i.id, until_date=45)  # baned 45s
                 await chat.unban(i.id)
@@ -156,9 +177,10 @@ async def new_member_callback(query: types.CallbackQuery):
 
     # user is chat member
     elif is_self:
-        if data == first.callback_data:
+        if data.endswith("__!"):
             await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
             await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
+
             await accepted_member(chat, msg, member)
 
             logger.info(
@@ -237,4 +259,3 @@ async def accepted_member(chat, msg, member):
     )
     await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
     await manager.lazy_session_delete(chat.id, member.id, "new_member_check")
-
