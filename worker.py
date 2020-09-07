@@ -94,6 +94,9 @@ async def main():
         await conn.execute(SQL_CREATE_MESSAGES)
         await conn.execute(SQL_CREATE_NEW_MEMBER_SESSION)
 
+        # 清理不必要的数据
+        await conn.execute("delete from lazy_sessions where checkout_at < datetime('now','-60 seconds')")
+
     for name, func in manager.events.items():
         logger.info("[worker]event:{} => {}", name, func)
 
