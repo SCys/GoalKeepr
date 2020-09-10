@@ -39,7 +39,7 @@ def build_new_member_message(member, msg_timestamp):
     title = manager.user_title(member)
 
     # 用户组
-    items = random.choices(list(ICONS.items()), k=3)
+    items = random.sample(list(ICONS.items()), k=3)
     button_user_ok, _ = random.choice(items)
     buttons_user = [
         types.InlineKeyboardButton(
