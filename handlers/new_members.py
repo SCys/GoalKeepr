@@ -4,6 +4,7 @@ import random
 from aiogram import types
 from aiogram.bot.bot import Bot
 from aiogram.dispatcher.storage import FSMContext
+from aiogram.types.inline_keyboard import InlineKeyboardMarkup
 from aiogram.utils.exceptions import MessageToDeleteNotFound
 
 from manager import manager
@@ -27,7 +28,37 @@ ICONS = {
     "柒": "7⃣",
     "捌": "8⃣",
     "玖": "9⃣",
+    "乘号": "✖",
+    "加号": "➕",
+    "减号": "➖",
+    "除号": "➗",
 }
+
+
+def build_new_member_message(member, msg_timestamp):
+    title = manager.user_title(member)
+
+    # 用户组
+    items = random.choices(list(ICONS.items()), k=3)
+    button_user_ok, _ = random.choice(items)
+    buttons_user = [
+        types.InlineKeyboardButton(
+            text=i[1], callback_data="__".join([str(member.id), str(msg_timestamp), "!" if button_user_ok == i[0] else "?"])
+        )
+        for i in items
+    ]
+    random.shuffle(buttons_user)
+
+    # 管理组
+    buttons_admin = [
+        types.InlineKeyboardButton(text="✔", callback_data="__".join([str(member.id), str(msg_timestamp), "O"])),
+        types.InlineKeyboardButton(text="❌", callback_data="__".join([str(member.id), str(msg_timestamp), "X"])),
+    ]
+
+    # 文字
+    content = WELCOME_TEXT % {"title": title, "user_id": member.id, "icon": button_user_ok}
+
+    return content, types.InlineKeyboardMarkup(inline_keyboard=[buttons_user, buttons_admin])
 
 
 @manager.register("message", content_types=[types.ContentType.NEW_CHAT_MEMBERS])
@@ -62,21 +93,10 @@ async def new_members(msg: types.Message, state: FSMContext):
             can_add_web_page_previews=False,
         )
 
-        # 动态图标
-        icon_key, icon_value = random.choice(list(ICONS.items()))
-        icons = [
-            types.InlineKeyboardButton(text=icon_value, callback_data="__".join([str(member.id), str(now), "!"])),
-            types.InlineKeyboardButton(text="✔", callback_data="__".join([str(member.id), str(now), "O"])),
-            types.InlineKeyboardButton(text="❌", callback_data="__".join([str(member.id), str(now), "X"])),
-        ]
-        random.shuffle(icons)
+        content, reply_markup = build_new_member_message(member, now)
 
         # send button
-        reply = await msg.reply(
-            WELCOME_TEXT % {"title": title, "user_id": member.id, "icon": icon_key},
-            parse_mode="markdown",
-            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[icons,]),
-        )
+        reply = await msg.reply(content, parse_mode="markdown", reply_markup=reply_markup)
 
         await manager.lazy_session(
             chat.id, msg.message_id, member.id, "new_member_check", now + timedelta(seconds=DELETED_AFTER)
@@ -149,12 +169,15 @@ async def new_member_callback(query: types.CallbackQuery):
             await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
             await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
 
+            # until_date = msg.date + timedelta(seconds=60)
             for i in members:
-                await chat.kick(i.id, until_date=45)  # baned 45s
-                await chat.unban(i.id)
+                # await chat.kick(i.id, until_date=until_date)
+
+                await chat.kick(i.id)
+                # await chat.unban(i.id)
 
                 logger.warning(
-                    "chat {}({}) msg {} administrator {}({}) reject new member {}({})",
+                    "chat {}({}) msg {} administrator {}({}) kick member {}({})",
                     chat.id,
                     chat.title,
                     msg.message_id,
@@ -184,7 +207,22 @@ async def new_member_callback(query: types.CallbackQuery):
             await accepted_member(chat, msg, member)
 
             logger.info(
-                "chat {}({}) msg {} user {}({}) clicked button",
+                "chat {}({}) msg {} user {}({}) click ok button",
+                chat.id,
+                chat.title,
+                msg.message_id,
+                member.id,
+                manager.user_title(member),
+            )
+
+        elif data.endswith("__?"):
+            content, reply_markup = build_new_member_message(member, msg.date)
+
+            await msg.edit_text(content, parse_mode="markdown")
+            await msg.edit_reply_markup(reply_markup=reply_markup)
+
+            logger.info(
+                "chat {}({}) msg {} user {}({}) click error button, resort user's buttons",
                 chat.id,
                 chat.title,
                 msg.message_id,
