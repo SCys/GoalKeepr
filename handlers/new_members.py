@@ -162,8 +162,11 @@ async def new_member_callback(query: types.CallbackQuery):
     if is_admin and not is_self:
         # accept
         if data.endswith("__O"):
-            await manager.delete_message(chat.id, msg.reply_to_message.message_id)
-            await manager.delete_message(chat.id, msg.message_id)
+            if not await manager.delete_message(chat.id, msg.reply_to_message.message_id):
+                await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, now)
+
+            if not await manager.delete_message(chat.id, msg.message_id):
+                await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
             for i in members:
                 await accepted_member(chat, msg, i)
@@ -181,18 +184,19 @@ async def new_member_callback(query: types.CallbackQuery):
 
         # reject
         elif data.endswith("__X"):
-            await manager.delete_message(chat.id, msg.reply_to_message.message_id)
-            await manager.delete_message(chat.id, msg.message_id)
+            if not await manager.delete_message(chat.id, msg.reply_to_message.message_id):
+                await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, now)
 
-            # until_date = msg.date + timedelta(seconds=60)
+            if not await manager.delete_message(chat.id, msg.message_id):
+                await manager.lazy_delete_message(chat.id, msg.message_id, now)
+
+            until_date = now + timedelta(days=30)
             for i in members:
-                # await chat.kick(i.id, until_date=until_date)
-
-                await chat.kick(i.id)
+                await chat.kick(i.id, until_date=until_date)
                 # await chat.unban(i.id)
 
                 logger.warning(
-                    "chat {}({}) msg {} administrator {}({}) kick member {}({})",
+                    "chat {}({}) msg {} administrator {}({}) kick member {}({}), until {}",
                     chat.id,
                     chat.title,
                     msg.message_id,
@@ -200,6 +204,7 @@ async def new_member_callback(query: types.CallbackQuery):
                     manager.user_title(msg.from_user),
                     i.id,
                     manager.user_title(i),
+                    until_date,
                 )
 
         else:
