@@ -10,7 +10,15 @@ from manager import manager
 is_running = False
 
 
-SQL_CREATE_MESSAGES = "create table if not exists lazy_delete_messages(id integer primary key autoincrement,chat int,msg int,deleted_at timestamp with time zone)"
+SQL_CREATE_MESSAGES = """
+create table if not exists lazy_delete_messages(
+    id integer primary key autoincrement,
+    chat int,
+    msg int,
+    deleted_at timestamp with time zone
+)
+"""
+
 SQL_CREATE_NEW_MEMBER_SESSION = """
 create table if not exists lazy_sessions(
     id integer primary key autoincrement,
@@ -22,6 +30,18 @@ create table if not exists lazy_sessions(
 )
 """
 
+SQL_FETCH_LAZY_DELETE_MESSAGES = """
+select id,chat,msg from lazy_delete_messages 
+where deleted_at < datetime('now','localtime') 
+order by deleted_at limit 500
+"""
+
+SQL_FETCH_SESSIONS = """
+select id,chat,msg,member,type from lazy_sessions 
+where checkout_at < datetime('now','localtime') 
+order by checkout_at limit 500
+"""
+
 logger = manager.logger
 logger.level = "DEBUG"
 
@@ -31,24 +51,14 @@ async def lazy_messages(bot: Bot):
     处理延迟删除信息
     """
     async with database.connection() as conn:
-        proxy = await conn.execute(
-            "select id,chat,msg from lazy_delete_messages where deleted_at < datetime('now','localtime') order by deleted_at limit 500"
-        )
+        proxy = await conn.execute(SQL_FETCH_LAZY_DELETE_MESSAGES)
         rows = [i for i in await proxy.fetchall()]
         await proxy.close()
 
-    async with database.connection() as conn:
         for row in rows:
-
-            try:
-                await bot.delete_message(row[1], row[2])
-            except aiogram.utils.exceptions.MessageToDeleteNotFound:
-                pass
-
-            await conn.execute("delete from lazy_delete_messages where id=$1", (row[0],))
-            logger.debug("[worker]message is deleted:{} {}", row[1], row[2])
-
-        await conn.commit()
+            if await manager.delete_message(row[1], row[2]):
+                await conn.execute("delete from lazy_delete_messages where id=$1", (row[0],))
+                await conn.commit()
 
 
 async def lazy_sessions(bot: Bot):
@@ -56,9 +66,7 @@ async def lazy_sessions(bot: Bot):
     处理延迟会话
     """
     async with database.connection() as conn:
-        proxy = await conn.execute(
-            "select id,chat,msg,member,type from lazy_sessions where checkout_at < datetime('now','localtime') order by checkout_at limit 500"
-        )
+        proxy = await conn.execute(SQL_FETCH_SESSIONS)
         rows = [i for i in await proxy.fetchall()]
         await proxy.close()
 

@@ -1,4 +1,7 @@
 import argparse
+from aiogram.types.chat import Chat
+from aiogram.types.message import Message
+from aiogram.utils.exceptions import MessageToDeleteNotFound
 import loguru
 import os.path
 import sys
@@ -127,6 +130,24 @@ class Manager:
             return f"{user.first_name or ''}{user.last_name or ''}"
 
         return " ".join([user.first_name, user.last_name])
+
+    async def delete_message(self, chat: int, msg: int):
+        """
+        延缓删除消息
+        chat: chat with msg
+        msg: msg will be deleted
+        deleted_at: message deleted after the timestamp
+        """
+        try:
+            await self.bot.delete_message(chat, msg)
+            logger.info("chat {} message {} deleted", chat, msg)
+        except MessageToDeleteNotFound:
+            logger.warning("chat {} message {} is deleted", chat, msg)
+        except Exception:
+            logger.exception("chat {} message {} delete error", chat, msg)
+            return False
+
+        return True
 
     async def lazy_delete_message(self, chat: int, msg: int, deleted_at: datetime):
         """

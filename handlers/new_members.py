@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 import random
 
 from aiogram import types
@@ -42,6 +42,9 @@ ICONS = {
 
 
 def build_new_member_message(member, msg_timestamp):
+    """
+    构建新用户验证信息的按钮和文字内容
+    """
     title = manager.user_title(member)
 
     # 用户组
@@ -71,6 +74,12 @@ def build_new_member_message(member, msg_timestamp):
 async def new_members(msg: types.Message, state: FSMContext):
     chat = msg.chat
     members = msg.new_chat_members
+
+    # 忽略太久之前的信息
+    now = datetime.now()
+    if now > msg.date + timedelta(seconds=60):
+        logger.warning("chat {} msg {} date is ignored:{} > {}", chat.id, msg.message_id, now, msg.date + timedelta(seconds=60))
+        return
     now = msg.date
 
     if chat.type not in SUPPORT_GROUP_TYPES:
@@ -153,9 +162,8 @@ async def new_member_callback(query: types.CallbackQuery):
     if is_admin and not is_self:
         # accept
         if data.endswith("__O"):
-            # delete now
-            await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
-            await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
+            await manager.delete_message(chat.id, msg.reply_to_message.message_id)
+            await manager.delete_message(chat.id, msg.message_id)
 
             for i in members:
                 await accepted_member(chat, msg, i)
@@ -173,9 +181,8 @@ async def new_member_callback(query: types.CallbackQuery):
 
         # reject
         elif data.endswith("__X"):
-            # delete now
-            await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, now)
-            await manager.lazy_delete_message(chat.id, msg.message_id, now)
+            await manager.delete_message(chat.id, msg.reply_to_message.message_id)
+            await manager.delete_message(chat.id, msg.message_id)
 
             # until_date = msg.date + timedelta(seconds=60)
             for i in members:
