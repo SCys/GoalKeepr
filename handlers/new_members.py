@@ -66,6 +66,9 @@ async def new_members(msg: types.Message, state: FSMContext):
         logger.info("{} administrator {} added members", prefix, msg.from_user.id)
         return
 
+    if not await manager.delete_message(chat.id, msg.message_id):
+        await manager.lazy_delete_message(chat.id, msg.message_id, now)
+
     for member in members:
         if member.is_bot:
             continue
@@ -95,123 +98,115 @@ async def new_members(msg: types.Message, state: FSMContext):
         # 如果已经被剔除，则不做处理
         member = await manager.chat_member(chat, i.id)
         if not member.is_member:
-            logger.info("{} new member {}({}) is kicked", prefix, member.id, manager.user_title(member))
+            logger.info("{} new member {}({}) is kicked", prefix, i.id, manager.user_title(i))
             continue
 
         if member.is_chat_admin():
-            logger.info("{} new member {}({}) is admin", prefix, member.id, manager.user_title(member))
+            logger.info("{} new member {}({}) is admin", prefix, i, manager.user_title(i))
             continue
 
         if member.can_send_messages:
-            logger.info("{} new member {}({}) rights is accepted", prefix, member.id, manager.user_title(member))
+            logger.info("{} new member {}({}) rights is accepted", prefix, i, manager.user_title(i))
             continue
 
         content, reply_markup = build_new_member_message(i, now)
 
-        reply = await msg.reply(content, parse_mode="markdown", reply_markup=reply_markup)
+        # reply = await msg.reply(content, parse_mode="markdown", reply_markup=reply_markup)
+        reply = await manager.bot.send_message(chat.id, content, parse_mode="markdown", reply_markup=reply_markup)
 
         await manager.lazy_session(chat.id, msg.message_id, i.id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
-        await manager.lazy_delete_message(chat.id, msg.message_id, now + timedelta(seconds=DELETED_AFTER + 2))
-        await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER + 2))
-
-    # if not await manager.delete_message(chat.id, msg.message_id):
-    #     await manager.lazy_delete_message(chat.id, msg.message_id, now)
+        await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER))
 
 
 @manager.register(
     "callback_query",
-    lambda q: q.message.reply_to_message is not None and q.message.reply_to_message.new_chat_members is not None,
+    # lambda q: q.message.reply_to_message is not None and q.message.reply_to_message.new_chat_members is not None,
+    lambda q: q.message.reply_markup is not None,
 )
 async def new_member_callback(query: types.CallbackQuery):
     msg = query.message
     chat = msg.chat
+    operator = query.from_user
 
     if chat.type not in SUPPORT_GROUP_TYPES:
         return
 
+    # only support myself
+    if not msg.from_user.is_bot or manager.bot.id != msg.from_user.id:
+        return
+
+    # 判断是否需要处理
+    if (
+        msg.reply_markup.inline_keyboard is None
+        or len(msg.reply_markup.inline_keyboard) != 2
+        or len(msg.reply_markup.inline_keyboard[0]) != 5
+        or len(msg.reply_markup.inline_keyboard[1]) != 2
+    ):
+        return
+
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
-
-    msg_prev = msg.reply_to_message
-    if not msg_prev:
-        logger.warning("{} is invalid", prefix, chat.id, chat.title, msg.message_id)
-        await query.answer(show_alert=False)
-        return
-
-    members = msg_prev.new_chat_members
-    if not members:
-        logger.warning("{} members is empty", prefix, chat.id, chat.title, msg.message_id)
-        await query.answer(show_alert=False)
-        return
-
-    operator = query.from_user
 
     data = query.data
     is_admin = await manager.is_admin(chat, operator)
-    is_self = data.startswith(f"{operator.id}__") and len([i.id for i in msg_prev.new_chat_members if i.id == operator.id]) > 0
+    is_self = data.startswith(f"{operator.id}__")
 
     if not any([is_admin, is_self]):
         logger.warning("{} invalid status", prefix)
         await query.answer(show_alert=False)
         return
 
-    # chooses = msg.reply_markup.inline_keyboard[0]
-
     now = datetime.now()
 
     # operator is admin
     if is_admin and not is_self:
-        # accept
-        if data.endswith("__O"):
-            if not await manager.delete_message(chat.id, msg.reply_to_message.message_id):
-                await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, now)
+        items = data.split("__")
+        if len(items) != 3:
+            logger.warning("{} admin {}({}) invalid data {}", prefix, operator.id, manager.user_title(operator), data)
+        else:
+            member_id, _, op = items
+            member = await manager.chat_member(chat, member_id)
 
-            if not await manager.delete_message(chat.id, msg.message_id):
-                await manager.lazy_delete_message(chat.id, msg.message_id, now)
+            # accept
+            if op == "O":
+                if not await manager.delete_message(chat.id, msg.message_id):
+                    await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
-            for i in members:
-                await accepted_member(chat, msg, i)
+                await accepted_member(chat, msg, member.user)
 
                 logger.info(
                     "{} admin {}({}) accept new member {}({})",
                     prefix,
                     operator.id,
                     manager.user_title(operator),
-                    i.id,
-                    manager.user_title(i),
+                    member_id,
+                    manager.user_title(member),
                 )
 
-        # reject
-        elif data.endswith("__X"):
-            if not await manager.delete_message(chat.id, msg.reply_to_message.message_id):
-                await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, now)
+            # reject
+            elif op == "X":
+                if not await manager.delete_message(chat.id, msg.message_id):
+                    await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
-            if not await manager.delete_message(chat.id, msg.message_id):
-                await manager.lazy_delete_message(chat.id, msg.message_id, now)
-
-            until_date = now + timedelta(days=30)
-            for i in members:
-                await chat.kick(i.id, until_date=until_date)
-                # await chat.unban(i.id)
+                until_date = now + timedelta(days=30)
+                await chat.kick(member_id, until_date=until_date)
+                # await chat.unban(member_id)
 
                 logger.warning(
-                    "{} administrator {}({}) kick member {}({}), until {}",
+                    "{} admin {}({}) kick member {}, until {}",
                     prefix,
                     operator.id,
                     manager.user_title(operator),
-                    i.id,
-                    manager.user_title(i),
+                    member_id,
+                    manager.user_title(member),
                     until_date,
                 )
 
-        else:
-            logger.warning(
-                "{} administrator {}({}) invalid data {}", prefix, operator.id, manager.user_title(operator), data,
-            )
+            else:
+                logger.warning("{} admin {}({}) invalid data {}", prefix, operator.id, manager.user_title(operator), data)
 
     # user is chat member
     elif is_self:
         if data.endswith("__!"):
-            await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
             await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
 
             await accepted_member(chat, msg, operator)
@@ -286,9 +281,9 @@ def build_new_member_message(member: User, msg_timestamp):
     return content, types.InlineKeyboardMarkup(inline_keyboard=[buttons_user, buttons_admin])
 
 
-async def accepted_member(chat, msg: Message, member):
+async def accepted_member(chat, msg: Message, user: User):
     await chat.restrict(
-        member.id,
+        user.id,
         can_send_messages=True,
         can_send_media_messages=True,
         can_send_other_messages=True,
@@ -297,11 +292,11 @@ async def accepted_member(chat, msg: Message, member):
 
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
 
-    logger.info("{} member {}({}) is accepted", prefix, msg.message_id, member.id, manager.user_title(member))
+    logger.info("{} member {}({}) is accepted", prefix, msg.message_id, user.id, manager.user_title(user))
 
     resp = await msg.answer(
-        "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(member), "user_id": member.id},
+        "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(user), "user_id": user.id},
         parse_mode="markdown",
     )
     await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
-    await manager.lazy_session_delete(chat.id, member.id, "new_member_check")
+    await manager.lazy_session_delete(chat.id, user.id, "new_member_check")

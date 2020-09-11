@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
@@ -14,6 +14,7 @@ async def left_member(msg: Message, state: FSMContext):
     chat = msg.chat
     user = msg.from_user
     member = msg.left_chat_member
+    now = datetime.now()
 
     # chat checked
     if chat.type not in SUPPORT_GROUP_TYPES:
@@ -21,7 +22,7 @@ async def left_member(msg: Message, state: FSMContext):
 
     # ignore others remove member
     if manager.bot.id == user.id:
-        await manager.lazy_delete_message(chat.id, msg.message_id, msg.date + timedelta(seconds=5))
+        await manager.lazy_delete_message(chat.id, msg.message_id, now + timedelta(seconds=5))
 
     manager.logger.info(
         "chat {}({}) message {} member {}({}) is left",
