@@ -111,10 +111,11 @@ async def new_members(msg: types.Message, state: FSMContext):
         reply = await msg.reply(content, parse_mode="markdown", reply_markup=reply_markup)
 
         await manager.lazy_session(chat.id, msg.message_id, i.id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
-        await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER))
+        await manager.lazy_delete_message(chat.id, msg.message_id, now + timedelta(seconds=DELETED_AFTER + 2))
+        await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER + 2))
 
-    if not await manager.delete_message(chat.id, msg.message_id):
-        await manager.lazy_delete_message(chat.id, msg.message_id, now)
+    # if not await manager.delete_message(chat.id, msg.message_id):
+    #     await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
 
 @manager.register(
