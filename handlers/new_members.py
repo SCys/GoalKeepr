@@ -66,6 +66,9 @@ async def new_members(msg: types.Message, state: FSMContext):
         logger.info("{} administrator {} added members", prefix, msg.from_user.id)
         return
 
+    if not await manager.delete_message(chat.id, msg.message_id):
+        await manager.lazy_delete_message(chat.id, msg.message_id, now)
+
     for member in members:
         if member.is_bot:
             continue
@@ -111,8 +114,7 @@ async def new_members(msg: types.Message, state: FSMContext):
         reply = await msg.reply(content, parse_mode="markdown", reply_markup=reply_markup)
 
         await manager.lazy_session(chat.id, msg.message_id, i.id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
-        await manager.lazy_delete_message(chat.id, msg.message_id, now + timedelta(seconds=DELETED_AFTER + 5))
-        await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER + 5))
+        await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER))
 
 
 @manager.register(
