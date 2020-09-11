@@ -1,7 +1,8 @@
 import argparse
+from types import MemberDescriptorType
 from aiogram.types.chat import Chat
 from aiogram.types.message import Message
-from aiogram.utils.exceptions import MessageToDeleteNotFound
+from aiogram.utils.exceptions import BadRequest, MessageToDeleteNotFound
 import loguru
 import os.path
 import sys
@@ -118,10 +119,6 @@ class Manager:
 
         self.dp.stop_polling()
 
-    async def is_admin(self, chat: types.Chat, member: types.User):
-        admins = await self.bot.get_chat_administrators(chat.id)
-        return len([i for i in admins if i.is_chat_admin() and i.user.id == member.id]) > 0
-
     def user_title(self, user):
         if isinstance(user, types.ChatMember):
             user = user.user
@@ -130,6 +127,20 @@ class Manager:
             return f"{user.first_name or ''}{user.last_name or ''}"
 
         return " ".join([user.first_name, user.last_name])
+
+    async def is_admin(self, chat: types.Chat, member: types.User):
+        admins = await self.bot.get_chat_administrators(chat.id)
+        return len([i for i in admins if i.is_chat_admin() and i.user.id == member.id]) > 0
+
+    async def chat_member(self, chat: types.Chat, member_id: int):
+        try:
+            return await self.bot.get_chat_member(chat.id, member_id)
+
+        except BadRequest as e:
+            logger.error("chat {} member {} check error:{}", chat.id, member_id, str(e))
+
+        except Exception:
+            logger.exception("chat {} member {} check exception", chat.id, member_id)
 
     async def delete_message(self, chat: int, msg: int):
         """
