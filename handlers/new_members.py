@@ -4,8 +4,6 @@ import random
 from aiogram import types
 from aiogram.bot.bot import Bot
 from aiogram.dispatcher.storage import FSMContext
-from aiogram.types.inline_keyboard import InlineKeyboardMarkup
-from aiogram.utils.exceptions import MessageToDeleteNotFound
 
 from manager import manager
 
@@ -32,6 +30,14 @@ ICONS = {
     "加号": "➕",
     "减号": "➖",
     "除号": "➗",
+    "禁止": "🚫",
+    "美元": "💲",
+    "A": "🅰",
+    "B": "🅱",
+    "O": "🅾",
+    "彩虹旗": "🏳‍🌈",
+    "眼睛": "👁",
+    "脚印": "👣",
 }
 
 
@@ -39,7 +45,7 @@ def build_new_member_message(member, msg_timestamp):
     title = manager.user_title(member)
 
     # 用户组
-    items = random.sample(list(ICONS.items()), k=3)
+    items = random.sample(list(ICONS.items()), k=5)
     button_user_ok, _ = random.choice(items)
     buttons_user = [
         types.InlineKeyboardButton(
@@ -141,6 +147,8 @@ async def new_member_callback(query: types.CallbackQuery):
 
     # chooses = msg.reply_markup.inline_keyboard[0]
 
+    now = datetime.now()
+
     # operator is admin
     if is_admin and not is_self:
         # accept
@@ -166,8 +174,8 @@ async def new_member_callback(query: types.CallbackQuery):
         # reject
         elif data.endswith("__X"):
             # delete now
-            await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, msg.date)
-            await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
+            await manager.lazy_delete_message(chat.id, msg.reply_to_message.message_id, now)
+            await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
             # until_date = msg.date + timedelta(seconds=60)
             for i in members:
