@@ -294,9 +294,16 @@ async def accepted_member(chat, msg: Message, user: User):
 
     logger.info("{} member {}({}) is accepted", prefix, msg.message_id, user.id, manager.user_title(user))
 
-    resp = await msg.answer(
-        "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(user), "user_id": user.id},
-        parse_mode="markdown",
-    )
+    content = "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(user), "user_id": user.id}
+
+    try:
+        photos = await user.get_profile_photos(0, 1)
+        if photos.total_count == 0:
+            content += "\n\n请设置头像或显示头像，能够更好体现个性。"
+    except Exception:
+        logger.exception("get profile photos error")
+
+    resp = await msg.answer(content, parse_mode="markdown")
     await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
     await manager.lazy_session_delete(chat.id, user.id, "new_member_check")
+
