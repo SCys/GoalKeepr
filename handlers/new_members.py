@@ -1,13 +1,13 @@
 import asyncio
-from datetime import datetime, timedelta
 import random
+from datetime import datetime, timedelta
 
 from aiogram import types
 from aiogram.bot.bot import Bot
 from aiogram.dispatcher.storage import FSMContext
 from aiogram.types.message import Message
 from aiogram.types.user import User
-
+from aiogram.utils.exceptions import NotEnoughRightsToRestrict
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
@@ -66,23 +66,27 @@ async def new_members(msg: types.Message, state: FSMContext):
         logger.info("{} administrator {} added members", prefix, msg.from_user.id)
         return
 
-    if not await manager.delete_message(chat.id, msg.message_id):
-        await manager.lazy_delete_message(chat.id, msg.message_id, now)
-
     for member in members:
         if member.is_bot:
             continue
 
         logger.info("{} restrict new member:{}({})", prefix, member.id, manager.user_title(member))
 
-        # 收紧权限
-        await chat.restrict(
-            member.id,
-            can_send_messages=False,
-            can_send_media_messages=False,
-            can_send_other_messages=False,
-            can_add_web_page_previews=False,
-        )
+        try:
+            # 收紧权限
+            await chat.restrict(
+                member.id,
+                can_send_messages=False,
+                can_send_media_messages=False,
+                can_send_other_messages=False,
+                can_add_web_page_previews=False,
+            )
+        except NotEnoughRightsToRestrict:
+            logger.warning("{} no right to restrict the member {} rights", prefix, member.id, manager.user_title(member))
+            return
+
+    if not await manager.delete_message(chat.id, msg.message_id):
+        await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
     # 睡眠5秒，兼容其他Bot处理事情
     await asyncio.sleep(5)

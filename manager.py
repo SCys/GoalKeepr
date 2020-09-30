@@ -1,9 +1,4 @@
 import argparse
-from types import MemberDescriptorType
-from aiogram.types.chat import Chat
-from aiogram.types.message import Message
-from aiogram.utils.exceptions import BadRequest, MessageToDeleteNotFound, MessageCantBeDeleted
-import loguru
 import os.path
 import sys
 from configparser import ConfigParser
@@ -11,7 +6,9 @@ from datetime import datetime
 from functools import wraps
 from typing import Optional
 
+import loguru
 from aiogram import Bot, Dispatcher, executor, types
+from aiogram.utils.exceptions import BadRequest, MessageCantBeDeleted, MessageToDeleteNotFound
 
 import database
 
