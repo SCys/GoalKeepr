@@ -2,7 +2,7 @@ import argparse
 from types import MemberDescriptorType
 from aiogram.types.chat import Chat
 from aiogram.types.message import Message
-from aiogram.utils.exceptions import BadRequest, MessageToDeleteNotFound
+from aiogram.utils.exceptions import BadRequest, MessageToDeleteNotFound, MessageCantBeDeleted
 import loguru
 import os.path
 import sys
@@ -152,6 +152,8 @@ class Manager:
         try:
             await self.bot.delete_message(chat, msg)
             logger.info("chat {} message {} deleted", chat, msg)
+        except MessageCantBeDeleted:
+            logger.warning("chat {} message {} can not be deleted", chat, msg)
         except MessageToDeleteNotFound:
             logger.warning("chat {} message {} is deleted", chat, msg)
         except Exception:
