@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import handlers
+import handlers  # include handlers
 import handlers.commands
 
 from manager import manager
@@ -10,7 +10,7 @@ def main():
     manager.load_config()
 
     manager.setup()
-    
+
     manager.load_handlers()
 
     try:

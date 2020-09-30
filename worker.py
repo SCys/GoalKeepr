@@ -1,10 +1,9 @@
 import asyncio
 
-import aiogram.utils.exceptions
 from aiogram.bot.bot import Bot
 
 import database
-from handlers.new_members import new_member_check
+from handlers.new_members import new_member_check  # include the event
 from manager import manager
 
 is_running = False
