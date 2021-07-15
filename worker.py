@@ -3,7 +3,7 @@ import asyncio
 from aiogram.bot.bot import Bot
 
 import database
-from handlers.new_members import new_member_check  # include the event
+from handlers.new_members import new_member_check  # NOQA: 引入处理器
 from manager import manager
 
 is_running = False
@@ -29,17 +29,8 @@ create table if not exists lazy_sessions(
 )
 """
 
-SQL_FETCH_LAZY_DELETE_MESSAGES = """
-select id,chat,msg from lazy_delete_messages 
-where deleted_at < datetime('now','localtime') 
-order by deleted_at limit 500
-"""
-
-SQL_FETCH_SESSIONS = """
-select id,chat,msg,member,type from lazy_sessions 
-where checkout_at < datetime('now','localtime') 
-order by checkout_at limit 500
-"""
+SQL_FETCH_LAZY_DELETE_MESSAGES = "select id,chat,msg from lazy_delete_messages where deleted_at < datetime('now','localtime') order by deleted_at limit 500"
+SQL_FETCH_SESSIONS = "select id,chat,msg,member,type from lazy_sessions where checkout_at < datetime('now','localtime') order by checkout_at limit 500"
 
 logger = manager.logger
 logger.level = "DEBUG"

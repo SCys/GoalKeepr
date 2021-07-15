@@ -1,8 +1,6 @@
 #!/usr/bin/python3
 
-import handlers  # include handlers
-import handlers.commands
-
+from handlers import *
 from manager import manager
 
 
