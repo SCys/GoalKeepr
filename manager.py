@@ -66,7 +66,7 @@ class Manager:
             if callable(method):
                 method(*args, **kwargs)(func)
 
-                logger.info("dispatcher:{}({},{})({})", method.__name__, args, kwargs, func)
+                logger.info(f"dispatcher:{method.__name__}({args},{kwargs})({func})")
 
     def register(self, type, *router_args, **router_kwargs):
         """
@@ -146,7 +146,7 @@ class Manager:
         """
         try:
             await self.bot.delete_message(chat, msg)
-            logger.info("chat {} message {} deleted", chat, msg)
+            logger.info(f"chat {chat} message {msg} deleted")
         except MessageCantBeDeleted:
             logger.warning(f"chat {chat} message {msg} can not be deleted")
         except MessageToDeleteNotFound:

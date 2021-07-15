@@ -29,7 +29,9 @@ create table if not exists lazy_sessions(
 )
 """
 
-SQL_FETCH_LAZY_DELETE_MESSAGES = "select id,chat,msg from lazy_delete_messages where deleted_at < datetime('now','localtime') order by deleted_at limit 500"
+SQL_FETCH_LAZY_DELETE_MESSAGES = (
+    "select id,chat,msg from lazy_delete_messages where deleted_at < datetime('now','localtime') order by deleted_at limit 500"
+)
 SQL_FETCH_SESSIONS = "select id,chat,msg,member,type from lazy_sessions where checkout_at < datetime('now','localtime') order by checkout_at limit 500"
 
 logger = manager.logger
@@ -76,7 +78,7 @@ async def lazy_sessions(bot: Bot):
                 await func(bot, chat, msg, member)
 
             await conn.execute("delete from lazy_sessions where id=$1", (id,))
-            logger.info("[worker]lazy session is touched:{} {}", id, session_type)
+            logger.info(f"lazy session is touched:{id} {session_type}")
 
         await conn.commit()
 
@@ -96,7 +98,7 @@ async def main():
         await conn.execute("delete from lazy_sessions where checkout_at < datetime('now','-60 seconds')")
 
     for name, func in manager.events.items():
-        logger.info("[worker]event:{} => {}", name, func)
+        logger.info(f"event:{name} => {func}")
 
     is_running = True
     while is_running:

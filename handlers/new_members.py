@@ -54,7 +54,7 @@ async def new_members(msg: types.Message, state: FSMContext):
     # 忽略太久之前的信息
     now = datetime.now()
     if now > msg.date + timedelta(seconds=60):
-        logger.warning("{} date is ignored:{} > {}", prefix, now, msg.date + timedelta(seconds=60))
+        logger.warning(f"{prefix} date is ignored:{now} > {msg.date + timedelta(seconds=60)}")
         return
     now = msg.date
 
@@ -63,14 +63,14 @@ async def new_members(msg: types.Message, state: FSMContext):
 
     # ignore from administrator
     if msg.from_user and await manager.is_admin(chat, msg.from_user):
-        logger.info("{} administrator {} added members", prefix, msg.from_user.id)
+        logger.info(f"{prefix} administrator {msg.from_user.id} added members")
         return
 
     for member in members:
         if member.is_bot:
             continue
 
-        logger.info("{} restrict new member:{}({})", prefix, member.id, manager.user_title(member))
+        logger.info(f"{prefix} restrict new member:{member.id}({manager.user_title(member)})")
 
         try:
             # 收紧权限
@@ -82,7 +82,7 @@ async def new_members(msg: types.Message, state: FSMContext):
                 can_add_web_page_previews=False,
             )
         except NotEnoughRightsToRestrict:
-            logger.warning("{} no right to restrict the member {} rights", prefix, member.id, manager.user_title(member))
+            logger.warning(f"{prefix} no right to restrict the member {member.id}({manager.user_title(member)}) rights")
             return
 
     if not await manager.delete_message(chat.id, msg.message_id):
@@ -90,7 +90,7 @@ async def new_members(msg: types.Message, state: FSMContext):
 
     # 睡眠5秒，兼容其他Bot处理事情
     await asyncio.sleep(5)
-    # logger.debug("{} new member event wait 5s", prefix)
+    # logger.debug(f"{prefix} new member event wait 5s")
 
     now = datetime.now()
 
@@ -102,15 +102,15 @@ async def new_members(msg: types.Message, state: FSMContext):
         # 如果已经被剔除，则不做处理
         member = await manager.chat_member(chat, i.id)
         if not member.is_member:
-            logger.info("{} new member {}({}) is kicked", prefix, i.id, manager.user_title(i))
+            logger.info(f"{prefix} new member {i.id}({manager.user_title(i)}) is kicked")
             continue
 
         if member.is_chat_admin():
-            logger.info("{} new member {}({}) is admin", prefix, i, manager.user_title(i))
+            logger.info(f"{prefix} new member {i}({manager.user_title(i)}) is admin")
             continue
 
         if member.can_send_messages:
-            logger.info("{} new member {}({}) rights is accepted", prefix, i, manager.user_title(i))
+            logger.info(f"{prefix} new member {i}({manager.user_title(i)}) rights is accepted")
             continue
 
         content, reply_markup = build_new_member_message(i, now)
@@ -155,7 +155,7 @@ async def new_member_callback(query: types.CallbackQuery):
     is_self = data.startswith(f"{operator.id}__")
 
     if not any([is_admin, is_self]):
-        logger.warning("{} invalid status", prefix)
+        logger.warning(f"{prefix} invalid status", prefix)
         await query.answer(show_alert=False)
         return
 
@@ -165,7 +165,7 @@ async def new_member_callback(query: types.CallbackQuery):
     if is_admin and not is_self:
         items = data.split("__")
         if len(items) != 3:
-            logger.warning("{} admin {}({}) invalid data {}", prefix, operator.id, manager.user_title(operator), data)
+            logger.warning(f"{prefix} admin {operator.id}({manager.user_title(operator)}) invalid data {data}")
         else:
             member_id, _, op = items
             member = await manager.chat_member(chat, member_id)
@@ -178,12 +178,7 @@ async def new_member_callback(query: types.CallbackQuery):
                 await accepted_member(chat, msg, member.user)
 
                 logger.info(
-                    "{} admin {}({}) accept new member {}({})",
-                    prefix,
-                    operator.id,
-                    manager.user_title(operator),
-                    member_id,
-                    manager.user_title(member),
+                    f"{prefix} admin {operator.id}({manager.user_title(operator)}) accept new member {member_id}({manager.user_title(member)})",
                 )
 
             # reject
@@ -196,17 +191,11 @@ async def new_member_callback(query: types.CallbackQuery):
                 # await chat.unban(member_id)
 
                 logger.warning(
-                    "{} admin {}({}) kick member {}, until {}",
-                    prefix,
-                    operator.id,
-                    manager.user_title(operator),
-                    member_id,
-                    manager.user_title(member),
-                    until_date,
+                    f"{prefix} admin {operator.id}({manager.user_title(operator)}) kick member {member_id}({manager.user_title(member)}), until {until_date}",
                 )
 
             else:
-                logger.warning("{} admin {}({}) invalid data {}", prefix, operator.id, manager.user_title(operator), data)
+                logger.warning(f"{prefix} admin {operator.id}({manager.user_title(operator)}) invalid data {data}")
 
     # user is chat member
     elif is_self:
@@ -215,7 +204,7 @@ async def new_member_callback(query: types.CallbackQuery):
 
             await accepted_member(chat, msg, operator)
 
-            logger.info("{} user {}({}) click ok button", prefix, operator.id, manager.user_title(operator))
+            logger.info(f"{prefix} user {operator.id}({manager.user_title(operator)}) click ok button")
 
         elif data.endswith("__?"):
             content, reply_markup = build_new_member_message(operator, msg.date)
@@ -223,10 +212,10 @@ async def new_member_callback(query: types.CallbackQuery):
             await msg.edit_text(content, parse_mode="markdown")
             await msg.edit_reply_markup(reply_markup=reply_markup)
 
-            logger.info("{} user {}({}) click error button, reload", prefix, operator.id, manager.user_title(operator))
+            logger.info(f"{prefix} user {operator.id}({manager.user_title(operator)}) click error button, reload")
 
         else:
-            logger.warning("{} member {}({}) invalid data {}", prefix, operator.id, manager.user_title(operator), data)
+            logger.warning(f"{prefix} member {operator.id}({manager.user_title(operator)}) invalid data {data}")
 
     await query.answer(show_alert=False)
 
@@ -239,21 +228,21 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
     prefix = f"chat {chat_id}({chat.title}) msg {message_id}"
 
     if member.is_chat_admin():
-        logger.info("{} member {}({}) is admin", prefix, member_id, manager.user_title(member))
+        logger.info(f"{prefix} member {member_id}({manager.user_title(member_id)}) is admin")
         return
 
     if not member.is_chat_member():
-        logger.warning("{} member {}({}) is kicked", prefix, member_id, manager.user_title(member))
+        logger.warning(f"{prefix} member {member_id}({manager.user_title(member_id)}) is kicked")
         return
 
     # FIXME 某些情况下可能会出现问题，比如获取不到权限
     if member.can_send_messages:
-        logger.info("{} member {}({}) is accepted", prefix, member_id, manager.user_title(member))
+        logger.info(f"{prefix} member {member_id}({manager.user_title(member_id)}) is accepted")
         return
 
     await bot.kick_chat_member(chat_id, member_id, until_date=45)  # baned 45s
     await bot.unban_chat_member(chat_id, member_id)
-    logger.info("{} member {}({}) is kicked by timeout", prefix, member_id, manager.user_title(member))
+    logger.info(f"{prefix} member {member_id}({manager.user_title(member_id)}) is kicked by timeout")
 
 
 def build_new_member_message(member: User, msg_timestamp):
@@ -296,7 +285,7 @@ async def accepted_member(chat, msg: Message, user: User):
 
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
 
-    logger.info("{} member {}({}) is accepted", prefix, msg.message_id, user.id, manager.user_title(user))
+    logger.info(f"{prefix} member {user.id}({manager.user_title(user)}) is accepted")
 
     content = "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(user), "user_id": user.id}
 
@@ -310,4 +299,3 @@ async def accepted_member(chat, msg: Message, user: User):
     resp = await msg.answer(content, parse_mode="markdown")
     await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
     await manager.lazy_session_delete(chat.id, user.id, "new_member_check")
-

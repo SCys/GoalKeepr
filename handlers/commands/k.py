@@ -1,3 +1,4 @@
+from configparser import MAX_INTERPOLATION_DEPTH
 from datetime import timedelta
 
 from aiogram import types
@@ -46,6 +47,9 @@ async def k(msg: types.Message, state: FSMContext):
 
 
 async def kick_member(chat: types.Chat, msg, administrator, member: types.User):
+    """
+    从 chat 踢掉对应的成员
+    """
     # FIXME check member permission
     # if member and await manager.is_admin(chat, member.id):
     #     print("member is administrator:", chat.id, administrator.id, member.id)
@@ -56,9 +60,7 @@ async def kick_member(chat: types.Chat, msg, administrator, member: types.User):
     await chat.kick(id, until_date=45)  # baned 45s
     await chat.unban(id)
 
-    logger.info(
-        "chat {}({}) msg {} member {}({}) is kicked", chat.id, chat.title, msg.message_id, id, manager.user_title(member)
-    )
+    logger.info(f"chat {chat.id}({chat.title}) msg {msg.message_id} member {id}({manager.user_title(member)}) is kicked")
 
     return await msg.answer(
         "用户 **%(title)s** 已经由 **%(administrator)s** 剔除，%(deleted_after)d 秒自毁。"
@@ -71,4 +73,3 @@ async def kick_member(chat: types.Chat, msg, administrator, member: types.User):
         disable_web_page_preview=True,
         disable_notification=True,
     )
-
