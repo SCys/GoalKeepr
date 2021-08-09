@@ -228,21 +228,21 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
     prefix = f"chat {chat_id}({chat.title}) msg {message_id}"
 
     if member.is_chat_admin():
-        logger.info(f"{prefix} member {member_id}({manager.user_title(member_id)}) is admin")
+        logger.info(f"{prefix} member {member_id} is admin")
         return
 
     if not member.is_chat_member():
-        logger.warning(f"{prefix} member {member_id}({manager.user_title(member_id)}) is kicked")
+        logger.warning(f"{prefix} member {member_id} is kicked")
         return
 
     # FIXME 某些情况下可能会出现问题，比如获取不到权限
     if member.can_send_messages:
-        logger.info(f"{prefix} member {member_id}({manager.user_title(member_id)}) is accepted")
+        logger.info(f"{prefix} member {member_id} is accepted")
         return
 
     await bot.kick_chat_member(chat_id, member_id, until_date=45)  # baned 45s
     await bot.unban_chat_member(chat_id, member_id)
-    logger.info(f"{prefix} member {member_id}({manager.user_title(member_id)}) is kicked by timeout")
+    logger.info(f"{prefix} member {member_id} is kicked by timeout")
 
 
 def build_new_member_message(member: User, msg_timestamp):
