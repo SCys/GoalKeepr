@@ -1,4 +1,4 @@
-FROM python:3-slim-buster AS build
+FROM python:3.9-slim-buster AS build
 RUN python3 -m venv --copies /venv && /venv/bin/pip install --upgrade pip
 
 FROM build AS build-venv

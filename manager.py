@@ -97,10 +97,10 @@ class Manager:
             self.events[type] = func
 
             @wraps(func)
-            async def wrappered(*args, **kwargs):
+            async def warpper(*args, **kwargs):
                 return func(*args, **kwargs)
 
-            return wrappered
+            return warpper
 
         return wrapper
 
