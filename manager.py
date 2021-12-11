@@ -54,7 +54,7 @@ class Manager:
             logger.error("telegram token is missing")
             sys.exit(1)
 
-        self.bot = Bot(token=token, proxy="http://10.1.2.11:3002")
+        self.bot = Bot(token=token)
         logger.info("bot is setup")
 
         self.dp = Dispatcher(self.bot)
