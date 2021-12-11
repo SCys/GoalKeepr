@@ -54,7 +54,7 @@ class Manager:
             logger.error("telegram token is missing")
             sys.exit(1)
 
-        self.bot = Bot(token=token)
+        self.bot = Bot(token=token, proxy="http://10.1.2.11:3002")
         logger.info("bot is setup")
 
         self.dp = Dispatcher(self.bot)
@@ -64,7 +64,10 @@ class Manager:
         for func, type, args, kwargs in self.handlers:
             method = getattr(self.dp, f"{type}_handler")
             if callable(method):
-                method(*args, **kwargs)(func)
+                if not args or len(args) == 0:
+                    method(**kwargs)(func)
+                else:
+                    method(*args, **kwargs)(func)
 
                 logger.info(f"dispatcher:{method.__name__}({args},{kwargs})({func})")
 
@@ -77,10 +80,10 @@ class Manager:
             self.handlers.append((func, type, router_args, router_kwargs))
 
             @wraps(func)
-            async def wrappered(*args, **kwargs):
+            async def warpper(*args, **kwargs):
                 return func(*args, **kwargs)
 
-            return wrappered
+            return warpper
 
         return wrapper
 
