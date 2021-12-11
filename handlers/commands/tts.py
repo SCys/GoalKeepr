@@ -1,4 +1,4 @@
-import asyncio.exceptions
+# import asyncio.exceptions
 import io
 from datetime import datetime
 
@@ -74,12 +74,12 @@ async def tts(msg: types.Message, state: FSMContext):
                         logger.info(f"unknown message type: {i.type}")
 
                 await ws.close()
-    except asyncio.exceptions.TimeoutError:
-        await msg.answer("tts server timeout")
-        logger.warning("tts server timeout")
-        return
-    except Exception:
-        logger.exception("remote error")
+    # except asyncio.exceptions.TimeoutError:
+    #     await msg.answer("tts server timeout")
+    #     logger.warning("tts server timeout")
+    #     return
+    except Exception as e:
+        logger.error(f"tts error: {e}")
         return
 
     if not data:
