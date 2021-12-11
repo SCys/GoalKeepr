@@ -64,11 +64,7 @@ class Manager:
         for func, type, args, kwargs in self.handlers:
             method = getattr(self.dp, f"{type}_handler")
             if callable(method):
-                if not args or len(args) == 0:
-                    method(**kwargs)(func)
-                else:
-                    method(*args, **kwargs)(func)
-
+                method(*args, **kwargs)(func)
                 logger.info(f"dispatcher:{method.__name__}({args},{kwargs})({func})")
 
     def register(self, type, *router_args, **router_kwargs):
