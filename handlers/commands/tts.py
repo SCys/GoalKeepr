@@ -22,7 +22,12 @@ CMD_1 = 'Content-Type:application/json; charset=utf-8\r\n\r\nPath:speech.config\
 async def tts(msg: types.Message, state: FSMContext):
     chat = msg.chat
     if chat.type not in ["private"]:
-        logger.debug("chat type is not private")
+        logger.warning("chat type is not private")
+        return
+
+    user = msg.from_user
+    if not user:
+        logger.warning(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) user is not found")
         return
 
     txt = msg.text
@@ -34,10 +39,10 @@ async def tts(msg: types.Message, state: FSMContext):
     txt = txt.strip()
 
     if not txt:
-        logger.debug("no text in message")
+        logger.warning(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) send empty text")
         return
 
-    logger.info(f"start tts message {len(txt)}")
+    logger.info(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) message {len(txt)}")
 
     cost = datetime.now()
     data = b""
@@ -79,11 +84,11 @@ async def tts(msg: types.Message, state: FSMContext):
     #     logger.warning("tts server timeout")
     #     return
     except Exception as e:
-        logger.error(f"tts error: {e}")
+        logger.error(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) error {e}")
         return
 
     if not data:
-        logger.info("no audio data")
+        logger.error(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) no data")
         return
 
     output = io.BytesIO()
@@ -94,4 +99,6 @@ async def tts(msg: types.Message, state: FSMContext):
         await msg.reply_to_message.reply_voice(output, disable_notification=True)
     else:
         await msg.reply_voice(output, disable_notification=True)
-    logger.info(f"tts message size {len(txt)} cost {(datetime.now() - cost).total_seconds()}s")
+    logger.info(
+        f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) cost {(datetime.now() - cost).total_seconds()}"
+    )
