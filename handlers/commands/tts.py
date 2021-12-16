@@ -11,8 +11,7 @@ from manager import manager
 
 logger = manager.logger
 
-TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
-URL_WS = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=" + TOKEN
+URL_WS = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken="
 URL_ENGINES = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=" + TOKEN
 
 CMD_1 = 'Content-Type:application/json; charset=utf-8\r\n\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"true"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n'
@@ -23,6 +22,10 @@ async def tts(msg: types.Message, state: FSMContext):
     chat = msg.chat
     if chat.type not in ["private"]:
         logger.warning("chat type is not private")
+        return
+
+    if not manager.config["tts"]["token"]:
+        logger.warning("tts token is missing")
         return
 
     user = msg.from_user
@@ -50,7 +53,7 @@ async def tts(msg: types.Message, state: FSMContext):
     try:
         timeout = aiohttp.ClientTimeout(total=60)
         async with ClientSession(timeout=timeout) as session:
-            async with session.ws_connect(URL_WS) as ws:
+            async with session.ws_connect(URL_WS + manager.config["tts"]["token"]) as ws:
                 # send command
                 await ws.send_str(CMD_1)
                 await ws.send_str(
