@@ -17,7 +17,7 @@ SUPPORT_GROUP_TYPES = ["supergroup", "group", "private"]
 
 # URL_ENGINES = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken="
 
-RE_CLEAR = re.compile(r"/tts@[a-zA-Z0-9]+\s?")
+RE_CLEAR = re.compile(r"/tts(@[a-zA-Z0-9]+\s?)?")
 URL_WS = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken="
 CMD_PREPARE = 'Content-Type:application/json; charset=utf-8\r\n\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"true"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n'
 
