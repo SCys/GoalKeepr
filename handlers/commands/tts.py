@@ -1,5 +1,6 @@
 # import asyncio.exceptions
 import io
+import re
 from datetime import datetime
 
 from pydub import AudioSegment
@@ -11,19 +12,26 @@ from manager import manager
 
 logger = manager.logger
 
-# TOKEN = __TOKEN__
-# URL_WS = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=" + TOKEN
-# URL_ENGINES = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=" + TOKEN
 
-CMD_1 = 'Content-Type:application/json; charset=utf-8\r\n\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"true"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n'
+SUPPORT_GROUP_TYPES = ["supergroup", "group", "private"]
+
+# URL_ENGINES = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken="
+
+RE_CLEAR = re.compile(r"/tts(@[a-zA-Z0-9]+\s?)?")
+URL_WS = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken="
+CMD_PREPARE = 'Content-Type:application/json; charset=utf-8\r\n\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"true"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n'
 
 
 @manager.register("message", commands=["tts"])
 async def tts(msg: types.Message, state: FSMContext):
     chat = msg.chat
-    # if chat.type not in ["private"]:
-    #     logger.warning("chat type is not private")
-    #     return
+    if chat.type not in SUPPORT_GROUP_TYPES:
+        logger.warning("chat type is not support")
+        return
+
+    if not manager.config["tts"]["token"]:
+        logger.warning("tts token is missing")
+        return
 
     user = msg.from_user
     if not user:
@@ -33,8 +41,9 @@ async def tts(msg: types.Message, state: FSMContext):
     txt = msg.text
     if msg.reply_to_message:
         txt = msg.reply_to_message.text
-    else:
-        txt = txt.replace("/tts", "", 1)
+
+    if txt.startswith("/tts"):
+        txt = RE_CLEAR.sub("", txt, 1)
 
     txt = txt.strip()
 
@@ -49,12 +58,11 @@ async def tts(msg: types.Message, state: FSMContext):
 
     try:
         timeout = aiohttp.ClientTimeout(total=60)
-        url_ws = f"wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken={manager.config['tts']['token']}"
 
         async with ClientSession(timeout=timeout) as session:
-            async with session.ws_connect(url_ws) as ws:
+            async with session.ws_connect(URL_WS + manager.config["tts"]["token"]) as ws:
                 # send command
-                await ws.send_str(CMD_1)
+                await ws.send_str(CMD_PREPARE)
                 await ws.send_str(
                     "X-RequestId:fe83fbefb15c7739fe674d9f3e81d38f\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><voice  name='"
                     "Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)'><prosody pitch='+0Hz' rate ='+0%' volume='+0%'>"

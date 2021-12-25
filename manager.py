@@ -30,7 +30,11 @@ class Manager:
     def load_config(self):
         config = self.config
 
-        for key, section in {"default": {"debug": False}, "telegram": {"token": ""}}.items():
+        for key, section in {
+            "default": {"debug": False},
+            "telegram": {"token": ""},  # telegram robot token
+            "tts": {"token": ""},  # TTS command token
+        }.items():
             config.setdefault(key, section)
 
         # load file
