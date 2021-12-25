@@ -21,9 +21,9 @@ CMD_1 = 'Content-Type:application/json; charset=utf-8\r\n\r\nPath:speech.config\
 @manager.register("message", commands=["tts"])
 async def tts(msg: types.Message, state: FSMContext):
     chat = msg.chat
-    if chat.type not in ["private"]:
-        logger.warning("chat type is not private")
-        return
+    # if chat.type not in ["private"]:
+    #     logger.warning("chat type is not private")
+    #     return
 
     user = msg.from_user
     if not user:
