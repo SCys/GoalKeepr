@@ -42,13 +42,13 @@ class Manager:
                 pass
 
         # load cmd arguments
-        parser = argparse.ArgumentParser(description="goalkeepr arguments:")
+        parser = argparse.ArgumentParser(description="arguments:")
         parser.add_argument("--token", dest="token", help="telegram bot token", type=str)
         args = parser.parse_args()
         if args.token:
             config["telegram"]["token"] = args.token
 
-    def setup(self, ignoreHandlers=False):
+    def setup(self):
         token = manager.config["telegram"]["token"]
         if not token:
             logger.error("telegram token is missing")
