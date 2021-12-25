@@ -11,7 +11,7 @@ from manager import manager
 
 logger = manager.logger
 
-# TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
+# TOKEN = __TOKEN__
 # URL_WS = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=" + TOKEN
 # URL_ENGINES = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=" + TOKEN
 
