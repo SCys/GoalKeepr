@@ -11,9 +11,9 @@ from manager import manager
 
 logger = manager.logger
 
-TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
-URL_WS = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=" + TOKEN
-URL_ENGINES = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=" + TOKEN
+# TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4"
+# URL_WS = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=" + TOKEN
+# URL_ENGINES = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=" + TOKEN
 
 CMD_1 = 'Content-Type:application/json; charset=utf-8\r\n\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"true"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n'
 
@@ -49,8 +49,10 @@ async def tts(msg: types.Message, state: FSMContext):
 
     try:
         timeout = aiohttp.ClientTimeout(total=60)
+        url_ws = f"wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken={manager.config['tts']['token']}"
+
         async with ClientSession(timeout=timeout) as session:
-            async with session.ws_connect(URL_WS) as ws:
+            async with session.ws_connect(url_ws) as ws:
                 # send command
                 await ws.send_str(CMD_1)
                 await ws.send_str(
@@ -79,12 +81,8 @@ async def tts(msg: types.Message, state: FSMContext):
                         logger.info(f"unknown message type: {i.type}")
 
                 await ws.close()
-    # except asyncio.exceptions.TimeoutError:
-    #     await msg.answer("tts server timeout")
-    #     logger.warning("tts server timeout")
-    #     return
     except Exception as e:
-        logger.error(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) error {e}")
+        logger.exception(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) error")
         return
 
     if not data:
