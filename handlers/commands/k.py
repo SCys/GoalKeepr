@@ -58,7 +58,11 @@ async def kick_member(chat: types.Chat, msg: types.Message, administrator, membe
 
     id = member.id
 
-    await chat.kick(id, until_date=45)  # baned 45s
+    # baned 45s
+    if not await chat.kick(id, until_date=45):
+        logger.warning(f"chat {chat.id}({chat.title}) msg {msg.message_id} user {administrator.id}({administrator.first_name}) failed to kick {id}")
+        return
+
     await chat.unban(id)
 
     logger.info(f"chat {chat.id}({chat.title}) msg {msg.message_id} member {id}({manager.user_title(member)}) is kicked")
