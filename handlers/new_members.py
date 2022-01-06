@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from aiogram import types
 from aiogram.bot.bot import Bot
 from aiogram.dispatcher.storage import FSMContext
+from aiogram.types.chat import Chat
 from aiogram.types.message import Message
 from aiogram.types.user import User
 from aiogram.utils.exceptions import NotEnoughRightsToRestrict
@@ -44,8 +45,12 @@ ICONS = {
     "汽车": "🚗",
     "飞机": "✈️",
     "火箭": "🚀",
-    "轮船": "⛵️",
+    "帆船": "⛵️",
     "警察": "👮",
+    "信": "✉",
+    "1/2": "½",
+    "雪花": "❄",
+    "眼镜": "👓",
 }
 
 
@@ -93,8 +98,8 @@ async def new_members(msg: types.Message, state: FSMContext):
     if not await manager.delete_message(chat.id, msg.message_id):
         await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
-    # 睡眠5秒，兼容其他Bot处理事情
-    await asyncio.sleep(5)
+    # 睡眠3秒，兼容其他Bot处理事情
+    await asyncio.sleep(3)
     # logger.debug(f"{prefix} new member event wait 5s")
 
     now = datetime.now()
@@ -279,7 +284,7 @@ def build_new_member_message(member: User, msg_timestamp):
     return content, types.InlineKeyboardMarkup(inline_keyboard=[buttons_user, buttons_admin])
 
 
-async def accepted_member(chat, msg: Message, user: User):
+async def accepted_member(chat: Chat, msg: Message, user: User):
     await chat.restrict(
         user.id,
         can_send_messages=True,
