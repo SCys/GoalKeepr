@@ -1,6 +1,7 @@
 aiogram
+aiohttp
 aiosqlite
 loguru
 orjson
-tencentcloud-sdk-python
 pydub
+tencentcloud-sdk-python
