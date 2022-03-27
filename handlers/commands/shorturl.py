@@ -18,6 +18,7 @@ logger = manager.logger
 
 @manager.register("message", commands=["shorturl"])
 async def shorturl(msg: types.Message, state: FSMContext):
+    user = msg.from_user
     content = msg.text
     if msg.reply_to_message:
         content = msg.reply_to_message.text
@@ -28,11 +29,12 @@ async def shorturl(msg: types.Message, state: FSMContext):
         await manager.lazy_delete_message(msg.chat.id, msg_reply.message_id, msg.date + timedelta(seconds=5))
         return
 
-    for item in matched:
-        url_shorted = shorturl(item.group(0))
+    for i in matched.groups():
+        url_shorted = shorturl(i)
         if url_shorted is None:
             continue
 
+        logger.info(f"user {user.id} shorturl {i} to {url_shorted}")
         await msg.reply(url_shorted, disable_web_page_preview=True, disable_notification=True)
 
 
