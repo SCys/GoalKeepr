@@ -71,7 +71,7 @@ async def asr(msg: types.Message, state: FSMContext):
             return
 
         logger.info(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) asr ok")
-        await target.reply(result)
+        await target.reply("识别结果：\n" + result)
         return
     except Exception as e:
         logger.exception(f"audio convert error")
@@ -144,11 +144,10 @@ async def tx_asr_result(task_id: str) -> str:
             status = data["StatusStr"]
 
             if status == "success":
-                # detail = data["ResultDetail"]
                 result = data["Result"]
                 duration = data["AudioDuration"]
 
-                logger.info(f"tencent cloud sdk asr is done: {task_id} {result} {duration}")
+                logger.info(f"tencent cloud sdk asr is done: {task_id} {duration}")
                 return result.strip()
             elif status == "failed":
                 logger.error(f'task status failed: {data["ErrorMsg"]}')
