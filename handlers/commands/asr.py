@@ -41,7 +41,7 @@ async def asr(msg: types.Message, state: FSMContext):
     target = msg
     if msg.reply_to_message:
         target = msg.reply_to_message
-        await manager.lazy_delete_message(chat.id, target.message_id, msg.date + timedelta(seconds=16))
+        await manager.lazy_delete_message(chat.id, msg.message_id, msg.date + timedelta(seconds=16))
 
     voice = target.voice
     if not voice:
