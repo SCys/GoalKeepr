@@ -38,9 +38,12 @@ async def asr(msg: types.Message, state: FSMContext):
         )
         return
 
-    voice = msg.voice
+    target = msg
     if msg.reply_to_message:
-        voice = msg.reply_to_message.voice
+        target = msg.reply_to_message
+        await manager.lazy_delete_message(chat.id, target.message_id, msg.date + timedelta(seconds=16))
+
+    voice = target.voice
     if not voice:
         return
 
@@ -69,7 +72,7 @@ async def asr(msg: types.Message, state: FSMContext):
             return
 
         logger.info(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) asr ok")
-        await msg.reply("识别结果：\n" + result)
+        await target.reply("识别结果：\n" + result)
         return
     except Exception as e:
         logger.exception(f"audio convert error")
