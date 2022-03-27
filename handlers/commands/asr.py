@@ -146,15 +146,15 @@ async def tx_asr_result(task_id: str) -> str:
             if status == "success":
                 # detail = data["ResultDetail"]
                 result = data["Result"]
-                # duration = data["AudioDuration"]
+                duration = data["AudioDuration"]
 
-                logger.info(f"tencent cloud sdk asr is done: {task_id} {result}")
+                logger.info(f"tencent cloud sdk asr is done: {task_id} {result} {duration}")
                 return result.strip()
             elif status == "failed":
                 logger.error(f'task status failed: {data["ErrorMsg"]}')
             else:
                 logger.warning(f"task status is {status}")
-                await asyncio.sleep(3)
+                await asyncio.sleep(5)
                 continue
 
         except TencentCloudSDKException as err:
