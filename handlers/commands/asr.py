@@ -1,7 +1,6 @@
 import base64
-from datetime import timedelta
 import io
-from typing import BinaryIO
+from datetime import timedelta
 
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
@@ -25,30 +24,25 @@ SUPPORT_GROUP_TYPES = ["supergroup", "group", "private"]
 async def asr(msg: types.Message, state: FSMContext):
     config = manager.config
 
-    users = [int(i) for i in config["asr"]["users"].split(",")]
-
     chat = msg.chat
-    if chat.type not in SUPPORT_GROUP_TYPES:
-        logger.warning("chat type is not support")
-        return
 
     if not manager.config["tts"]["token"]:
         logger.warning("tts token is missing")
         return
 
     user = msg.from_user
-    if not user or user.id not in users:
+    users = [int(i) for i in config["asr"]["users"].split(",")]
+    if user and user and user.id not in users:
         logger.warning(
             f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) user is not permission, users {users}"
         )
         return
 
+    target = msg
     if msg.reply_to_message:
-        msg_target = msg.reply_to_message
-    else:
-        msg_target = msg
+        target = msg.reply_to_message
 
-    voice = msg_target.voice
+    voice = target.voice
     if not voice:
         return
 
@@ -77,7 +71,7 @@ async def asr(msg: types.Message, state: FSMContext):
             return
 
         logger.info(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) asr ok")
-        await msg_target.reply(result)
+        await target.reply(result)
         return
     except Exception as e:
         logger.exception(f"audio convert error")
