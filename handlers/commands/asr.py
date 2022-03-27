@@ -154,6 +154,7 @@ async def tx_asr_result(task_id: str) -> str:
                 logger.error(f'task status failed: {data["ErrorMsg"]}')
             else:
                 logger.warning(f"task status is {status}")
+                await asyncio.sleep(3)
                 continue
 
         except TencentCloudSDKException as err:
