@@ -38,11 +38,9 @@ async def asr(msg: types.Message, state: FSMContext):
         )
         return
 
-    target = msg
+    voice = msg.voice
     if msg.reply_to_message:
-        target = msg.reply_to_message
-
-    voice = target.voice
+        voice = msg.reply_to_message.voice
     if not voice:
         return
 
@@ -71,7 +69,7 @@ async def asr(msg: types.Message, state: FSMContext):
             return
 
         logger.info(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) asr ok")
-        await target.reply("识别结果：\n" + result)
+        await msg.reply("识别结果：\n" + result)
         return
     except Exception as e:
         logger.exception(f"audio convert error")
