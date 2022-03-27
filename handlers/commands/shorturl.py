@@ -30,7 +30,7 @@ async def shorturl(msg: types.Message, state: FSMContext):
         return
 
     for i in matched.groups():
-        url_shorted = shorturl(i)
+        url_shorted = await shorturl(i)
         if url_shorted is None:
             continue
 
