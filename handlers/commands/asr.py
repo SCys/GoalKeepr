@@ -152,6 +152,10 @@ async def tx_asr_result(task_id: str) -> str:
                 return result.strip()
             elif status == "failed":
                 logger.error(f'task status failed: {data["ErrorMsg"]}')
+            elif status in ["doing", "wait"]:
+                logger.debug(f"task status is {status}")
+                await asyncio.sleep(7)
+                continue
             else:
                 logger.warning(f"task status is {status}")
                 await asyncio.sleep(5)
