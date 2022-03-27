@@ -33,9 +33,9 @@ jobs:
       - name: restart service
         uses: appleboy/ssh-action@master
         with:
-          host:     ${{ secrets.DEPLOY_HOST }}
+          host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
-          KEY:      ${{ secrets.DEPLOY_KEY }}
+          KEY: ${{ secrets.DEPLOY_KEY }}
           script: |
-            systemdctrl --user restart goalkeepr_worker
-            systemdctrl --user restart goalkeepr
+            systemctrl --user restart goalkeepr_worker
+            systemctrl --user restart goalkeepr
