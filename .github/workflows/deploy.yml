@@ -37,5 +37,5 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           KEY: ${{ secrets.DEPLOY_KEY }}
           script: |
-            systemctrl --user restart goalkeepr_worker
-            systemctrl --user restart goalkeepr
+            systemctl --user restart goalkeepr_worker
+            systemctl --user restart goalkeepr
