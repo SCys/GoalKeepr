@@ -196,8 +196,7 @@ async def new_member_callback(query: types.CallbackQuery):
                 if not await manager.delete_message(chat.id, msg.message_id):
                     await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
-                until_date = now + timedelta(days=30)
-                await chat.kick(member_id, until_date=until_date)
+                await chat.kick(member_id, until_date=timedelta(days=30))
                 # await chat.unban(member_id)
 
                 logger.warning(
