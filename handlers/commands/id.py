@@ -17,8 +17,10 @@ async def id(msg: types.Message, state: FSMContext):
     if not user or not user.id:
         return
 
-    msg_reply = await msg.reply(f"""id:\t{user.id}\nname:\t{user.full_name}\nbot:\t{user.is_bot}""", disable_notification=True)
+    content = f"""ID：\t{user.id}\n完整名：\t{user.full_name}\n分享URL：{user.url}"""
+    msg_reply = await msg.reply(content, disable_notification=True)
     logger.info(f"chat {msg.chat.id}({msg.chat.title}) msg {msg.message_id} user {user.id}({user.first_name})")
 
-    chat = msg.chat
-    await manager.lazy_delete_message(chat.id, msg_reply.id, msg.date + timedelta(seconds=5))
+    # auto delete after 5s at (super)group
+    if msg.chat.type in ["supergroup", "group"]:
+        await manager.lazy_delete_message(msg.chat.id, msg_reply.message_id, msg.date + timedelta(seconds=15))
