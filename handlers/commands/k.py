@@ -1,4 +1,3 @@
-from configparser import MAX_INTERPOLATION_DEPTH
 from datetime import timedelta
 
 from aiogram import types
@@ -9,6 +8,7 @@ from manager import manager
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 
 DELETED_AFTER = 15
+BAN_MEMBER = 60 # 60s
 logger = manager.logger
 
 
@@ -40,7 +40,6 @@ async def k(msg: types.Message, state: FSMContext):
     elif msgReply.left_chat_member:
         return
 
-    member = await chat.get_member(msgReply.from_user.id)
     resp = await kick_member(chat, msg, user, msgReply.from_user)
 
     for i in [msg, resp, msgReply]:
@@ -59,11 +58,11 @@ async def kick_member(chat: types.Chat, msg: types.Message, administrator, membe
     id = member.id
 
     # baned 45s
-    if not await chat.kick(id, until_date=45):
+    if not await chat.kick(id, until_date=timedelta(seconds=BAN_MEMBER)):
         logger.warning(f"chat {chat.id}({chat.title}) msg {msg.message_id} user {administrator.id}({administrator.first_name}) failed to kick {id}")
         return
 
-    await chat.unban(id)
+    # await chat.unban(id)
 
     logger.info(f"chat {chat.id}({chat.title}) msg {msg.message_id} member {id}({manager.user_title(member)}) is kicked")
 
