@@ -250,7 +250,7 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
         return
 
     await bot.kick_chat_member(chat_id, member_id, until_date=45)  # baned 45s
-    await bot.unban_chat_member(chat_id, member_id)
+    # await bot.unban_chat_member(chat_id, member_id)
     logger.info(f"{prefix} member {member_id} is kicked by timeout")
 
 
