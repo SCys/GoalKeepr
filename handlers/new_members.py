@@ -12,45 +12,48 @@ from aiogram.utils.exceptions import NotEnoughRightsToRestrict
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
-WELCOME_TEXT = "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 *%(icon)s* 按钮后才能发言\n如果 *30秒* 内不操作即会被送走。"
+WELCOME_TEXT = "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 *%(icon)s* 按钮后才能发言。\n\n *30秒* 内不操作即会被送走。\n\n" \
+        "Welcome [%(title)s](tg://user?id=%(user_id)d). \n\n" \
+        "You can only speak after clicking the *%(icon)s* button. \n\n"\
+        "If you do not operate within *30 seconds* you will be sent away."
 DELETED_AFTER = 30
 
 logger = manager.logger
 
 ICONS = {
-    "爱心": "❤️️",
-    "感叹号": "❗",
-    "问号": "❓",
-    "壹": "1⃣",
-    "贰": "2⃣",
-    "叁": "3⃣",
-    "肆": "4⃣",
-    "伍": "5⃣",
-    "陆": "6⃣",
-    "柒": "7⃣",
-    "捌": "8⃣",
-    "玖": "9⃣",
-    "乘号": "✖",
-    "加号": "➕",
-    "减号": "➖",
-    "除号": "➗",
-    "禁止": "🚫",
-    "美元": "💲",
+    "爱心|Love": "❤️️",
+    "感叹号|Exclamation mark": "❗",
+    "问号|Question mark": "❓",
+    "壹|One": "1⃣",
+    "贰|Two": "2⃣",
+    "叁|Three": "3⃣",
+    "肆|Four": "4⃣",
+    "伍|Five": "5⃣",
+    "陆|Six": "6⃣",
+    "柒|Seven": "7⃣",
+    "捌|Eight": "8⃣",
+    "玖|Nine": "9⃣",
+    "乘号|Multiplication number": "✖",
+    "加号|Plus": "➕",
+    "减号|Minus": "➖",
+    "除号|Divisor": "➗",
+    "禁止|Prohibition": "🚫",
+    "美元|US Dollar": "💲",
     "A": "🅰",
     "B": "🅱",
     "O": "🅾",
-    "彩虹旗": "🏳‍🌈",
-    "眼睛": "👁",
-    "脚印": "👣",
-    "汽车": "🚗",
-    "飞机": "✈️",
-    "火箭": "🚀",
-    "帆船": "⛵️",
-    "警察": "👮",
-    "信": "✉",
+    "彩虹旗|Rainbow flag": "🏳‍🌈",
+    "眼睛|Eye": "👁",
+    "脚印|Footprints": "👣",
+    "汽车|Car": "🚗",
+    "飞机|Aircraft": "✈️",
+    "火箭|Rocket": "🚀",
+    "帆船|Sailboat": "⛵️",
+    "警察|Police": "👮",
+    "信|Letter": "✉",
     "1/2": "½",
-    "雪花": "❄",
-    "眼镜": "👓",
+    "雪花|Snowflake": "❄",
+    "眼镜|Eyeglasses": "👓",
 }
 
 
@@ -200,7 +203,7 @@ async def new_member_callback(query: types.CallbackQuery):
                 # await chat.unban(member_id)
 
                 logger.warning(
-                    f"{prefix} admin {operator.id}({manager.user_title(operator)}) kick member {member_id}({manager.user_title(member)}), until {until_date}",
+                    f"{prefix} admin {operator.id}({manager.user_title(operator)}) kick member {member_id}({manager.user_title(member)})"
                 )
 
             else:
@@ -296,12 +299,17 @@ async def accepted_member(chat: Chat, msg: Message, user: User):
 
     logger.info(f"{prefix} member {user.id}({manager.user_title(user)}) is accepted")
 
-    content = "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(user), "user_id": user.id}
+    #content = "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(user), "user_id": user.id}
+    title = manager.user_title(user)
+    user_id = user.id
+    content = f"欢迎 [{title}](tg://user?id={user_id}) 加入群组，先请阅读群规。\n\n" \
+        f"Welcome [{title}](tg://user?id={user_id}). \n\nPlease read the rules thoroughly before posting."
 
     try:
         photos = await user.get_profile_photos(0, 1)
         if photos.total_count == 0:
-            content += "\n\n请设置头像或显示头像，能够更好体现个性。"
+            content += "\n\n请设置头像或显示头像，能够更好体现个性。\n\n" \
+                "Please set the avatar or display avatar, to be able to better reflect the personality."
     except Exception:
         logger.exception("get profile photos error")
 
