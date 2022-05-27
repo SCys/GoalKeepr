@@ -1,5 +1,9 @@
 TG 入群验证机器人
 
+  [Github SCys/GoalKeepr](https://github.com/SCys/GoalKeepr)
+
+  翻译感谢 77 老师。
+
   将机器人加入群内，并且设置为管理员后，具备入群验证的基本功能。
 
   当用户加入群后，机器人会删除入群信息，并且发出验证信息。
