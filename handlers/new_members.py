@@ -14,8 +14,7 @@ from manager import manager
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 WELCOME_TEXT = "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 *%(icon)s* 按钮后才能发言。\n\n *30秒* 内不操作即会被送走。\n\n" \
         "Welcome [%(title)s](tg://user?id=%(user_id)d). \n\n" \
-        "You can only speak after clicking the *%(icon)s* button. \n\n"\
-        "If you do not operate within *30 seconds* you will be sent away."
+        "You would be allowed to send the message after choosing the right option for [*%(icon)s*] through pressing the correct button"
 DELETED_AFTER = 30
 
 logger = manager.logger
@@ -303,13 +302,15 @@ async def accepted_member(chat: Chat, msg: Message, user: User):
     title = manager.user_title(user)
     user_id = user.id
     content = f"欢迎 [{title}](tg://user?id={user_id}) 加入群组，先请阅读群规。\n\n" \
-        f"Welcome [{title}](tg://user?id={user_id}). \n\nPlease read the rules thoroughly before posting."
+        f"Welcome [{title}](tg://user?id={user_id}). \n\n"\
+        "Please read the rules carefully before sending the message in the group."
 
     try:
         photos = await user.get_profile_photos(0, 1)
         if photos.total_count == 0:
             content += "\n\n请设置头像或显示头像，能够更好体现个性。\n\n" \
-                "Please set the avatar or display avatar, to be able to better reflect the personality."
+                "Please choose your appropriate fancy profile photo and set it available in public. " \
+                "It would improve your experience in communicate with everyone here and knowing you faster and better."
     except Exception:
         logger.exception("get profile photos error")
 
