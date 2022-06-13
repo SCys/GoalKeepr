@@ -5,4 +5,4 @@ loguru
 orjson
 pydub
 tencentcloud-sdk-python
-googletrans
+translators
