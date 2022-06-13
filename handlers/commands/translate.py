@@ -12,7 +12,7 @@ logger = manager.logger
 RE_CLEAR = re.compile(r"/tr(anslate)?(@[a-zA-Z0-9]+\s?)?")
 
 
-@manager.register("message", commands=["translate", "tr"])
+@manager.register("message", commands=["tr"])
 async def translate(msg: types.Message, state: FSMContext):
     user = msg.from_user
 
