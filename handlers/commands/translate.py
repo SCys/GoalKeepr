@@ -31,7 +31,7 @@ async def translate(msg: types.Message, state: FSMContext):
 
     ts_create = datetime.now()
     try:
-        result = ts.deepl(content, to_language="zh-CN")
+        result = ts.google(content, to_language="zh-CN")
         await target.reply(result)
     except Exception as e:
         logger.exception("translate failed")
