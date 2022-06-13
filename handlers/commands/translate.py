@@ -37,7 +37,8 @@ async def translate(msg: types.Message, state: FSMContext):
 
     try:
         translator = Translator(timeout=Timeout(5))
-        result = await translator.translate(content, dest=user.language_code, src="auto")
+        #result = await translator.translate(content, dest=user.language_code, src="auto")
+        result = await translator.translate(content, dest='zh-cn', src="auto")
         await target.reply(result.text)
     except Exception as e:
         logger.exception("translate failed")
