@@ -1,11 +1,11 @@
-import re
 
+import re
+from datetime import datetime
+
+import translators as ts
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
 from manager import manager
-
-import translators as ts
-
 
 logger = manager.logger
 
@@ -29,6 +29,7 @@ async def translate(msg: types.Message, state: FSMContext):
     if content.startswith("/tr"):
         content = RE_CLEAR.sub("", content, 1)
 
+    ts_create = datetime.now()
     try:
         result = ts.google(content, to_language="zh-CN")
         await target.reply(result)
@@ -37,4 +38,4 @@ async def translate(msg: types.Message, state: FSMContext):
 
         await msg.reply("Translate failed with:{}".format(e))
 
-    logger.info(f"user ({user.full_name} / {user.id}) start a translate task")
+    logger.info(f"user ({user.full_name} / {user.id}) start a translate task, cost {datetime.now() - ts_create}")
