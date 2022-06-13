@@ -30,7 +30,7 @@ async def translate(msg: types.Message, state: FSMContext):
         content = RE_CLEAR.sub("", content, 1)
 
     try:
-        result = ts.google(content, to_language="zh-cn")
+        result = ts.google(content, to_language="zh-CN")
         await target.reply(result)
     except Exception as e:
         logger.exception("translate failed")
