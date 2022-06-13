@@ -1,6 +1,4 @@
-import asyncio
-import time
-from typing import Optional
+import re
 
 import googletrans
 import httpx
@@ -13,6 +11,8 @@ from httpx import Timeout
 from manager import manager
 
 logger = manager.logger
+
+RE_CLEAR = re.compile(r"/tr(anslate)?(@[a-zA-Z0-9]+\s?)?")
 
 
 @manager.register("message", commands=["translate", "tr"])
@@ -29,9 +29,12 @@ async def translate(msg: types.Message, state: FSMContext):
         await msg.answer("Please send me a text to translate")
         return
 
+    if txt.startswith("/tr"):
+        txt = RE_CLEAR.sub("", txt, 1)
+
     try:
         translator = Translator(timeout=Timeout(5))
-        result = await translator.translate(content, dest="zh-cn", src="auto")
+        result = await translator.translate(content, dest=user.language_code, src="auto")
         await target.reply(result.text)
     except Exception as e:
         logger.exception("translate failed")
