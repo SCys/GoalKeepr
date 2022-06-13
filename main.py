@@ -3,17 +3,12 @@
 from handlers import *
 from manager import manager
 
-from handlers.commands.translate import translate_setup
-
-
 def main():
     manager.load_config()
 
     manager.setup()
 
     manager.load_handlers()
-
-    translate_setup()
 
     try:
         manager.is_running = True

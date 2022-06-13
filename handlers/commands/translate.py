@@ -6,78 +6,39 @@ import googletrans
 import httpx
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
-from googletrans.constants import  DEFAULT_USER_AGENT, DUMMY_DATA, LANGCODES, LANGUAGES, SPECIAL_CASES
-from googletrans.models import  Translated
+from googletrans import urls, utils
+from googletrans.constants import DEFAULT_USER_AGENT, DUMMY_DATA, LANGCODES, LANGUAGES, SPECIAL_CASES
+from googletrans.models import Translated
 from httpx import Timeout
 from manager import manager
 
 logger = manager.logger
-queue = asyncio.Queue(100)
-task: Optional[asyncio.Task] = None
-
-from googletrans import urls, utils
 
 
 @manager.register("message", commands=["translate", "tr"])
 async def translate(msg: types.Message, state: FSMContext):
     user = msg.from_user
 
+    target = msg
     content = msg.text
-    msg_id = msg.message_id
     if msg.reply_to_message:
         content = msg.reply_to_message.text
-        msg_id = msg.reply_to_message.message_id
+        target = msg.reply_to_message
 
     if not content:
         await msg.answer("Please send me a text to translate")
         return
 
     try:
-        queue.put_nowait(
-            {
-                "user": user,
-                "content": content,
-                "chat": msg.chat.id,
-                "message_id": msg_id,
-            }
-        )
-    except asyncio.QueueFull:
-        await msg.answer("Queue is full, please try again later")
-        return
+        translator = Translator(timeout=Timeout(5))
+        result = await translator.translate(content, dest="zh-cn", src="auto")
+        await target.reply(result.text)
+    except Exception as e:
+        logger.exception("translate failed")
 
-    msg.reply
+        await msg.reply("Translate failed with:{}".format(e))
 
-    logger.info(f"user ({user.full_name} / {user.id}) add a translate task to queue")
-
-
-async def translate_worker():
-
-    while True:
-        time.sleep(1.0)
-
-        dat = await queue.get()
-        if not dat:
-            continue
-
-        content = dat["content"]
-        chat = dat["chat"]
-        msg_id = dat["message_id"]
-
-        try:
-            translator = Translator(timeout=Timeout(5))
-            result = await translator.translate(content, dest="zh-cn", src="auto")
-            await manager.reply(chat, msg_id, result.text)
-        except Exception as e:
-            logger.exception("translate failed")
-
-            await manager.reply(chat, msg_id, f"Translate failed with:{e}")
-
-
-def translate_setup():
-    global task
-    task = asyncio.create_task(translate_worker())
-
-    logger.info("translate worker started")
+    logger.info(f"user ({user.full_name} / {user.id}) start a translate task")
 
 
 EXCLUDES = ("en", "ca", "fr")
