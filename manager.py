@@ -196,5 +196,35 @@ class Manager:
 
         logger.debug(f"chat {chat} member {member} lazy session {type} is deleted")
 
+    async def send(self, chat: int, msg: str, **kwargs):
+        """
+        发送消息
+        chat: chat with msg
+        msg: msg will be sent
+        """
+        try:
+            await self.bot.send_message(chat, msg, **kwargs)
+            logger.info(f"chat {chat} message {msg} sent")
+        except Exception:
+            logger.exception(f"chat {chat} message {msg} send error")
+            return False
+
+        return True
+
+    async def reply(self, chat: int, message_id: int, msg: str, **kwargs):
+        """
+        回复消息
+        chat: chat with msg
+        msg: msg will be sent
+        """
+        try:
+            await self.bot.send_message(chat, msg, reply_to_message_id=message_id, **kwargs)
+            logger.info(f"chat {chat} message {msg} sent")
+        except Exception:
+            logger.exception(f"chat {chat} message {msg} send error")
+            return False
+
+        return True
+
 
 manager = Manager()

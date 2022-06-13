@@ -3,6 +3,8 @@
 from handlers import *
 from manager import manager
 
+from handlers.commands.translate import translate_setup
+
 
 def main():
     manager.load_config()
@@ -11,11 +13,15 @@ def main():
 
     manager.load_handlers()
 
+    translate_setup()
+
     try:
         manager.is_running = True
 
         manager.start()
     except KeyboardInterrupt:
+        manager.stop()
+    except InterruptedError:
         manager.stop()
 
 
