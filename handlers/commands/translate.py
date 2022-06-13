@@ -30,8 +30,8 @@ async def translate(msg: types.Message, state: FSMContext):
         await msg.answer("Please send me a text to translate")
         return
 
-    if txt.startswith("/tr"):
-        txt = RE_CLEAR.sub("", txt, 1)
+    if content.startswith("/tr"):
+        content = RE_CLEAR.sub("", content, 1)
 
     try:
         translator = Translator(timeout=Timeout(5))
