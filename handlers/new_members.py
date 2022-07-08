@@ -305,15 +305,19 @@ def build_new_member_message(member: User, msg_timestamp):
 
 
 async def accepted_member(chat: Chat, msg: Message, user: User):
-    await chat.restrict(
-        user.id,
-        can_send_messages=True,
-        can_send_media_messages=True,
-        can_send_other_messages=True,
-        can_add_web_page_previews=True,
-    )
-
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+
+    try:
+        await chat.restrict(
+            user.id,
+            can_send_messages=True,
+            can_send_media_messages=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True,
+        )
+    except Exception as e:
+        logger.error(f"{prefix} restrict {user.id} error {e}")
+        return
 
     logger.info(f"{prefix} member {user.id}({manager.user_title(user)}) is accepted")
 
