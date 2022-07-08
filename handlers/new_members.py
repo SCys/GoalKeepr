@@ -238,7 +238,7 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
     try:
         chat = await bot.get_chat(chat_id)
     except Exception as e:
-        logger.warning(f"chat {chat_id}({chat.title}) get chat failed: {e}")
+        logger.warning(f"bot get chat {chat_id} failed: {e}")
         return
 
     member = await manager.chat_member(chat, member_id)
