@@ -133,7 +133,6 @@ class Manager:
     async def chat_member(self, chat: types.Chat, member_id: int):
         try:
             return await self.bot.get_chat_member(chat.id, member_id)
-
         except BadRequest:
             logger.error(f"chat {chat.id} member {member_id} check failed")
 

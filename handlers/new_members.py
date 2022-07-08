@@ -247,8 +247,12 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
         return
 
     # FIXME 某些情况下可能会出现问题，比如获取不到权限
-    if member.can_send_messages:
-        logger.info(f"{prefix} member {member_id} is accepted")
+    try: 
+        if member.can_send_messages:
+            logger.info(f"{prefix} member {member_id} is accepted")
+            return
+    except Exception as e:
+        logger.warning(f"{prefix} member {member_id} can_send_messages error {e}")
         return
 
     await bot.kick_chat_member(chat_id, member_id, until_date=timedelta(seconds=45))  # baned 45s

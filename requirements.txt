@@ -6,3 +6,4 @@ orjson
 pydub
 tencentcloud-sdk-python
 translators
+aiogram
