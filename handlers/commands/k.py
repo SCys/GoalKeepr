@@ -8,7 +8,7 @@ from manager import manager
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 
 DELETED_AFTER = 15
-BAN_MEMBER = 60 # 60s
+BAN_MEMBER = 60  # 60s
 logger = manager.logger
 
 
@@ -57,23 +57,22 @@ async def kick_member(chat: types.Chat, msg: types.Message, administrator, membe
 
     id = member.id
 
-    # baned 45s
+    # baned 60s
     if not await chat.kick(id, until_date=timedelta(seconds=BAN_MEMBER)):
-        logger.warning(f"chat {chat.id}({chat.title}) msg {msg.message_id} user {administrator.id}({administrator.first_name}) failed to kick {id}")
+        logger.warning(
+            f"chat {chat.id}({chat.title}) msg {msg.message_id} user {administrator.id}({administrator.first_name}) failed to kick {id}"
+        )
         return
 
+    # 踢掉的用户将会保持在Baned状态，一定时间
     # await chat.unban(id)
 
     logger.info(f"chat {chat.id}({chat.title}) msg {msg.message_id} member {id}({manager.user_title(member)}) is kicked")
 
+    username = manager.user_title(member)
+
     return await msg.answer(
-        "用户 **%(title)s** 已经由 **%(administrator)s** 剔除，%(deleted_after)d 秒自毁。"
-        % {
-            "title": manager.user_title(member),
-            "administrator": manager.user_title(administrator),
-            "deleted_after": DELETED_AFTER,
-        },
-        parse_mode="markdown",
+        f"{username} 被剔除/kicked",
         disable_web_page_preview=True,
         disable_notification=True,
     )
