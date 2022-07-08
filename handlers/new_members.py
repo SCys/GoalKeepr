@@ -1,6 +1,7 @@
 import asyncio
 import random
 from datetime import datetime, timedelta
+from tkinter import E
 
 from aiogram import types
 from aiogram.bot.bot import Bot
@@ -254,17 +255,26 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
         logger.warning(f"{prefix} member {member_id} is kicked")
         return
 
+    if isinstance(member.status, types.ChatMemberMember):
+        logger.warning(
+            f"{prefix} member {member_id} is Represents a chat member that has no additional privileges or restrictions"
+        )
+        return
+
     # FIXME 某些情况下可能会出现问题，比如获取不到权限
     try:
-        if not isinstance(member, ChatMemberMember) and member.can_send_messages:
+        if member.can_send_messages:
             logger.info(f"{prefix} member {member_id} is accepted")
             return
     except Exception as e:
         logger.warning(f"{prefix} member {member_id} can_send_messages error {e}")
 
-    await bot.kick_chat_member(chat_id, member_id, until_date=timedelta(seconds=45))  # baned 45s
-    # await bot.unban_chat_member(chat_id, member_id)
-    logger.info(f"{prefix} member {member_id} is kicked by timeout")
+    try:
+        await bot.kick_chat_member(chat_id, member_id, until_date=timedelta(seconds=45))  # baned 45s
+        # await bot.unban_chat_member(chat_id, member_id)
+        logger.info(f"{prefix} member {member_id} is kicked by timeout")
+    except Exception as e:
+        logger.warning(f"{prefix} member {member_id} kick error {e}")
 
 
 def build_new_member_message(member: User, msg_timestamp):
