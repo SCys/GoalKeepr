@@ -32,7 +32,8 @@ async def k(msg: types.Message, state: FSMContext):
     # checkout target member
     if msgReply.new_chat_members:
         for member in msgReply.new_chat_members:
-            await kick_member(chat, msg, user, member)
+            resp = await kick_member(chat, msg, user, member)
+            await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
 
         return
 
@@ -41,7 +42,6 @@ async def k(msg: types.Message, state: FSMContext):
         return
 
     resp = await kick_member(chat, msg, user, msgReply.from_user)
-
     for i in [msg, resp, msgReply]:
         await manager.lazy_delete_message(chat.id, i.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
 
