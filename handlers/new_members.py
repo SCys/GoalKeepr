@@ -9,12 +9,15 @@ from aiogram.types.chat import Chat
 from aiogram.types.message import Message
 from aiogram.types.user import User
 from aiogram.utils.exceptions import NotEnoughRightsToRestrict
+from aiogram.types.chat_member import ChatMemberMember
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
-WELCOME_TEXT = "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 *%(icon)s* 按钮后才能发言。\n\n *30秒* 内不操作即会被送走。\n\n" \
-        "Welcome [%(title)s](tg://user?id=%(user_id)d). \n\n" \
-        "You would be allowed to send the message after choosing the right option for [*%(icon)s*] through pressing the correct button"
+WELCOME_TEXT = (
+    "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 *%(icon)s* 按钮后才能发言。\n\n *30秒* 内不操作即会被送走。\n\n"
+    "Welcome [%(title)s](tg://user?id=%(user_id)d). \n\n"
+    "You would be allowed to send the message after choosing the right option for [*%(icon)s*] through pressing the correct button"
+)
 DELETED_AFTER = 30
 
 logger = manager.logger
@@ -233,7 +236,12 @@ async def new_member_callback(query: types.CallbackQuery):
 
 @manager.register_event("new_member_check")
 async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: int):
-    chat = await bot.get_chat(chat_id)
+    try:
+        chat = await bot.get_chat(chat_id)
+    except Exception as e:
+        logger.warning(f"chat {chat_id}({chat.title}) get chat failed: {e}")
+        return
+
     member = await manager.chat_member(chat, member_id)
 
     prefix = f"chat {chat_id}({chat.title}) msg {message_id}"
@@ -247,13 +255,12 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
         return
 
     # FIXME 某些情况下可能会出现问题，比如获取不到权限
-    try: 
-        if member.can_send_messages:
+    try:
+        if not isinstance(member, ChatMemberMember) and member.can_send_messages:
             logger.info(f"{prefix} member {member_id} is accepted")
             return
     except Exception as e:
         logger.warning(f"{prefix} member {member_id} can_send_messages error {e}")
-        return
 
     await bot.kick_chat_member(chat_id, member_id, until_date=timedelta(seconds=45))  # baned 45s
     # await bot.unban_chat_member(chat_id, member_id)
@@ -302,19 +309,23 @@ async def accepted_member(chat: Chat, msg: Message, user: User):
 
     logger.info(f"{prefix} member {user.id}({manager.user_title(user)}) is accepted")
 
-    #content = "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(user), "user_id": user.id}
+    # content = "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(user), "user_id": user.id}
     title = manager.user_title(user)
     user_id = user.id
-    content = f"欢迎 [{title}](tg://user?id={user_id}) 加入群组，先请阅读群规。\n\n" \
-        f"Welcome [{title}](tg://user?id={user_id}). \n\n"\
+    content = (
+        f"欢迎 [{title}](tg://user?id={user_id}) 加入群组，先请阅读群规。\n\n"
+        f"Welcome [{title}](tg://user?id={user_id}). \n\n"
         "Please read the rules carefully before sending the message in the group."
+    )
 
     try:
         photos = await user.get_profile_photos(0, 1)
         if photos.total_count == 0:
-            content += "\n\n请设置头像或显示头像，能够更好体现个性。\n\n" \
-                "Please choose your appropriate fancy profile photo and set it available in public. " \
+            content += (
+                "\n\n请设置头像或显示头像，能够更好体现个性。\n\n"
+                "Please choose your appropriate fancy profile photo and set it available in public. "
                 "It would improve your experience in communicate with everyone here and knowing you faster and better."
+            )
     except Exception:
         logger.exception("get profile photos error")
 
