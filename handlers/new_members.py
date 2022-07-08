@@ -1,7 +1,6 @@
 import asyncio
 import random
 from datetime import datetime, timedelta
-from tkinter import E
 
 from aiogram import types
 from aiogram.bot.bot import Bot
@@ -10,7 +9,6 @@ from aiogram.types.chat import Chat
 from aiogram.types.message import Message
 from aiogram.types.user import User
 from aiogram.utils.exceptions import NotEnoughRightsToRestrict
-from aiogram.types.chat_member import ChatMemberMember
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
