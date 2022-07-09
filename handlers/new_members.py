@@ -268,7 +268,8 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
         logger.warning(f"{prefix} member {member_id} can_send_messages error {e}")
 
     try:
-        await bot.ban_chat_member(chat_id, member_id)
+        # await bot.ban_chat_member(chat_id, member_id)
+        await chat.kick(member_id)
 
         # unban member after 45s
         await manager.lazy_session(chat.id, message_id, member_id, "unban_member", datetime.now() + timedelta(seconds=45))
