@@ -268,11 +268,36 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
         logger.warning(f"{prefix} member {member_id} can_send_messages error {e}")
 
     try:
-        await bot.kick_chat_member(chat_id, member_id, until_date=timedelta(seconds=45))  # baned 45s
-        # await bot.unban_chat_member(chat_id, member_id)
+        await bot.ban_chat_member(chat_id, member_id)
+
+        # unban member after 45s
+        await manager.lazy_session(chat.id, message_id, member_id, "unban_member", datetime.now() + timedelta(seconds=45))
+
         logger.info(f"{prefix} member {member_id} is kicked by timeout")
     except Exception as e:
         logger.warning(f"{prefix} member {member_id} kick error {e}")
+
+
+@manager.register_event("unban_member")
+async def unban_member(bot: Bot, chat_id: int, message_id: int, member_id: int):
+    try:
+        chat = await bot.get_chat(chat_id)
+        member = await manager.chat_member(chat, member_id)
+    except Exception as e:
+        logger.warning(f"bot get chat {chat_id} failed: {e}")
+        return
+
+    prefix = f"chat {chat_id}({chat.title}) msg {message_id}"
+
+    if member.is_chat_admin():
+        logger.info(f"{prefix} member {member_id} is admin")
+        return
+
+    try:
+        await bot.unban_chat_member(chat_id, member_id, only_if_banned=True)
+        logger.info(f"{prefix} member {member_id} is unbanned")
+    except Exception as e:
+        logger.warning(f"{prefix} member {member_id} unbanned error {e}")
 
 
 def build_new_member_message(member: User, msg_timestamp):

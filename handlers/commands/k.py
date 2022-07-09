@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
@@ -59,13 +59,13 @@ async def kick_member(chat: types.Chat, msg: types.Message, administrator, membe
 
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
 
-    # baned 60s
-    if not await chat.kick(id, until_date=timedelta(seconds=BAN_MEMBER)):
+    # 剔除以后就在黑名单中
+    if not await chat.kick(id):
         logger.warning(f"{prefix} user {id}({member.first_name}) is not kickable, maybe he is administrator")
         return
 
-    # 踢掉的用户将会保持在Baned状态，一定时间
-    # await chat.unban(id)
+    # unban member after 45s
+    await manager.lazy_session(chat.id, msg.message_id, id, "unban_member", datetime.now() + timedelta(seconds=45))
 
     logger.info(f"{prefix} user {id}({member.first_name}) is kicked")
     username = manager.user_title(member)
