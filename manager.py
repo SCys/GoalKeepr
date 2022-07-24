@@ -4,7 +4,7 @@ import sys
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
-from typing import Optional
+from typing import Union
 
 import loguru
 from aiogram import Bot, Dispatcher, executor, types
@@ -16,9 +16,10 @@ logger = loguru.logger
 
 
 class Manager:
+    bot: Bot
+    dp: Dispatcher
+
     config = ConfigParser()
-    bot: Optional[Bot] = None
-    dp: Optional[Dispatcher] = None
 
     handlers = []
     events = {}
@@ -53,7 +54,7 @@ class Manager:
             config["telegram"]["token"] = args.token
 
     def setup(self):
-        token = manager.config["telegram"]["token"]
+        token = self.config["telegram"]["token"]
         if not token:
             logger.error("telegram token is missing")
             sys.exit(1)
@@ -65,45 +66,45 @@ class Manager:
         logger.info("dispatcher is setup")
 
     def load_handlers(self):
-        for func, type, args, kwargs in self.handlers:
-            method = getattr(self.dp, f"{type}_handler")
+        for func, type_name, args, kwargs in self.handlers:
+            method = getattr(self.dp, f"{type_name}_handler")
             if callable(method):
                 method(*args, **kwargs)(func)
                 logger.info(f"dispatcher:{method.__name__}({args},{kwargs})({func})")
 
-    def register(self, type, *router_args, **router_kwargs):
+    def register(self, type_name, *router_args, **router_kwargs):
         """
         延迟注册到 Dispatcher
         """
 
         def wrapper(func):
-            self.handlers.append((func, type, router_args, router_kwargs))
+            self.handlers.append((func, type_name, router_args, router_kwargs))
 
             @wraps(func)
-            async def warpper(*args, **kwargs):
+            async def _wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
 
-            return warpper
+            return _wrapper
 
         return wrapper
 
-    def register_event(self, type):
+    def register_event(self, type_name: str):
         """
         将函数添加到事件处理内
 
-        type: 对应 lazy_session 函数的类型
+        type_name: 对应 lazy_session 函数的类型
 
         函数会这样 await func(bot, chat_id, message_id, user_id) 调用
         """
 
         def wrapper(func):
-            self.events[type] = func
+            self.events[type_name] = func
 
             @wraps(func)
-            async def warpper(*args, **kwargs):
+            async def _wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
 
-            return warpper
+            return _wrapper
 
         return wrapper
 
@@ -117,14 +118,14 @@ class Manager:
 
         self.dp.stop_polling()
 
-    def user_title(self, user):
-        if isinstance(user, types.ChatMember):
-            user = user.user
+    def username(self, _user: Union[types.ChatMember, types.User]):
+        """获取用户名"""
 
-        if None in [user.first_name, user.last_name]:
-            return f"{user.first_name or ''}{user.last_name or ''}"
+        user = _user
+        if isinstance(_user, types.ChatMember):
+            user = _user.user
 
-        return " ".join([user.first_name, user.last_name])
+        return user.full_name
 
     async def is_admin(self, chat: types.Chat, member: types.User):
         admins = await self.bot.get_chat_administrators(chat.id)
@@ -135,8 +136,7 @@ class Manager:
             return await self.bot.get_chat_member(chat.id, member_id)
         except BadRequest:
             logger.error(f"chat {chat.id} member {member_id} check failed")
-
-        except Exception:
+        except:
             logger.exception(f"chat {chat.id} member {member_id} check exception")
 
     async def delete_message(self, chat: int, msg: int):
@@ -204,7 +204,7 @@ class Manager:
         try:
             await self.bot.send_message(chat, msg, **kwargs)
             logger.info(f"chat {chat} message {msg} sent")
-        except Exception:
+        except:
             logger.exception(f"chat {chat} message {msg} send error")
             return False
 
@@ -219,7 +219,7 @@ class Manager:
         try:
             await self.bot.send_message(chat, msg, reply_to_message_id=message_id, **kwargs)
             logger.info(f"chat {chat} message {msg} sent")
-        except Exception:
+        except:
             logger.exception(f"chat {chat} message {msg} send error")
             return False
 

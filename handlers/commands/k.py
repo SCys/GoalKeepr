@@ -5,15 +5,14 @@ from aiogram.dispatcher.storage import FSMContext
 
 from manager import manager
 
-SUPPORT_GROUP_TYPES = ["supergroup", "group"]
-
-DELETED_AFTER = 15
+DELETED_AFTER = 5
 BAN_MEMBER = 60  # 60s
 logger = manager.logger
 
 
 @manager.register("message", commands=["k"])
 async def k(msg: types.Message, state: FSMContext):
+    """踢人功能"""
     chat = msg.chat
     user = msg.from_user
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
@@ -61,14 +60,14 @@ async def kick_member(chat: types.Chat, msg: types.Message, administrator, membe
 
     # 剔除以后就在黑名单中
     if not await chat.kick(id):
-        logger.warning(f"{prefix} user {id}({member.first_name}) is not kickable, maybe he is administrator")
+        logger.warning(f"{prefix} user {id}({member.first_name}) kick failed, maybe he is administrator")
         return
 
     # unban member after 45s
-    await manager.lazy_session(chat.id, msg.message_id, id, "unban_member", datetime.now() + timedelta(seconds=45))
+    await manager.lazy_session(chat.id, msg.message_id, id, "unban_member", datetime.now() + timedelta(seconds=BAN_MEMBER))
 
     logger.info(f"{prefix} user {id}({member.first_name}) is kicked")
-    username = manager.user_title(member)
+    username = manager.username(member)
     return await msg.answer(
         f"{username} 被剔除/kicked",
         disable_web_page_preview=True,

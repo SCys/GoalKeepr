@@ -9,6 +9,7 @@ from aiogram.types.chat import Chat
 from aiogram.types.message import Message
 from aiogram.types.user import User
 from aiogram.utils.exceptions import NotEnoughRightsToRestrict
+
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
@@ -84,7 +85,7 @@ async def new_members(msg: types.Message, state: FSMContext):
         if member.is_bot:
             continue
 
-        logger.info(f"{prefix} restrict new member:{member.id}({manager.user_title(member)})")
+        logger.info(f"{prefix} restrict new member:{member.id}({manager.username(member)})")
 
         try:
             # 收紧权限
@@ -96,7 +97,7 @@ async def new_members(msg: types.Message, state: FSMContext):
                 can_add_web_page_previews=False,
             )
         except NotEnoughRightsToRestrict:
-            logger.warning(f"{prefix} no right to restrict the member {member.id}({manager.user_title(member)}) rights")
+            logger.warning(f"{prefix} no right to restrict the member {member.id}({manager.username(member)}) rights")
             return
 
     if not await manager.delete_message(chat.id, msg.message_id):
@@ -116,15 +117,15 @@ async def new_members(msg: types.Message, state: FSMContext):
         # 如果已经被剔除，则不做处理
         member = await manager.chat_member(chat, i.id)
         if not member.is_member:
-            logger.info(f"{prefix} new member {i.id}({manager.user_title(i)}) is kicked")
+            logger.info(f"{prefix} new member {i.id}({manager.username(i)}) is kicked")
             continue
 
         if member.is_chat_admin():
-            logger.info(f"{prefix} new member {i}({manager.user_title(i)}) is admin")
+            logger.info(f"{prefix} new member {i}({manager.username(i)}) is admin")
             continue
 
         if member.can_send_messages:
-            logger.info(f"{prefix} new member {i}({manager.user_title(i)}) rights is accepted")
+            logger.info(f"{prefix} new member {i}({manager.username(i)}) rights is accepted")
             continue
 
         content, reply_markup = build_new_member_message(i, now)
@@ -138,7 +139,6 @@ async def new_members(msg: types.Message, state: FSMContext):
 
 @manager.register(
     "callback_query",
-    # lambda q: q.message.reply_to_message is not None and q.message.reply_to_message.new_chat_members is not None,
     lambda q: q.message.reply_markup is not None,
 )
 async def new_member_callback(query: types.CallbackQuery):
@@ -155,10 +155,10 @@ async def new_member_callback(query: types.CallbackQuery):
 
     # 判断是否需要处理
     if (
-        msg.reply_markup.inline_keyboard is None
-        or len(msg.reply_markup.inline_keyboard) != 2
-        or len(msg.reply_markup.inline_keyboard[0]) != 5
-        or len(msg.reply_markup.inline_keyboard[1]) != 2
+            msg.reply_markup.inline_keyboard is None
+            or len(msg.reply_markup.inline_keyboard) != 2
+            or len(msg.reply_markup.inline_keyboard[0]) != 5
+            or len(msg.reply_markup.inline_keyboard[1]) != 2
     ):
         return
 
@@ -179,7 +179,7 @@ async def new_member_callback(query: types.CallbackQuery):
     if is_admin and not is_self:
         items = data.split("__")
         if len(items) != 3:
-            logger.warning(f"{prefix} admin {operator.id}({manager.user_title(operator)}) invalid data {data}")
+            logger.warning(f"{prefix} admin {operator.id}({manager.username(operator)}) invalid data {data}")
         else:
             member_id, _, op = items
             member = await manager.chat_member(chat, member_id)
@@ -192,7 +192,8 @@ async def new_member_callback(query: types.CallbackQuery):
                 await accepted_member(chat, msg, member.user)
 
                 logger.info(
-                    f"{prefix} admin {operator.id}({manager.user_title(operator)}) accept new member {member_id}({manager.user_title(member)})",
+                    f"{prefix} admin {operator.id}({manager.username(operator)}) "
+                    f"accept new member {member_id}({manager.username(member)})",
                 )
 
             # reject
@@ -204,11 +205,12 @@ async def new_member_callback(query: types.CallbackQuery):
                 # await chat.unban(member_id)
 
                 logger.warning(
-                    f"{prefix} admin {operator.id}({manager.user_title(operator)}) kick member {member_id}({manager.user_title(member)})"
+                    f"{prefix} admin {operator.id}({manager.username(operator)}) kick "
+                    f"member {member_id}({manager.username(member)})"
                 )
 
             else:
-                logger.warning(f"{prefix} admin {operator.id}({manager.user_title(operator)}) invalid data {data}")
+                logger.warning(f"{prefix} admin {operator.id}({manager.username(operator)}) invalid data {data}")
 
     # user is chat member
     elif is_self:
@@ -217,7 +219,7 @@ async def new_member_callback(query: types.CallbackQuery):
 
             await accepted_member(chat, msg, operator)
 
-            logger.info(f"{prefix} user {operator.id}({manager.user_title(operator)}) click ok button")
+            logger.info(f"{prefix} user {operator.id}({manager.username(operator)}) click ok button")
 
         elif data.endswith("__?"):
             content, reply_markup = build_new_member_message(operator, msg.date)
@@ -225,10 +227,10 @@ async def new_member_callback(query: types.CallbackQuery):
             await msg.edit_text(content, parse_mode="markdown")
             await msg.edit_reply_markup(reply_markup=reply_markup)
 
-            logger.info(f"{prefix} user {operator.id}({manager.user_title(operator)}) click error button, reload")
+            logger.info(f"{prefix} user {operator.id}({manager.username(operator)}) click error button, reload")
 
         else:
-            logger.warning(f"{prefix} member {operator.id}({manager.user_title(operator)}) invalid data {data}")
+            logger.warning(f"{prefix} member {operator.id}({manager.username(operator)}) invalid data {data}")
 
     await query.answer(show_alert=False)
 
@@ -305,7 +307,7 @@ def build_new_member_message(member: User, msg_timestamp):
     """
     构建新用户验证信息的按钮和文字内容
     """
-    title = manager.user_title(member)
+    title = manager.username(member)
 
     # 用户组
     items = random.sample(list(ICONS.items()), k=5)
@@ -345,10 +347,9 @@ async def accepted_member(chat: Chat, msg: Message, user: User):
         logger.error(f"{prefix} restrict {user.id} error {e}")
         return
 
-    logger.info(f"{prefix} member {user.id}({manager.user_title(user)}) is accepted")
+    logger.info(f"{prefix} member {user.id}({manager.username(user)}) is accepted")
 
-    # content = "欢迎 [%(title)s](tg://user?id=%(user_id)d) 加入群组，先请阅读群规。" % {"title": manager.user_title(user), "user_id": user.id}
-    title = manager.user_title(user)
+    title = manager.username(user)
     user_id = user.id
     content = (
         f"欢迎 [{title}](tg://user?id={user_id}) 加入群组，先请阅读群规。\n\n"
@@ -364,7 +365,7 @@ async def accepted_member(chat: Chat, msg: Message, user: User):
                 "Please choose your appropriate fancy profile photo and set it available in public. "
                 "It would improve your experience in communicate with everyone here and knowing you faster and better."
             )
-    except Exception:
+    except:
         logger.exception("get profile photos error")
 
     resp = await msg.answer(content, parse_mode="markdown")

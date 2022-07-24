@@ -1,13 +1,12 @@
 #!/usr/bin/python3
 
-from handlers import *
+from handlers import *  # noqa
 from manager import manager
+
 
 def main():
     manager.load_config()
-
     manager.setup()
-
     manager.load_handlers()
 
     try:
