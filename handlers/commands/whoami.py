@@ -8,7 +8,8 @@ logger = manager.logger
 
 
 @manager.register("message", commands=["id"])
-async def id(msg: types.Message, state: FSMContext):
+async def whoami(msg: types.Message, state: FSMContext):
+    """我的信息"""
     if msg.reply_to_message:
         user = msg.reply_to_message.from_user
     else:

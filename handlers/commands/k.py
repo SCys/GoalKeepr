@@ -10,7 +10,7 @@ BAN_MEMBER = 60  # 60s
 logger = manager.logger
 
 
-@manager.register("message", commands=["k"])
+@manager.register("message", commands=["k", "sb"])
 async def k(msg: types.Message, state: FSMContext):
     """踢人功能"""
     chat = msg.chat
