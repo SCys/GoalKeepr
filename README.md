@@ -19,6 +19,7 @@ https://github.com/SCys/GoalKeepr
 包括命令:
 
 k - 踢掉发信息的人
+sb - 踢掉发信息的人
 id - 获取用户信息，reply 信息则会返回发信人的详细信息
 asr - 识别音频内文本
 tts - 转换文本为音频
