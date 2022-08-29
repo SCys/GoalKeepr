@@ -18,12 +18,14 @@ https://github.com/SCys/GoalKeepr
 
 包括命令:
 
-k - 踢掉发信息的人
-id - 获取用户信息，reply 信息则会返回发信人的详细信息
-asr - 识别音频内文本
-tts - 转换文本为音频
-shorturl - 压缩 URL,支持多条 URL 同时压缩，每条之间换行即可
-tr - 将输入的文本翻译为中文
+<pre>
+k - 踢掉发信息的人 kicks off the person who sent the message
+id - 获取用户信息，reply 信息则会返回发信人的详细信息 gets the user information, reply message returns the sender details
+asr - 识别音频内文本 recognizes text within audio
+tts - 转换文本为音频 convert text to audio
+shorturl - 压缩 URL,支持多条 URL 同时压缩，每条之间换行即可 compress URLs, support multiple URLs at the same time, just line break between each one
+tr - 将输入的文本翻译为中文 translate the input text into Chinese
+</pre>
 
 配置文件 main.ini
 
