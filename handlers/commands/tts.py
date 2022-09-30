@@ -51,7 +51,7 @@ async def tts(msg: types.Message, state: FSMContext):
     cost = datetime.now()
 
     try:
-        data = await google_translate_tts(txt)
+        data = google_translate_tts(txt)
     except Exception as e:
         logger.exception(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) error")
         return
