@@ -38,7 +38,7 @@ async def tts(msg: types.Message, state: FSMContext):
         logger.warning(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) user is not found")
         return
 
-    await msg.reply("sorry, features is closed")
+    await msg.reply("sorry, tty is down")
     return
 
     txt = msg.text
