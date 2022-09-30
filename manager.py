@@ -121,11 +121,10 @@ class Manager:
     def username(self, _user: Union[types.ChatMember, types.User]):
         """获取用户名"""
 
-        user = _user
         if isinstance(_user, types.ChatMember):
-            user = _user.user
+            return _user.user.full_name
 
-        return user.full_name
+        return _user.full_name
 
     async def is_admin(self, chat: types.Chat, member: types.User):
         admins = await self.bot.get_chat_administrators(chat.id)

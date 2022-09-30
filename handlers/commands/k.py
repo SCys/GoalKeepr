@@ -1,12 +1,11 @@
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
-
 from manager import manager
 
 DELETED_AFTER = 5
-BAN_MEMBER = 60  # 60s
+BAN_MEMBER = 300  # 300s
 logger = manager.logger
 
 
@@ -40,20 +39,15 @@ async def k(msg: types.Message, state: FSMContext):
         logger.info(f"{prefix} is left chat member message, ignored")
         return
 
-    resp = await kick_member(chat, msg, user, msg_reply.from_user)
+    resp = await kick_member(chat, msg, user, msg_reply.from_user, False)
     for i in [msg, resp, msg_reply]:
         await manager.lazy_delete_message(chat.id, i.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
 
 
-async def kick_member(chat: types.Chat, msg: types.Message, administrator, member: types.User):
+async def kick_member(chat: types.Chat, msg: types.Message, administrator: types.User, member: types.User, auto_unban=True):
     """
     从 chat 踢掉对应的成员
     """
-    # FIXME check member permission
-    # if member and await manager.is_admin(chat, member.id):
-    #     print("member is administrator:", chat.id, administrator.id, member.id)
-    #     return
-
     id = member.id
 
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
@@ -63,13 +57,15 @@ async def kick_member(chat: types.Chat, msg: types.Message, administrator, membe
         logger.warning(f"{prefix} user {id}({member.first_name}) kick failed, maybe he is administrator")
         return
 
-    # unban member after 45s
-    await manager.lazy_session(chat.id, msg.message_id, id, "unban_member", datetime.now() + timedelta(seconds=BAN_MEMBER))
+    # 重新激活用户
+    if auto_unban:
+        ts_free = datetime.now() + timedelta(seconds=BAN_MEMBER)
+        await manager.lazy_session(chat.id, msg.message_id, id, "unban_member", ts_free)
+        logger.info(f"{prefix} user {id}({member.first_name}) will unban after {ts_free}")
 
     logger.info(f"{prefix} user {id}({member.first_name}) is kicked")
-    username = manager.username(member)
     return await msg.answer(
-        f"{username} 被剔除/kicked",
+        f"{manager.username(member)} 被剔除/Baned <= {manager.username(administrator)}",
         disable_web_page_preview=True,
         disable_notification=True,
     )
