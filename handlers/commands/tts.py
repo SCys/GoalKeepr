@@ -76,7 +76,8 @@ async def tts(msg: types.Message, state: FSMContext):
 def google_translate_tts(source: str):
     fp = BytesIO()
 
-    tts = gTTS(source)
+    # TODO support select lang
+    tts = gTTS(source, lang="zh-CN")
     tts.write_to_fp(fp)
 
     fp.seek(0)
