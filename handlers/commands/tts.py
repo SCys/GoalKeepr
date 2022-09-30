@@ -38,6 +38,9 @@ async def tts(msg: types.Message, state: FSMContext):
         logger.warning(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) user is not found")
         return
 
+    await msg.reply("sorry, features is closed")
+    return
+
     txt = msg.text
     if msg.reply_to_message:
         txt = msg.reply_to_message.text
@@ -54,41 +57,9 @@ async def tts(msg: types.Message, state: FSMContext):
     logger.info(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) message {len(txt)}")
 
     cost = datetime.now()
-    data = b""
 
     try:
-        timeout = aiohttp.ClientTimeout(total=60)
-
-        async with ClientSession(timeout=timeout) as session:
-            async with session.ws_connect(URL_WS + manager.config["tts"]["token"]) as ws:
-                # send command
-                await ws.send_str(CMD_PREPARE)
-                await ws.send_str(
-                    "X-RequestId:fe83fbefb15c7739fe674d9f3e81d38f\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'><voice  name='"
-                    "Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)'><prosody pitch='+0Hz' rate ='+0%' volume='+0%'>"
-                    f"{txt}</prosody></voice></speak>\r\n"
-                )
-
-                async for i in ws:
-                    if i.type == aiohttp.WSMsgType.TEXT:
-                        if "turn.end" in i.data:
-                            break
-
-                    elif i.type == aiohttp.WSMsgType.BINARY:
-                        if b"turn.end" in i.data:
-                            break
-                        elif b"Path:audio\r\n" in i.data:
-                            header, bin = i.data.split(b"Path:audio\r\n")
-                            # logger.info(f"got audio:{header}")
-                            data += bin
-
-                    elif i.type == aiohttp.WSMsgType.ERROR:
-                        logger.info(f"ws connection closed with exception {i.data}")
-                        break
-                    else:
-                        logger.info(f"unknown message type: {i.type}")
-
-                await ws.close()
+        data = await bind_tts(txt)
     except Exception as e:
         logger.exception(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) error")
         return
@@ -108,3 +79,44 @@ async def tts(msg: types.Message, state: FSMContext):
     logger.info(
         f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) cost {(datetime.now() - cost).total_seconds()}"
     )
+
+
+# async def bind_tts(source):
+#     """outdated"""
+#     data = b""
+#     timeout = aiohttp.ClientTimeout(total=60)
+
+#     async with ClientSession(timeout=timeout) as session:
+#         async with session.ws_connect(URL_WS + manager.config["tts"]["token"]) as ws:
+#             # send command
+#             await ws.send_str(CMD_PREPARE)
+#             await ws.send_str(
+#                 "X-RequestId:fe83fbefb15c7739fe674d9f3e81d38f\r\n"
+#                 "Content-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n"
+#                 "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
+#                 "<voice  name='Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)'><prosody pitch='+0Hz' rate ='+0%' volume='+0%'>"
+#                 f"{source}</prosody></voice></speak>\r\n"
+#             )
+
+#             async for i in ws:
+#                 if i.type == aiohttp.WSMsgType.TEXT:
+#                     if "turn.end" in i.data:
+#                         break
+
+#                 elif i.type == aiohttp.WSMsgType.BINARY:
+#                     if b"turn.end" in i.data:
+#                         break
+#                     elif b"Path:audio\r\n" in i.data:
+#                         header, bin = i.data.split(b"Path:audio\r\n")
+#                         # logger.info(f"got audio:{header}")
+#                         data += bin
+
+#                 elif i.type == aiohttp.WSMsgType.ERROR:
+#                     logger.info(f"ws connection closed with exception {i.data}")
+#                     break
+#                 else:
+#                     logger.info(f"unknown message type: {i.type}")
+
+#             await ws.close()
+
+#     return data
