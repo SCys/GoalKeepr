@@ -1,14 +1,13 @@
-# import asyncio.exceptions
 import io
 import re
 from datetime import datetime
+from io import BytesIO
 
-from pydub import AudioSegment
-import aiohttp
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
-from aiohttp.client import ClientSession
+from gtts import gTTS
 from manager import manager
+from pydub import AudioSegment
 
 logger = manager.logger
 
@@ -38,9 +37,6 @@ async def tts(msg: types.Message, state: FSMContext):
         logger.warning(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) user is not found")
         return
 
-    await msg.reply("sorry, tty is down")
-    return
-
     txt = msg.text
     if msg.reply_to_message:
         txt = msg.reply_to_message.text
@@ -59,7 +55,7 @@ async def tts(msg: types.Message, state: FSMContext):
     cost = datetime.now()
 
     try:
-        data = await bind_tts(txt)
+        data = await google_translate_tts(txt)
     except Exception as e:
         logger.exception(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) error")
         return
@@ -79,6 +75,16 @@ async def tts(msg: types.Message, state: FSMContext):
     logger.info(
         f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) cost {(datetime.now() - cost).total_seconds()}"
     )
+
+
+def google_translate_tts(source: str):
+    fp = BytesIO()
+
+    tts = gTTS(source)
+    tts.write_to_fp(fp)
+
+    fp.seek(0)
+    return fp.read()
 
 
 # async def bind_tts(source):

@@ -7,3 +7,4 @@ pydub
 tencentcloud-sdk-python
 translators
 aiogram
+gTTS
