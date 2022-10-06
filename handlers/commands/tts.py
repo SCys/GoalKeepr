@@ -47,7 +47,7 @@ async def tts(msg: types.Message, state: FSMContext):
         logger.warning(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) send empty text")
         return
 
-    logger.info(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) message {len(txt)}")
+    logger.info(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) message size is {len(txt)}")
 
     cost = datetime.now()
 
@@ -58,8 +58,8 @@ async def tts(msg: types.Message, state: FSMContext):
         logger.exception(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) error")
         return
 
-    if not data:
-        logger.error(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) no data")
+    if not data or len(data) == 0:
+        logger.warning(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) is empty data")
         return
 
     output = io.BytesIO()
@@ -88,6 +88,6 @@ def google_translate_tts(source: str):
 
 async def edge_ext(source: str):
     communicate = edge_tts.Communicate()
-    async for i in communicate.run(source, voice="zh-CN-XiaoxiaoNeural"):
+    async for i in communicate.run(source, voice="Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)"):
         if i[2] is not None:
             return i[2]
