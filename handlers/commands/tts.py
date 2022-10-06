@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from io import BytesIO
 
+import edge_tts
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
 from gtts import gTTS
@@ -51,8 +52,9 @@ async def tts(msg: types.Message, state: FSMContext):
     cost = datetime.now()
 
     try:
-        data = google_translate_tts(txt)
-    except Exception as e:
+        # data = google_translate_tts(txt)
+        data = await edge_tts(txt)
+    except Exception:
         logger.exception(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) error")
         return
 
@@ -84,50 +86,8 @@ def google_translate_tts(source: str):
     return fp.read()
 
 
-def paddle_speech(source: str):
-    pass
-
-
-# URL_ENGINES = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken="
-# URL_WS = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken="
-# CMD_PREPARE = 'Content-Type:application/json; charset=utf-8\r\n\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"true"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n'
-
-# async def bind_tts(source):
-#     """outdated"""
-#     data = b""
-#     timeout = aiohttp.ClientTimeout(total=60)
-
-#     async with ClientSession(timeout=timeout) as session:
-#         async with session.ws_connect(URL_WS + manager.config["tts"]["token"]) as ws:
-#             # send command
-#             await ws.send_str(CMD_PREPARE)
-#             await ws.send_str(
-#                 "X-RequestId:fe83fbefb15c7739fe674d9f3e81d38f\r\n"
-#                 "Content-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n"
-#                 "<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>
-#                 "<voice  name='Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)'><prosody pitch='+0Hz' rate ='+0%' volume='+0%'>"
-#                 f"{source}</prosody></voice></speak>\r\n"
-#             )
-
-#             async for i in ws:
-#                 if i.type == aiohttp.WSMsgType.TEXT:
-#                     if "turn.end" in i.data:
-#                         break
-
-#                 elif i.type == aiohttp.WSMsgType.BINARY:
-#                     if b"turn.end" in i.data:
-#                         break
-#                     elif b"Path:audio\r\n" in i.data:
-#                         header, bin = i.data.split(b"Path:audio\r\n")
-#                         # logger.info(f"got audio:{header}")
-#                         data += bin
-
-#                 elif i.type == aiohttp.WSMsgType.ERROR:
-#                     logger.info(f"ws connection closed with exception {i.data}")
-#                     break
-#                 else:
-#                     logger.info(f"unknown message type: {i.type}")
-
-#             await ws.close()
-
-#     return data
+async def edge_tts(source: str):
+    communicate = edge_tts.Communicate()
+    async for i in communicate.run(source, voice="zh-CN-XiaoxiaoNeural"):
+        if i[2] is not None:
+            return i[2]
