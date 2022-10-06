@@ -81,6 +81,11 @@ async def new_members(msg: types.Message, state: FSMContext):
         logger.info(f"{prefix} administrator {msg.from_user.id} added members")
         return
 
+    try:
+        logger.info(f"{prefix} found new member at {now} ttl is {datetime.now() - msg.date}")
+    except Exception as e:
+        logger.error(f"check point #1 failed:{e}")
+
     for member in members:
         if member.is_bot:
             continue
@@ -155,10 +160,10 @@ async def new_member_callback(query: types.CallbackQuery):
 
     # 判断是否需要处理
     if (
-            msg.reply_markup.inline_keyboard is None
-            or len(msg.reply_markup.inline_keyboard) != 2
-            or len(msg.reply_markup.inline_keyboard[0]) != 5
-            or len(msg.reply_markup.inline_keyboard[1]) != 2
+        msg.reply_markup.inline_keyboard is None
+        or len(msg.reply_markup.inline_keyboard) != 2
+        or len(msg.reply_markup.inline_keyboard[0]) != 5
+        or len(msg.reply_markup.inline_keyboard[1]) != 2
     ):
         return
 
