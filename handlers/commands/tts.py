@@ -88,6 +88,11 @@ def google_translate_tts(source: str):
 
 async def edge_ext(source: str):
     communicate = edge_tts.Communicate()
-    async for i in communicate.run(source, voice="Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)"):
+
+
+    data = b''
+    async for i in communicate.run(source, voice="zh-CN-XiaoxiaoNeural"):
         if i[2] is not None:
-            return i[2]
+            data += i[2]
+
+    return data
