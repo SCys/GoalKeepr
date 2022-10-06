@@ -206,7 +206,7 @@ async def new_member_callback(query: types.CallbackQuery):
                 if not await manager.delete_message(chat.id, msg.message_id):
                     await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
-                await chat.kick(member_id, until_date=timedelta(days=30))
+                await chat.kick(member_id, until_date=timedelta(days=30), revoke_messages=True)
                 # await chat.unban(member_id)
 
                 logger.warning(
@@ -276,7 +276,7 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
 
     try:
         # await bot.ban_chat_member(chat_id, member_id)
-        await chat.kick(member_id)
+        await chat.kick(member_id, revoke_messages=True)
 
         # unban member after 45s
         await manager.lazy_session(chat.id, message_id, member_id, "unban_member", datetime.now() + timedelta(seconds=45))
