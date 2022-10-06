@@ -89,8 +89,7 @@ def google_translate_tts(source: str):
 async def edge_ext(source: str):
     communicate = edge_tts.Communicate()
 
-
-    data = b''
+    data = b""
     async for i in communicate.run(source, voice="zh-CN-XiaoxiaoNeural"):
         if i[2] is not None:
             data += i[2]
