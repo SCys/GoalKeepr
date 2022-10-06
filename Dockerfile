@@ -1,15 +1,12 @@
-FROM python:3.9-slim-buster AS build
-RUN python3 -m venv --copies /venv && /venv/bin/pip install --upgrade pip
+FROM python:3
 
-FROM build AS build-venv
+WORKDIR /app
+
 COPY requirements.txt /requirements.txt
-RUN /venv/bin/pip install --disable-pip-version-check -r /requirements.txt
 
-FROM gcr.io/distroless/python3-debian10
-WORKDIR /data
-COPY --from=build-venv /venv /venv
-COPY --from=build-venv /usr/local /usr
+RUN python -m pip install -U pip && \
+    pip install -r /requirements.txt
+
 COPY . /app/
-VOLUME ["/data"]
-ENTRYPOINT ["/venv/bin/python"]
-CMD ["/app/main.py"]
+
+CMD ["python", "main.py"]
