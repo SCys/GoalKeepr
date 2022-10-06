@@ -53,7 +53,7 @@ async def tts(msg: types.Message, state: FSMContext):
 
     try:
         # data = google_translate_tts(txt)
-        data = await edge_tts(txt)
+        data = await edge_ext(txt)
     except Exception:
         logger.exception(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) error")
         return
@@ -86,7 +86,7 @@ def google_translate_tts(source: str):
     return fp.read()
 
 
-async def edge_tts(source: str):
+async def edge_ext(source: str):
     communicate = edge_tts.Communicate()
     async for i in communicate.run(source, voice="zh-CN-XiaoxiaoNeural"):
         if i[2] is not None:
