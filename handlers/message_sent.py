@@ -39,7 +39,7 @@ async def message_sent(msg: types.Message, state: FSMContext):
                 await (
                     pipe.expire(key, 5)
                     .hset(key, "message", msg.message_id)
-                    .hset(key, "message_date", msg.date)
+                    .hset(key, "message_date", msg.date.isoformat())
                     .hset(key, "message_text", msg.text)
                     .execute()
                 )
@@ -52,7 +52,7 @@ async def message_sent(msg: types.Message, state: FSMContext):
                         key,
                         {
                             "message": msg.message_id,
-                            "message_date": msg.date,
+                            "message_date": msg.date.isoformat(),
                             "message_content": msg.text,
                         },
                     )
