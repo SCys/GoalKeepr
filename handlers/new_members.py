@@ -156,6 +156,7 @@ async def new_members(msg: types.Message, state: FSMContext):
 
                     await chat.kick(i.id, until_date=timedelta(seconds=60), revoke_messages=True)
                     await chat.delete_message(message_id)
+                    continue
         except Exception as e:
             logger.error(f"{prefix} new member {member_id}({member_name}) is checking message failed:{e}")
 
