@@ -2,10 +2,9 @@
 
 from handlers import *  # noqa
 from manager import manager
-import asyncio
 
 
-async def main():
+def main():
     manager.load_config()
     manager.setup()
     manager.load_handlers()
