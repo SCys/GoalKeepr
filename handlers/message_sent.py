@@ -38,7 +38,7 @@ async def message_sent(msg: types.Message, state: FSMContext):
             async with rdb.pipeline(transaction=True) as pipe:
                 await (
                     pipe.ttl(key, 5)
-                    .hset(key, "message", msg.id)
+                    .hset(key, "message", msg.message_id)
                     .hset(key, "message_date", msg.date)
                     .hset(key, "message_text", msg.text)
                     .execute()
@@ -51,7 +51,7 @@ async def message_sent(msg: types.Message, state: FSMContext):
                     pipe.hmset(
                         key,
                         {
-                            "message": msg.id,
+                            "message": msg.message_id,
                             "message_date": msg.date,
                             "message_content": msg.text,
                         },
