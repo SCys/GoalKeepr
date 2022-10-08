@@ -59,4 +59,4 @@ async def message_sent(msg: types.Message, state: FSMContext):
                     .execute()
                 )
 
-            logger.info(f"{prefix} add redis record {key} {msg.message_id} {msg.date}")
+            logger.debug(f"{prefix} add redis record {key} {msg.message_id} {msg.date}")
