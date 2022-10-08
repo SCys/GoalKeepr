@@ -27,7 +27,6 @@ async def message_sent(msg: types.Message, state: FSMContext):
 
     # ignore from administrator
     if member and await manager.is_admin(chat, member):
-        logger.info(f"{prefix} administrator {member.id} added members")
         return
 
     # store member last message id and date
