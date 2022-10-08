@@ -26,17 +26,17 @@ async def asr(msg: types.Message, state: FSMContext):
 
     chat = msg.chat
 
-    if not manager.config["tts"]["token"]:
-        logger.warning("tts token is missing")
+    if "asr" not in config:
+        logger.warning("asr command is disabled")
         return
 
     user = msg.from_user
-    users = [int(i) for i in config["asr"]["users"].split(",")]
-    if user and user and user.id not in users:
-        logger.warning(
-            f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) user is not permission, users {users}"
-        )
-        return
+    # users = [int(i) for i in config["asr"]["users"].split(",")]
+    # if user and user and user.id not in users:
+    #     logger.warning(
+    #         f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) user is not permission, users {users}"
+    #     )
+    #     return
 
     target = msg
     if msg.reply_to_message:

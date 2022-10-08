@@ -37,8 +37,6 @@ class Manager:
         for key, section in {
             "default": {"debug": False},
             "telegram": {"token": ""},  # telegram robot token
-            "tts": {"token": ""},  # TTS command token
-            "redis": {"dsn": ""},
         }.items():
             config.setdefault(key, section)
 
@@ -230,6 +228,9 @@ class Manager:
 
     async def get_redis(self):
         """setup redis connections"""
+        if "redis" not in self.config:
+            return None
+
         if self.rdb is None:
             redis_dsn = self.config["redis"]["dsn"]
             self.rdb = await aioredis.from_url(redis_dsn)

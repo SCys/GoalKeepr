@@ -1,12 +1,10 @@
 import io
 import re
 from datetime import datetime
-from io import BytesIO
 
 import edge_tts
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
-from gtts import gTTS
 from manager import manager
 from pydub import AudioSegment
 
@@ -23,10 +21,6 @@ async def tts(msg: types.Message, state: FSMContext):
     chat = msg.chat
     if chat.type not in SUPPORT_GROUP_TYPES:
         logger.warning("chat type is not support")
-        return
-
-    if not manager.config["tts"]["token"]:
-        logger.warning("tts token is missing")
         return
 
     user = msg.from_user
@@ -75,15 +69,12 @@ async def tts(msg: types.Message, state: FSMContext):
     )
 
 
-def google_translate_tts(source: str):
-    fp = BytesIO()
-
-    # TODO support select lang
-    tts = gTTS(source, lang="zh-CN")
-    tts.write_to_fp(fp)
-
-    fp.seek(0)
-    return fp.read()
+# def google_translate_tts(source: str):
+#     fp = BytesIO()
+#     tts = gTTS(source, lang="zh-CN")
+#     tts.write_to_fp(fp)
+#     fp.seek(0)
+#     return fp.read()
 
 
 async def edge_ext(source: str):
