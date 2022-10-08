@@ -44,7 +44,7 @@ async def message_sent(msg: types.Message, state: FSMContext):
                     .execute()
                 )
 
-            logger.debug(f"{prefix} update redis record {msg.id} {msg.date}")
+            logger.debug(f"{prefix} update redis record {key} {msg.message_id} {msg.date}")
         else:
             async with rdb.pipeline(transaction=True) as pipe:
                 await (
@@ -60,4 +60,4 @@ async def message_sent(msg: types.Message, state: FSMContext):
                     .execute()
                 )
 
-            logger.debug(f"{prefix} add redis record {msg.id} {msg.date}")
+            logger.debug(f"{prefix} add redis record {key} {msg.message_id} {msg.date}")
