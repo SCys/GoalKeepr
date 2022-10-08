@@ -33,6 +33,7 @@ async def message_sent(msg: types.Message, state: FSMContext):
     # store member last message id and date
     if rdb := await manager.get_redis():
         key = f"{chat.id}_{member.id}"
+
         if await rdb.exists(key):
             async with rdb.pipeline(transaction=True) as pipe:
                 await (
@@ -42,6 +43,8 @@ async def message_sent(msg: types.Message, state: FSMContext):
                     .hset(key, "message_text", msg.text)
                     .execute()
                 )
+
+            logger.debug(f"{prefix} update redis record {msg.id} {msg.date}")
         else:
             async with rdb.pipeline(transaction=True) as pipe:
                 await (
@@ -56,3 +59,5 @@ async def message_sent(msg: types.Message, state: FSMContext):
                     .ttl(key, 5)
                     .execute()
                 )
+
+            logger.debug(f"{prefix} add redis record {msg.id} {msg.date}")

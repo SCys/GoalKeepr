@@ -115,8 +115,6 @@ async def new_members(msg: types.Message, state: FSMContext):
     await asyncio.sleep(3)
     # logger.debug(f"{prefix} new member event wait 5s")
 
-    rdb = await manager.get_redis()
-
     # 开始发出验证信息
     for i in members:
         if i.is_bot:
@@ -137,11 +135,12 @@ async def new_members(msg: types.Message, state: FSMContext):
             continue
 
         # checkout message sent after join 10ms
-        key = f"{chat.id}_{i.id}"
-        if rdb and await rdb.exists(key):
-            content = await rdb.hget(key, "message_content")
-            date = await rdb.hget(key, "message_date")
-            logger.warning(f"{prefix} found user sending message is the same as joining the group, \'{content}\', date: \'{date}\'")
+        if rdb := await manager.get_redis():
+            key = f"{chat.id}_{i.id}"
+            if await rdb.exists(key):
+                content = await rdb.hget(key, "message_content")
+                date = await rdb.hget(key, "message_date")
+                logger.warning(f"{prefix} found user sending message is the same as joining the group, '{content}', date: '{date}'")
 
         content, reply_markup = build_new_member_message(i, now)
 
