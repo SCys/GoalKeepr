@@ -137,7 +137,7 @@ async def new_members(msg: types.Message, state: FSMContext):
             continue
 
         # checkout message sent after join 10ms
-        key = f"{chat.id}_{member.id}"
+        key = f"{chat.id}_{i.id}"
         if rdb and await rdb.exists(key):
             content = await rdb.hget(key, "message_content")
             date = await rdb.hget(key, "message_date")
