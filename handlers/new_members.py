@@ -115,10 +115,7 @@ async def new_members(msg: types.Message, state: FSMContext):
     await asyncio.sleep(3)
     # logger.debug(f"{prefix} new member event wait 5s")
 
-    now = datetime.now()
-
-    # store member last message id and date
-    rdb = manager.rdb
+    rdb = await manager.get_redis()
 
     # 开始发出验证信息
     for i in members:

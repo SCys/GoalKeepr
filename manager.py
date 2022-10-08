@@ -4,9 +4,9 @@ import sys
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
-from typing import Union
-import aioredis
+from typing import Optional, Union
 
+import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.utils.exceptions import BadRequest, MessageCantBeDeleted, MessageToDeleteNotFound
@@ -20,7 +20,7 @@ class Manager:
     bot: Bot
     dp: Dispatcher
 
-    rdb: aioredis.Redis
+    rdb: Optional[aioredis.Redis] = None
 
     config = ConfigParser()
 
@@ -56,7 +56,7 @@ class Manager:
         if args.token:
             config["telegram"]["token"] = args.token
 
-    async def setup(self):
+    def setup(self):
         token = self.config["telegram"]["token"]
         if not token:
             logger.error("telegram token is missing")
@@ -67,10 +67,6 @@ class Manager:
 
         self.dp = Dispatcher(self.bot)
         logger.info("dispatcher is setup")
-
-        # setup redis connections
-        redis_dsn = self.config["redis"]["dsn"]
-        self.rdb = await aioredis.from_url(redis_dsn)
 
     def load_handlers(self):
         for func, type_name, args, kwargs in self.handlers:
@@ -230,6 +226,14 @@ class Manager:
             return False
 
         return True
+
+    async def get_redis(self):
+        """setup redis connections"""
+        if self.rdb is None:
+            redis_dsn = self.config["redis"]["dsn"]
+            self.rdb = await aioredis.from_url(redis_dsn)
+
+        return self.rdb
 
 
 manager = Manager()

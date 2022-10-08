@@ -7,7 +7,7 @@ import asyncio
 
 async def main():
     manager.load_config()
-    await manager.setup()
+    manager.setup()
     manager.load_handlers()
 
     try:
@@ -21,4 +21,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

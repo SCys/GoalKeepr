@@ -9,7 +9,6 @@ SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 logger = manager.logger
 
 
-
 @manager.register("message", content_types=[types.ContentType.TEXT])
 async def message_sent(msg: types.Message, state: FSMContext):
     chat = msg.chat
@@ -32,7 +31,7 @@ async def message_sent(msg: types.Message, state: FSMContext):
         return
 
     # store member last message id and date
-    if rdb := manager.db:
+    if rdb := await manager.get_redis():
         key = f"{chat.id}_{member.id}"
         if await rdb.exists(key):
             async with rdb.pipeline(transaction=True) as pipe:
