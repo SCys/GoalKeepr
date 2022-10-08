@@ -1,4 +1,5 @@
 import asyncio
+import re
 import random
 from datetime import datetime, timedelta
 
@@ -19,6 +20,8 @@ WELCOME_TEXT = (
     "You would be allowed to send the message after choosing the right option for [*%(icon)s*] through pressing the correct button"
 )
 DELETED_AFTER = 30
+
+RE_BAD_USERNAME = re.compile(r"[a-z]+_[a-z]+[0-9]+")
 
 logger = manager.logger
 
@@ -114,6 +117,9 @@ async def new_members(msg: types.Message, state: FSMContext):
 
     now = datetime.now()
 
+    # store member last message id and date
+    rdb = manager.rdb
+
     # 开始发出验证信息
     for i in members:
         if i.is_bot:
@@ -121,7 +127,7 @@ async def new_members(msg: types.Message, state: FSMContext):
 
         # 如果已经被剔除，则不做处理
         member = await manager.chat_member(chat, i.id)
-        if not member.is_member:
+        if not member or not member.is_member:
             logger.info(f"{prefix} new member {i.id}({manager.username(i)}) is kicked")
             continue
 
@@ -132,6 +138,13 @@ async def new_members(msg: types.Message, state: FSMContext):
         if member.can_send_messages:
             logger.info(f"{prefix} new member {i}({manager.username(i)}) rights is accepted")
             continue
+
+        # checkout message sent after join 10ms
+        key = f"{chat.id}_{member.id}"
+        if rdb and await rdb.exists(key):
+            content = await rdb.hget(key, "message_content")
+            date = await rdb.hget(key, "message_date")
+            logger.warning(f"{prefix} found user sending message is the same as joining the group, \'{content}\', date: \'{date}\'")
 
         content, reply_markup = build_new_member_message(i, now)
 

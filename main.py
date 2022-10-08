@@ -2,11 +2,12 @@
 
 from handlers import *  # noqa
 from manager import manager
+import asyncio
 
 
-def main():
+async def main():
     manager.load_config()
-    manager.setup()
+    await manager.setup()
     manager.load_handlers()
 
     try:
@@ -20,4 +21,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

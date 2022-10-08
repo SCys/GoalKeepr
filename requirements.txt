@@ -9,3 +9,4 @@ translators
 aiogram
 gTTS
 edge-tts
+aioredis

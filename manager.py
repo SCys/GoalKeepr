@@ -5,6 +5,7 @@ from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
 from typing import Union
+import aioredis
 
 import loguru
 from aiogram import Bot, Dispatcher, executor, types
@@ -18,6 +19,8 @@ logger = loguru.logger
 class Manager:
     bot: Bot
     dp: Dispatcher
+
+    rdb: aioredis.Redis
 
     config = ConfigParser()
 
@@ -41,8 +44,8 @@ class Manager:
         # load file
         if os.path.isfile("main.ini"):
             try:
-                with open("main.ini", "r") as fobj:
-                    config.read_file(fobj)
+                with open("main.ini", "r") as f:
+                    config.read_file(f)
             except IOError:
                 pass
 
@@ -53,7 +56,7 @@ class Manager:
         if args.token:
             config["telegram"]["token"] = args.token
 
-    def setup(self):
+    async def setup(self):
         token = self.config["telegram"]["token"]
         if not token:
             logger.error("telegram token is missing")
@@ -64,6 +67,10 @@ class Manager:
 
         self.dp = Dispatcher(self.bot)
         logger.info("dispatcher is setup")
+
+        # setup redis connections
+        redis_dsn = self.config["redis"]["dsn"]
+        self.rdb = await aioredis.from_url(redis_dsn)
 
     def load_handlers(self):
         for func, type_name, args, kwargs in self.handlers:
