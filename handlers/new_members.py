@@ -120,32 +120,49 @@ async def new_members(msg: types.Message, state: FSMContext):
         if i.is_bot:
             continue
 
+        member_id = i.id
+        member_name = manager.username(i)
+
         # 如果已经被剔除，则不做处理
         member = await manager.chat_member(chat, i.id)
         if not member or not member.is_member:
-            logger.info(f"{prefix} new member {i.id}({manager.username(i)}) is kicked")
+            logger.info(f"{prefix} new member {member_id}({member_name}) is left")
             continue
 
         if member.is_chat_admin():
-            logger.info(f"{prefix} new member {i}({manager.username(i)}) is admin")
+            logger.info(f"{prefix} new member {member_id}({member_name}) is admin")
             continue
 
         if member.can_send_messages:
-            logger.info(f"{prefix} new member {i}({manager.username(i)}) rights is accepted")
+            logger.info(f"{prefix} new member {member_id}({member_name}) rights is accepted")
             continue
 
         # checkout message sent after join 10ms
-        if rdb := await manager.get_redis():
-            key = f"{chat.id}_{i.id}"
-            if await rdb.exists(key):
-                content = await rdb.hget(key, "message_content")
-                date = await rdb.hget(key, "message_date")
-                logger.warning(f"{prefix} found user sending message is the same as joining the group, '{content}', date: '{date}'")
+        try:
+            if rdb := await manager.get_redis():
+                key = f"{chat.id}_{i.id}"
+                if await rdb.exists(key):
+                    message_id: bytes = await rdb.hget(key, "message")
+                    message_content: bytes = await rdb.hget(key, "message_content")
+                    message_date: bytes = await rdb.hget(key, "message_date")
 
-        content, reply_markup = build_new_member_message(i, now)
+                    message_id = int(message_id.decode())
+                    message_content = message_content.decode()
+                    message_date = message_date.decode()
+
+                    logger.warning(
+                        f"{prefix} new member {member_id}({member_name}) sent message is the same as joining the group: content:'{message_content}', date:'{message_date}'"
+                    )
+
+                    await chat.kick(i.id, until_date=timedelta(seconds=60), revoke_messages=True)
+                    await chat.delete_message(message_id)
+        except Exception as e:
+            logger.error(f"{prefix} new member {member_id}({member_name}) is checking message failed:{e}")
+
+        message_content, reply_markup = build_new_member_message(i, now)
 
         # reply = await msg.reply(content, parse_mode="markdown", reply_markup=reply_markup)
-        reply = await manager.bot.send_message(chat.id, content, parse_mode="markdown", reply_markup=reply_markup)
+        reply = await manager.bot.send_message(chat.id, message_content, parse_mode="markdown", reply_markup=reply_markup)
 
         await manager.lazy_session(chat.id, msg.message_id, i.id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
         await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER))
