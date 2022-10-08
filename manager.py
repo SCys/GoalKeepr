@@ -38,6 +38,7 @@ class Manager:
             "default": {"debug": False},
             "telegram": {"token": ""},  # telegram robot token
             "tts": {"token": ""},  # TTS command token
+            "redis": {"dsn": ""},
         }.items():
             config.setdefault(key, section)
 
