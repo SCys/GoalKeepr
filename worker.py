@@ -3,7 +3,7 @@ import asyncio
 from aiogram.bot.bot import Bot
 
 import database
-from handlers.new_members import new_member_check, unban_member  # NOQA: 引入处理器
+from handlers.member_captcha import new_member_check, unban_member  # NOQA: 引入处理器
 from manager import manager
 
 is_running = False

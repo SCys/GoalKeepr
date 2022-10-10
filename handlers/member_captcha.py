@@ -1,3 +1,14 @@
+
+"""
+校验新入群成员
+
+现在提供静默规则如下：
+
+- 如果进群立即发言（在机器人反应前），则认为会被立即 Ban 60s
+
+如果管理员设置高级设置，可以提供 website 的检测
+"""
+
 import asyncio
 import re
 import random
@@ -63,7 +74,7 @@ ICONS = {
 
 
 @manager.register("message", content_types=[types.ContentType.NEW_CHAT_MEMBERS])
-async def new_members(msg: types.Message, state: FSMContext):
+async def member_captcha(msg: types.Message, state: FSMContext):
     chat = msg.chat
     members = msg.new_chat_members
 
