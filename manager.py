@@ -1,4 +1,3 @@
-import argparse
 import os.path
 import sys
 from configparser import ConfigParser
@@ -15,8 +14,21 @@ import database
 
 logger = loguru.logger
 
+SETTINGS_TEMPLATE = {
+    "default": {"debug": False},
+    "telegram": {"token": ""},  # telegram robot token
+    "captcha": {
+        "cloudflare_turnstile": False,  # enable cloudflare turnstile detector
+        "cloudflare_turnstile_token": "",
+        "google_recaptcha": False,  # enable google recaptcha detector
+        "google_recaptcha_token": "",
+    },
+}
+
 
 class Manager:
+    """管理模块"""
+
     bot: Bot
     dp: Dispatcher
 
@@ -32,28 +44,22 @@ class Manager:
     logger = logger
 
     def load_config(self):
+        """加载 main.ini，默认会配置相关代码"""
         config = self.config
 
-        for key, section in {
-            "default": {"debug": False},
-            "telegram": {"token": ""},  # telegram robot token
-        }.items():
+        # 设置默认模板
+        for key, section in SETTINGS_TEMPLATE.items():
             config.setdefault(key, section)
 
-        # load file
+        # 从文件读取
         if os.path.isfile("main.ini"):
             try:
-                with open("main.ini", "r") as f:
+                with open("main.ini", "r", encoding="utf-8") as f:
                     config.read_file(f)
+
+                logger.info("settings is loaded from main.ini")
             except IOError:
                 pass
-
-        # load cmd arguments
-        parser = argparse.ArgumentParser(description="arguments:")
-        parser.add_argument("--token", dest="token", help="telegram bot token", type=str)
-        args = parser.parse_args()
-        if args.token:
-            config["telegram"]["token"] = args.token
 
     def setup(self):
         token = self.config["telegram"]["token"]
@@ -68,11 +74,17 @@ class Manager:
         logger.info("dispatcher is setup")
 
     def load_handlers(self):
-        for func, type_name, args, kwargs in self.handlers:
-            method = getattr(self.dp, f"{type_name}_handler")
-            if callable(method):
-                method(*args, **kwargs)(func)
-                logger.info(f"dispatcher:{method.__name__}({args},{kwargs})({func})")
+        dp = self.dp
+        handlers = self.handlers
+
+        for func, type_name, args, kwargs in handlers:
+            method = getattr(dp, f"register_{type_name}_handler")
+            if not callable(method):
+                continue
+
+            method(func, *args, **kwargs)
+            logger.info(f"dispatcher:{method.__name__}({func.__name__}, {args}, {kwargs})")
+
 
     def register(self, type_name, *router_args, **router_kwargs):
         """

@@ -6,18 +6,23 @@ from manager import manager
 
 DELETED_AFTER = 5
 BAN_MEMBER = 300  # 300s
+
 logger = manager.logger
 
 
-@manager.register("message", commands=["k", "sb"])
+@manager.register("message", commands=["k", "sb"], commands_ignore_caption=True, commands_ignore_mention=True)
 async def k(msg: types.Message, state: FSMContext):
     """踢人功能"""
     chat = msg.chat
     user = msg.from_user
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
 
+    if not user:
+        logger.warning(f"{prefix} message without user, ignored")
+        return
+
     # check permission
-    if not user or not await manager.is_admin(chat, user):
+    if not await manager.is_admin(chat, user):
         logger.warning(f"{prefix} user {user.id}({user.first_name}) is not admin")
         return
 

@@ -14,7 +14,7 @@ async def message_sent(msg: types.Message, state: FSMContext):
     chat = msg.chat
     member = msg.from_user
 
-    prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+    prefix = f"[message_sent]chat {chat.id}({chat.title}) msg {msg.message_id}"
 
     # 忽略太久之前的信息
     now = datetime.now()

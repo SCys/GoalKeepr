@@ -20,7 +20,7 @@ async def whoami(msg: types.Message, state: FSMContext):
 
     content = f"""ID：\t{user.id}\n完整名：\t{user.full_name}\n分享URL：{user.url}"""
     msg_reply = await msg.reply(content, disable_notification=True)
-    logger.info(f"chat {msg.chat.id}({msg.chat.title}) msg {msg.message_id} user {user.id}({user.first_name})")
+    logger.info(f"[id]chat {msg.chat.id}({msg.chat.title}) msg {msg.message_id} user {user.id}({user.first_name})")
 
     # auto delete after 5s at (super)group
     if msg.chat.type in ["supergroup", "group"]:
