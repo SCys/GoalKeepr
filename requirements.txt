@@ -6,6 +6,6 @@ orjson
 pydub
 tencentcloud-sdk-python
 translators
-aiogram
+aiogram==2.22.2
 edge-tts
 aioredis
