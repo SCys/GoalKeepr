@@ -1,4 +1,4 @@
-from datetime import  timedelta
+from datetime import timedelta
 
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
@@ -60,10 +60,10 @@ async def ban_member(chat: types.Chat, msg: types.Message, administrator: types.
 
     # 剔除以后就在黑名单中
     if not await chat.kick(id, revoke_messages=True):
-        logger.warning(f"{prefix} user {id}({member.first_name}) kick failed, maybe he is administrator")
+        logger.warning(f"{prefix} user {id}({member.first_name}) ban is failed")
         return
 
-    logger.info(f"{prefix} user {id}({member.first_name}) is kicked")
+    logger.info(f"{prefix} user {id}({member.first_name}) is baned")
     return await msg.answer(
         f"{manager.username(member)} 进入黑名单/is Baned by {manager.username(administrator)}",
         disable_web_page_preview=True,
