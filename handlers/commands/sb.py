@@ -10,7 +10,7 @@ logger = manager.logger
 
 
 @manager.register("message", commands=["sb"], commands_ignore_caption=True, commands_ignore_mention=True)
-async def sb(msg: types.Message, _: FSMContext):
+async def sb(msg: types.Message, state: FSMContext):
     """将用户放入黑名单"""
     chat = msg.chat
     user = msg.from_user
