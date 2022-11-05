@@ -20,6 +20,7 @@ https://github.com/SCys/GoalKeepr
 
 <pre>
 k - 踢掉发信息的人 kicks off the person who sent the message
+sb - 将发送信息的人放入黑名单，会清理此人之前发出的所有信息 ban the message sender, will cleanup the user sent messages
 id - 获取用户信息，reply 信息则会返回发信人的详细信息 gets the user information, reply message returns the sender details
 asr - 识别音频内文本 recognizes text within audio
 tts - 转换文本为音频 convert text to audio
