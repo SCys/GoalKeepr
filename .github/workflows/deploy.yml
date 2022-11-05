@@ -41,8 +41,8 @@ jobs:
             # systemctl --user restart goalkeepr
             cd /data
             # at lx
-            podman-compose down gk
-            podman-compose up -d gk
+            #podman-compose down gk
+            #podman-compose up -d gk
             # at eu
-            #docker compose build gk 
-            #docker compose up -d gk
+            docker compose build gk 
+            docker compose up -d gk
