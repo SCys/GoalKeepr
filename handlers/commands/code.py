@@ -17,8 +17,9 @@ async def code(msg: types.Message, state: FSMContext):
     if not user:
         logger.warning(f"{prefix} message without user, ignored")
         return
-
-
+    
+    prefix += f' user {user.full_name}'
+    
     logger.info(f"{prefix} is generating code")
     response = await openai.Completion.acreate(
         prompt=msg.text,
