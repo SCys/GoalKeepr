@@ -41,4 +41,7 @@ token = TG 的 BOT TOKEN
 tx_id =  腾讯云ID
 tx_key = 腾讯云KEY
 users = 指定TG用户ID，如果不指定，则无限制
+
+[openai]
+key = OPENAI key
 ```

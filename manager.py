@@ -85,7 +85,6 @@ class Manager:
             method(func, *args, **kwargs)
             logger.info(f"dispatcher:{method.__name__}({func.__name__}, {args}, {kwargs})")
 
-
     def register(self, type_name, *router_args, **router_kwargs):
         """
         延迟注册到 Dispatcher

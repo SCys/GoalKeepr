@@ -25,6 +25,5 @@ async def left_member(msg: Message, state: FSMContext):
         await manager.lazy_delete_message(chat.id, msg.message_id, now + timedelta(seconds=5))
 
     manager.logger.info(
-        f"chat {chat.id}({chat.title}) message {msg.message_id} "
-        f"member {member.id}({manager.username(member)}) is left"
+        f"chat {chat.id}({chat.title}) message {msg.message_id} " f"member {member.id}({manager.username(member)}) is left"
     )
