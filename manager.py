@@ -69,7 +69,7 @@ class Manager:
             logger.error("telegram token is missing")
             sys.exit(1)
 
-        openai.api = self.config["openai"]["api"]
+        openai.api_key = self.config["openai"]["api"]
 
         self.bot = Bot(token=token)
         logger.info("bot is setup")
