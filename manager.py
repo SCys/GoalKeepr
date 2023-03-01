@@ -9,6 +9,7 @@ import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.utils.exceptions import BadRequest, MessageCantBeDeleted, MessageToDeleteNotFound
+import openai
 
 import database
 
@@ -23,6 +24,7 @@ SETTINGS_TEMPLATE = {
         "google_recaptcha": False,  # enable google recaptcha detector
         "google_recaptcha_token": "",
     },
+    "openai": {"api": ""},
 }
 
 
@@ -66,6 +68,8 @@ class Manager:
         if not token:
             logger.error("telegram token is missing")
             sys.exit(1)
+
+        openai.api = self.config["openai"]["api"]
 
         self.bot = Bot(token=token)
         logger.info("bot is setup")
