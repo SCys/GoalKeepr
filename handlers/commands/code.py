@@ -22,7 +22,7 @@ async def code(msg: types.Message, state: FSMContext):
         prompt=msg.text,
         model="code-davinci-002",
         temperature=0,
-        max_tokens=1200,
+        max_tokens=500,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0,
