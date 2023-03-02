@@ -21,20 +21,24 @@ async def code(msg: types.Message, state: FSMContext):
     prefix += f" user {user.full_name}"
 
     logger.info(f"{prefix} is generating code")
-    response = await openai.Completion.acreate(
-        prompt=msg.text,
-        model="code-davinci-002",
-        temperature=0,
-        max_tokens=2000,
-        top_p=1,
-        frequency_penalty=0,
-        presence_penalty=0,
-    )
 
-    if not isinstance(response, dict) or "choices" not in response or len(response["choices"]) == 0:
-        logger.warning(f"{prefix} is generated code failed {response}")
-        return
+    try:
+        response = await openai.Completion.acreate(
+            prompt=msg.text,
+            model="code-davinci-002",
+            temperature=0,
+            max_tokens=2000,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0,
+        )
 
-    raw = response["choices"][0]["text"]
-    logger.info(f"{prefix} is generated code {len(raw)}")
-    await msg.reply(raw)
+        if not isinstance(response, dict) or "choices" not in response or len(response["choices"]) == 0:
+            logger.warning(f"{prefix} is generated code failed {response}")
+            return
+
+        raw = response["choices"][0]["text"]
+        logger.info(f"{prefix} is generated code {len(raw)}")
+        await msg.reply(raw)
+    except:
+        logger.exception(f"{prefix} is generated code failed")
