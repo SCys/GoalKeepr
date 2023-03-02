@@ -25,7 +25,7 @@ async def code(msg: types.Message, state: FSMContext):
         prompt=msg.text,
         model="code-davinci-002",
         temperature=0,
-        max_tokens=500,
+        max_tokens=2000,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0,
@@ -35,6 +35,6 @@ async def code(msg: types.Message, state: FSMContext):
         logger.warning(f"{prefix} is generated code failed {response}")
         return
 
-    codes = response["choices"][0]
-    logger.info(f"{prefix} is generated code {len(codes)}")
-    await msg.reply(codes)
+    raw = response["choices"][0]["text"]
+    logger.info(f"{prefix} is generated code {len(raw)}")
+    await msg.reply(raw)
