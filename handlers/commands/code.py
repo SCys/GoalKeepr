@@ -17,9 +17,9 @@ async def code(msg: types.Message, state: FSMContext):
     if not user:
         logger.warning(f"{prefix} message without user, ignored")
         return
-    
-    prefix += f' user {user.full_name}'
-    
+
+    prefix += f" user {user.full_name}"
+
     logger.info(f"{prefix} is generating code")
     response = await openai.Completion.acreate(
         prompt=msg.text,
@@ -30,9 +30,11 @@ async def code(msg: types.Message, state: FSMContext):
         frequency_penalty=0,
         presence_penalty=0,
     )
-    if isinstance(response, dict) or 'choices' not in response or len(response['choices']) == 0:
+
+    if not isinstance(response, dict) or "choices" not in response or len(response["choices"]) == 0:
+        logger.warning(f"{prefix} is generated code failed {response}")
         return
-    
-    codes = response['choices'][0]
+
+    codes = response["choices"][0]
     logger.info(f"{prefix} is generated code {len(codes)}")
     await msg.reply(codes)
