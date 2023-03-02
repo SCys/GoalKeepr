@@ -39,6 +39,7 @@ async def code(msg: types.Message, state: FSMContext):
 
         raw = response["choices"][0]["text"]
         logger.info(f"{prefix} is generated code {len(raw)}")
-        await msg.reply(raw)
+        # await msg.reply(raw)
+        await manager.reply(chat.id, msg.message_id, raw)
     except:
         logger.exception(f"{prefix} is generated code failed")
