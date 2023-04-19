@@ -78,11 +78,13 @@ async def tts(msg: types.Message, state: FSMContext):
 
 
 async def edge_ext(source: str):
-    communicate = edge_tts.Communicate()
+    communicate = edge_tts.Communicate(source, "zh-CN-XiaoxiaoNeural")
 
     data = b""
-    async for i in communicate.run(source, voice="zh-CN-XiaoxiaoNeural"):
-        if i[2] is not None:
-            data += i[2]
+    async for chunk in communicate.stream():
+        if chunk["type"] == "audio":
+            data += chunk["data"]
+        elif chunk["type"] == "WordBoundary":
+            logger.info(f"WordBoundary: {chunk}")
 
     return data
