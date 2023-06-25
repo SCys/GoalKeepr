@@ -8,7 +8,7 @@ from typing import Optional, Union
 import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.utils.exceptions import BotBlocked, BotKicked, BadRequest, MessageCantBeDeleted, MessageToDeleteNotFound
+from aiogram.utils.exceptions import Unauthorized, BotBlocked, BotKicked, BadRequest, MessageCantBeDeleted, MessageToDeleteNotFound
 import openai
 
 import database
@@ -169,6 +169,8 @@ class Manager:
             logger.info(f"chat {chat} message {msg} delete failed, bot blocked")
         except BotKicked:
             logger.info(f"chat {chat} message {msg} delete failed, bot kicked")
+        except Unauthorized:
+            logger.info(f"chat {chat} message {msg} delete failed, unauthorized(include kicked/blocked/...)")
         except MessageCantBeDeleted:
             logger.warning(f"chat {chat} message {msg} can not be deleted")
         except MessageToDeleteNotFound:
