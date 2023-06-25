@@ -144,8 +144,13 @@ class Manager:
         return _user.full_name
 
     async def is_admin(self, chat: types.Chat, member: types.User):
-        admins = await self.bot.get_chat_administrators(chat.id)
-        return len([i for i in admins if i.is_chat_admin() and i.user.id == member.id]) > 0
+        try:
+            admins = await self.bot.get_chat_administrators(chat.id)
+            return len([i for i in admins if i.is_chat_admin() and i.user.id == member.id]) > 0
+        except BadRequest as e:
+            logger.error(f"chat {chat.id} member {member.id} check failed:{e}")
+            
+        return False
 
     async def chat_member(self, chat: types.Chat, member_id: int):
         try:
