@@ -4,7 +4,7 @@ from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
 from manager import manager
 
-DELETED_AFTER = 5
+DELETED_AFTER = 3
 
 logger = manager.logger
 
