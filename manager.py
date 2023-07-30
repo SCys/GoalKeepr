@@ -8,7 +8,14 @@ from typing import Optional, Union
 import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.utils.exceptions import Unauthorized, BotBlocked, BotKicked, BadRequest, MessageCantBeDeleted, MessageToDeleteNotFound
+from aiogram.utils.exceptions import (
+    Unauthorized,
+    BotBlocked,
+    BotKicked,
+    BadRequest,
+    MessageCantBeDeleted,
+    MessageToDeleteNotFound,
+)
 import openai
 
 import database
@@ -24,7 +31,11 @@ SETTINGS_TEMPLATE = {
         "google_recaptcha": False,  # enable google recaptcha detector
         "google_recaptcha_token": "",
     },
-    "openai": {"api": ""},
+    "openai": {"api": "", "base_url": ""},
+    "image_generate": {
+        "white_users": [],  # allowed users(id list)
+        "white_groups": [],  # allowed groups(id list)
+    },
 }
 
 
@@ -69,7 +80,10 @@ class Manager:
             logger.error("telegram token is missing")
             sys.exit(1)
 
+        # setup openai sdk config
         openai.api_key = self.config["openai"]["api"]
+        openai.api_base = self.config["openai"]["base_url"]
+        logger.info(f"openai is setup, base on {openai.api_base}")
 
         self.bot = Bot(token=token)
         logger.info("bot is setup")
@@ -149,7 +163,7 @@ class Manager:
             return len([i for i in admins if i.is_chat_admin() and i.user.id == member.id]) > 0
         except BadRequest as e:
             logger.error(f"chat {chat.id} member {member.id} check failed:{e}")
-            
+
         return False
 
     async def chat_member(self, chat: types.Chat, member_id: int):

@@ -7,8 +7,8 @@ from manager import manager
 logger = manager.logger
 
 
-@manager.register("message", commands=["code"], commands_ignore_caption=True, commands_ignore_mention=True)
-async def code(msg: types.Message, state: FSMContext):
+@manager.register("message", commands=["chat"], commands_ignore_caption=True, commands_ignore_mention=True)
+async def chat(msg: types.Message, state: FSMContext):
     """使用openai的模型生成代码"""
     chat = msg.chat
     user = msg.from_user

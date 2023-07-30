@@ -26,6 +26,7 @@ asr - 识别音频内文本 recognizes text within audio
 tts - 转换文本为音频 convert text to audio
 shorturl - 压缩 URL,支持多条 URL 同时压缩，每条之间换行即可 compress URLs, support multiple URLs at the same time, just line break between each one
 tr - 将输入的文本翻译为中文 translate the input text into Chinese
+img - 通过文本生成图像 generate images through text
 </pre>
 
 配置文件 main.ini
