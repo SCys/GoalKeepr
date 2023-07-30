@@ -38,7 +38,7 @@ async def img(msg: types.Message, state: FSMContext):
 
     try:
         # limit prompt
-        prompt = msg.text[:500]
+        prompt = msg.text[4:500] # remove prefix
         url = await image(prompt, "256x256")
 
         logger.info(f"{prefix} image is generated")
