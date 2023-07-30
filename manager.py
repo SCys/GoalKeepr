@@ -80,13 +80,6 @@ class Manager:
             logger.error("telegram token is missing")
             sys.exit(1)
 
-        # setup image config
-        try:
-            self.config["image"]["users"] = [int(i) for i in self.config["image"]["users"].split(",")]
-            self.config["image"]["groups"] = [int(i) for i in self.config["image"]["groups"].split(",")]
-        except:
-            logger.exception("image users or groups is invalid")
-
         # setup openai sdk config
         openai.api_key = self.config["openai"]["api"]
         openai.api_base = self.config["openai"]["base_url"]

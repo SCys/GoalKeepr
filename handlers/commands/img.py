@@ -20,8 +20,13 @@ async def img(msg: types.Message, state: FSMContext):
 
     # load users and groups from configure
     config = manager.config
-    users = config["image"]["users"]
-    groups = config["image"]["groups"]
+    # setup image config
+    try:
+        users = [int(i) for i in config["image"]["users"].split(",")]
+        groups = [int(i) for i in config["image"]["groups"].split(",")]
+    except:
+        logger.exception("image users or groups is invalid")
+        return
 
     if user.id not in users and chat.id not in groups:
         logger.warning(f"{prefix} user {user.full_name} or group {chat.id} is not allowed, ignored")
