@@ -35,7 +35,7 @@ jobs:
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
-          KEY: ${{ secrets.DEPLOY_KEY }}
+          key: ${{ secrets.DEPLOY_KEY }}
           script: |
             # systemctl --user restart goalkeepr_worker
             # systemctl --user restart goalkeepr

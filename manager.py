@@ -32,9 +32,9 @@ SETTINGS_TEMPLATE = {
         "google_recaptcha_token": "",
     },
     "openai": {"api": "", "base_url": ""},
-    "image_generate": {
-        "white_users": [],  # allowed users(id list)
-        "white_groups": [],  # allowed groups(id list)
+    "image": {
+        "users": [],  # allowed users(id list)
+        "groups": [],  # allowed groups(id list)
     },
 }
 
@@ -73,6 +73,12 @@ class Manager:
                 logger.info("settings is loaded from main.ini")
             except IOError:
                 pass
+
+        try:
+            config["image"]["users"] = [int(i) for i in config["image"]["users"].split(",")]
+            config["image"]["groups"] = [int(i) for i in config["image"]["groups"].split(",")]
+        except:
+            logger.exception("image users or groups is invalid")
 
     def setup(self):
         token = self.config["telegram"]["token"]
