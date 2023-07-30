@@ -74,17 +74,18 @@ class Manager:
             except IOError:
                 pass
 
-        try:
-            config["image"]["users"] = [int(i) for i in config["image"]["users"].split(",")]
-            config["image"]["groups"] = [int(i) for i in config["image"]["groups"].split(",")]
-        except:
-            logger.exception("image users or groups is invalid")
-
     def setup(self):
         token = self.config["telegram"]["token"]
         if not token:
             logger.error("telegram token is missing")
             sys.exit(1)
+
+        # setup image config
+        try:
+            self.config["image"]["users"] = [int(i) for i in self.config["image"]["users"].split(",")]
+            self.config["image"]["groups"] = [int(i) for i in self.config["image"]["groups"].split(",")]
+        except:
+            logger.exception("image users or groups is invalid")
 
         # setup openai sdk config
         openai.api_key = self.config["openai"]["api"]
