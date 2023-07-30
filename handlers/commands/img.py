@@ -22,8 +22,8 @@ async def img(msg: types.Message, state: FSMContext):
     config = manager.config
     # setup image config
     try:
-        users = [int(i) for i in config["image"]["users"].split(",")]
-        groups = [int(i) for i in config["image"]["groups"].split(",")]
+        users = [int(i) for i in config["image"]["users"].split(",") if i]
+        groups = [int(i) for i in config["image"]["groups"].split(",") if i]
     except:
         logger.exception("image users or groups is invalid")
         return
