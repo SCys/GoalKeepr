@@ -18,11 +18,6 @@ async def img(msg: types.Message, state: FSMContext):
         logger.warning(f"{prefix} message without user, ignored")
         return
 
-    # only support text content
-    if msg.content_type is ContentType.TEXT:
-        logger.warning(f"{prefix} message is not text, ignored")
-        return
-
     # load users and groups from configure
     config = manager.config
     users = config["image"]["users"]
@@ -42,6 +37,28 @@ async def img(msg: types.Message, state: FSMContext):
         url = await image(prompt, "256x256")
 
         logger.info(f"{prefix} image is generated")
-        await manager.reply(chat.id, msg.message_id, url)
     except:
         logger.exception(f"{prefix} image generate error")
+        return
+
+    # download url image to memory
+    try:
+        async with manager.bot.session.get(url) as resp:
+            if resp.status != 200:
+                logger.warning(f"{prefix} image download error, status {resp.status}")
+                return
+
+            data = await resp.read()
+
+        logger.info(f"{prefix} image is downloaded")
+    except:
+        logger.exception(f"{prefix} image download error")
+        return
+
+    # send image
+    try:
+        input_file = types.InputFile(data, filename="image.png")
+        await msg.reply_photo(input_file, caption=f"Prompt:{prompt}")
+        logger.info(f"{prefix} image is sent")
+    except:
+        logger.exception(f"{prefix} image send error")
