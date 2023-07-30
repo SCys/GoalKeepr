@@ -1,6 +1,6 @@
 from aiogram import types
+import io
 from aiogram.dispatcher.storage import FSMContext
-from aiogram.types import ContentType
 from manager import manager
 from utils.chimera_gpt import image
 
@@ -60,7 +60,7 @@ async def img(msg: types.Message, state: FSMContext):
 
             # send image
             try:
-                input_file = types.InputFile(data, filename="image.png")
+                input_file = types.InputFile(io.BytesIO(data), filename="image.png")
                 await msg.reply_photo(input_file, caption=f"Prompt:{prompt}")
                 logger.info(f"{prefix} image is sent")
             except:
