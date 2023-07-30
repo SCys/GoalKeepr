@@ -1,10 +1,11 @@
 import asyncio
 import openai
+from typing import List
 
 
-async def image(prompt: str, n: int = 1, size: str = "512x512"):
+async def image(prompt: str, n: int = 1, size: str = "512x512") -> List[str]:
     response = openai.Image.create(prompt=prompt, n=n, size=size)
-    return response["data"]["url"]
+    return [i["url"] for i in response["data"]]
 
 
 async def chat(prompt: str, model: str = "gpt-3"):

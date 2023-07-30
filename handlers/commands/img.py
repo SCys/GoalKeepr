@@ -38,8 +38,8 @@ async def img(msg: types.Message, state: FSMContext):
 
     try:
         # limit prompt
-        prompt = msg.text[4:500] # remove prefix
-        url = await image(prompt)
+        prompt = msg.text[4:500]  # remove prefix
+        urls = await image(prompt)
 
         logger.info(f"{prefix} image is generated")
     except:
@@ -48,22 +48,23 @@ async def img(msg: types.Message, state: FSMContext):
 
     # download url image to memory
     try:
-        async with manager.bot.session.get(url) as resp:
-            if resp.status != 200:
-                logger.warning(f"{prefix} image download error, status {resp.status}")
-                return
+        for url in urls:
+            async with manager.bot.session.get(url) as resp:
+                if resp.status != 200:
+                    logger.warning(f"{prefix} image download error, status {resp.status}")
+                    return
 
-            data = await resp.read()
+                data = await resp.read()
 
-        logger.info(f"{prefix} image is downloaded")
+            logger.info(f"{prefix} image is downloaded")
+
+            # send image
+            try:
+                input_file = types.InputFile(data, filename="image.png")
+                await msg.reply_photo(input_file, caption=f"Prompt:{prompt}")
+                logger.info(f"{prefix} image is sent")
+            except:
+                logger.exception(f"{prefix} image send error")
+
     except:
         logger.exception(f"{prefix} image download error")
-        return
-
-    # send image
-    try:
-        input_file = types.InputFile(data, filename="image.png")
-        await msg.reply_photo(input_file, caption=f"Prompt:{prompt}")
-        logger.info(f"{prefix} image is sent")
-    except:
-        logger.exception(f"{prefix} image send error")
