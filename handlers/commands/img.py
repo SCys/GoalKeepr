@@ -49,7 +49,9 @@ async def img(msg: types.Message, state: FSMContext):
     # download url image to memory
     try:
         for url in urls:
-            async with manager.bot.session.get(url) as resp:
+            session = await manager.bot.get_session()
+
+            async with session.get(url) as resp:
                 if resp.status != 200:
                     logger.warning(f"{prefix} image download error, status {resp.status}")
                     return
