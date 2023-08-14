@@ -70,9 +70,9 @@ async def txt2img(msg: types.Message, state: FSMContext):
     }
 
     if task_size > 0:
-        reply = await msg.reply(f"task is queued, please wait(~{task_size * 45}s). /txt2img to check system & task status")
+        reply = await msg.reply(f"task is queued, please wait(~{task_size * 45}s).")
     else:
-        reply = await msg.reply("task is queued, please wait(~45s). /txt2img to check system & task status")
+        reply = await msg.reply("task is queued, please wait(~45s).")
     task["to"] = reply.message_id
 
     try:
@@ -149,16 +149,17 @@ async def process_task(task):
     chat_fullname = task["chat_name"]
     user = task["user"]
     user_fullname = task["user_name"]
-    reply = task["to"]
+    msg_reply = task["to"]
+    msg_from = task["from"]
     created_at = datetime.fromtimestamp(task["created_at"])
     prefix = f"chat {chat}({chat_fullname}) msg {task['from']} user {user}({user_fullname})"
 
     # task is started, reply to user
     cost = datetime.now() - created_at
     await manager.bot.edit_message_text(
-        f"task is started(cost {str(cost)[:-7]}), please wait(~45s). /txt2img to check system & task status",
+        f"task is started(cost {str(cost)[:-7]}), please wait(~45s).",
         chat,
-        reply,
+        msg_reply,
     )
 
     logger.info(f"{prefix} is processing task")
@@ -173,17 +174,15 @@ async def process_task(task):
         )
         cost = datetime.now() - created_at
 
-        # @user and show cost time
-        await manager.bot.edit_message_media(
-            types.InputMediaPhoto(input_file, caption=f"cost {str(cost)[:-7]}"),
-            chat,
-            reply,
-        )
+        # delete reply and create new reply
+        await manager.bot.delete_message(chat, msg_reply)
+        await manager.bot.send_photo(chat, input_file, reply_to_message_id=msg_from, caption=f"cost {str(cost)[:-7]}")
+
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
     except:
         await manager.bot.edit_message_text(
             f"task is failed(create before {str(cost)[:-7]}), please try again later",
             chat,
-            reply,
+            msg_reply,
         )
         logger.exception(f"{prefix} sd txt2img error")
