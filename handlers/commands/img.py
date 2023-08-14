@@ -43,6 +43,8 @@ async def img(msg: types.Message, state: FSMContext):
 
         logger.info(f"{prefix} image is generated")
     except:
+        await msg.reply("image generate error, please try again later")
+
         logger.exception(f"{prefix} image generate error")
         return
 

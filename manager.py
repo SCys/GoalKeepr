@@ -36,6 +36,9 @@ SETTINGS_TEMPLATE = {
         "users": [],  # allowed users(id list)
         "groups": [],  # allowed groups(id list)
     },
+    'sd_api': {
+        "endpoint": "",
+    }
 }
 
 

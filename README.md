@@ -27,6 +27,7 @@ tts - 转换文本为音频 convert text to audio
 shorturl - 压缩 URL,支持多条 URL 同时压缩，每条之间换行即可 compress URLs, support multiple URLs at the same time, just line break between each one
 tr - 将输入的文本翻译为中文 translate the input text into Chinese
 img - 通过文本生成图像 generate images through text
+txt2img - 通过文本生成图像 generate images through text(on mini machine, only support English)
 </pre>
 
 配置文件 main.ini
@@ -45,4 +46,7 @@ users = 指定TG用户ID，如果不指定，则无限制
 
 [openai]
 key = OPENAI key
+
+[sd_api]
+endpoint = https://api.snowdusk.me
 ```

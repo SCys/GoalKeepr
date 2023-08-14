@@ -5,6 +5,7 @@ from aiogram.bot.bot import Bot
 import database
 from handlers.member_captcha import new_member_check, unban_member  # NOQA: 引入处理器
 from manager import manager
+from handlers.commands.txt2img import worker as txt2img_worker  # NOQA: 引入处理器
 
 is_running = False
 
@@ -101,6 +102,11 @@ async def main():
         logger.info(f"event:{name} => {func}")
 
     is_running = True
+
+    # 启动新成员检查
+    asyncio.create_task(txt2img_worker())
+
+    # 启动延迟删除消息
     while is_running:
         await asyncio.sleep(0.25)
 
