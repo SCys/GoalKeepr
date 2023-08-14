@@ -58,30 +58,34 @@ async def txt2img(msg: types.Message, state: FSMContext):
         await msg.reply("task queue is full, please try again later")
         return
 
+    task = {
+        "chat": msg.chat.id,
+        "chat_name": msg.chat.full_name,
+        "user": msg.from_user.id,
+        "user_name": msg.from_user.full_name,
+        "raw": msg.text,
+        "from": msg.message_id,
+        "to": -1,
+        "created_at": datetime.now().timestamp(),
+    }
+
+    if task_size > 0:
+        reply = await msg.reply(f"task is queued, please wait(~{task_size * 45}s). /txt2img to check system & task status")
+    else:
+        reply = await msg.reply("task is queued, please wait(~45s). /txt2img to check system & task status")
+    task["to"] = reply.message_id
+
     try:
-        task = {
-            "chat": msg.chat.id,
-            "chat_name": msg.chat.full_name,
-            "user": msg.from_user.id,
-            "user_name": msg.from_user.full_name,
-            "raw": msg.text,
-            "from": msg.message_id,
-            "to": -1,
-            "created_at": datetime.now().timestamp(),
-        }
-
-        if task_size > 0:
-            reply = await msg.reply(f"task is queued, please wait(~{task_size * 45}s). /txt2img to check system & task status")
-        else:
-            reply = await msg.reply("task is queued, please wait(~45s). /txt2img to check system & task status")
-        task["to"] = reply.message_id
-
         # put task to queue
         await rdb.lpush(QUEUE_NAME, dumps(task))
 
         logger.info(f"{prefix} task is queued")
     except:
-        await msg.reply(f"task is failed, please try again later")
+        await manager.bot.edit_message_text(
+            f"task is failed, please try again later",
+            chat,
+            reply,
+        )
 
         logger.exception(f"{prefix} sd txt2img error")
 
@@ -173,5 +177,9 @@ async def process_task(task):
         await manager.bot.send_photo(chat, input_file, caption=f"cost: {str(cost)[:-7]}")
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
     except:
-        await manager.bot.send_message(chat, "task is failed, please try again later")
+        await manager.bot.edit_message_text(
+            f"task is failed(create before {str(cost)[:-7]}), please try again later",
+            chat,
+            reply,
+        )
         logger.exception(f"{prefix} sd txt2img error")
