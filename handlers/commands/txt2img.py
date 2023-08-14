@@ -60,8 +60,10 @@ async def txt2img(msg: types.Message, state: FSMContext):
 
     try:
         task = {
-            "chat": msg.chat,
-            "user": msg.from_user,
+            "chat": msg.chat.id,
+            "chat_name": msg.chat.full_name,
+            "user": msg.from_user.id,
+            "user_name": msg.from_user.full_name,
             "raw": msg.text,
             "from": msg.message_id,
             "to": -1,
@@ -140,10 +142,12 @@ async def process_task(task):
         return
 
     raw = task["raw"]
-    chat: types.Chat = task["chat"]
-    user: types.User = task["user"]
+    chat = task["chat"]
+    chat_fullname = task["chat_name"]
+    user = task["user"]
+    user_fullname = task["user_name"]
     reply = task["to"]
-    prefix = f"chat {chat.id}({chat.title}) msg {task['from']} user {user.full_name}"
+    prefix = f"chat {chat}({chat_fullname}) msg {task['from']} user {user}({user_fullname})"
 
     # task is started, reply to user
     cost = datetime.now() - task["created_at"]
