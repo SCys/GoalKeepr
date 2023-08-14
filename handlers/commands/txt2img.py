@@ -5,7 +5,7 @@ from aiogram.dispatcher.storage import FSMContext
 from manager import manager
 from utils.chimera_gpt import image
 from asyncio.queues import Queue
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 from utils import sd_api
 from orjson import dumps, loads
@@ -15,6 +15,7 @@ logger = manager.logger
 GLOBAL_FORCE_SLEEP = 10
 GLOBAL_TASK_LIMIT = 3
 QUEUE_NAME = "txt2img"
+DELETED_AFTER = 3 # 3s
 
 
 @manager.register("message", commands=["txt2img"], commands_ignore_caption=True, commands_ignore_mention=True)
@@ -40,6 +41,8 @@ async def txt2img(msg: types.Message, state: FSMContext):
 
     if user.id not in users and chat.id not in groups:
         logger.warning(f"{prefix} user {user.full_name} or group {chat.id} is not allowed, ignored")
+        msg_err = await manager.bot.edit_message_text(f"task is failed: queue is full.", chat, msg.message_id)
+        await manager.lazy_delete_message(chat, msg_err.message_id)
         return
 
     prefix += f" user {user.full_name}"
@@ -55,7 +58,8 @@ async def txt2img(msg: types.Message, state: FSMContext):
     task_size = await rdb.llen(QUEUE_NAME)
     if task_size >= GLOBAL_TASK_LIMIT:
         logger.warning(f"task queue is full, ignored")
-        await msg.reply("task queue is full, please try again later")
+        msg_err = await manager.bot.edit_message_text(f"task is failed: queue is full.", chat, msg.message_id)
+        await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
 
     task = {
@@ -81,11 +85,8 @@ async def txt2img(msg: types.Message, state: FSMContext):
 
         logger.info(f"{prefix} task is queued, size is {task_size + 1}")
     except:
-        await manager.bot.edit_message_text(
-            f"task is failed, please try again later",
-            chat,
-            reply,
-        )
+        msg_err = await manager.bot.edit_message_text(f"task is failed: put task to queue failed.", chat, reply.message_id)
+        await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
 
         logger.exception(f"{prefix} sd txt2img error")
 
@@ -109,6 +110,7 @@ async def worker():
                 await process_task(task)
             except:
                 logger.exception("process task error")
+
             await asyncio.sleep(GLOBAL_FORCE_SLEEP)
 
         # sleep 1s
@@ -139,9 +141,13 @@ async def process_task(task):
         endpoint = config["sd_api"]["endpoint"]
     except:
         logger.exception("sd api endpoint is invalid")
+        msg_err = await manager.bot.edit_message_text(f"task is failed: sd api endpoint is invalid.", chat, msg_reply)
+        await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
     if not endpoint:
         logger.warning("sd api endpoint is empty")
+        msg_err = await manager.bot.edit_message_text(f"task is failed: sd api endpoint is empty.", chat, msg_reply)
+        await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
 
     raw = task["raw"]
@@ -180,9 +186,11 @@ async def process_task(task):
 
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
     except:
-        await manager.bot.edit_message_text(
+        msg_err = await manager.bot.edit_message_text(
             f"task is failed(create before {str(cost)[:-7]}), please try again later",
             chat,
             msg_reply,
         )
+        await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+
         logger.exception(f"{prefix} sd txt2img error")
