@@ -67,8 +67,7 @@ async def txt2img(msg: types.Message, state: FSMContext):
             "raw": msg.text,
             "from": msg.message_id,
             "to": -1,
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
+            "created_at": datetime.now().timestamp(),
         }
 
         if task_size > 0:
@@ -147,10 +146,11 @@ async def process_task(task):
     user = task["user"]
     user_fullname = task["user_name"]
     reply = task["to"]
+    created_at = datetime.fromtimestamp(task["created_at"])
     prefix = f"chat {chat}({chat_fullname}) msg {task['from']} user {user}({user_fullname})"
 
     # task is started, reply to user
-    cost = datetime.now() - task["created_at"]
+    cost = datetime.now() - created_at
     await manager.bot.edit_message_text(
         f"task is started(create before {str(cost)[:-7]}), please wait(~45s). /txt2img to check system & task status",
         chat.id,
@@ -167,7 +167,7 @@ async def process_task(task):
             io.BytesIO(base64.b64decode(img_raw.split(",", 1)[0])),
             filename="sd_txt2img.png",
         )
-        cost = datetime.now() - task["created_at"]
+        cost = datetime.now() - created_at
 
         # output cost as 00:00
         await manager.bot.send_photo(chat.id, input_file, caption=f"cost: {str(cost)[:-7]}")
