@@ -15,7 +15,7 @@ logger = manager.logger
 GLOBAL_FORCE_SLEEP = 10
 GLOBAL_TASK_LIMIT = 3
 QUEUE_NAME = "txt2img"
-DELETED_AFTER = 3 # 3s
+DELETED_AFTER = 3  # 3s
 
 
 @manager.register("message", commands=["txt2img"], commands_ignore_caption=True, commands_ignore_mention=True)
@@ -55,8 +55,8 @@ async def txt2img(msg: types.Message, state: FSMContext):
         return
 
     # check task is full
-    task_size = await rdb.llen(QUEUE_NAME)
-    if task_size >= GLOBAL_TASK_LIMIT:
+    task_size = await rdb.llen(QUEUE_NAME) + 1
+    if task_size > GLOBAL_TASK_LIMIT:
         logger.warning(f"task queue is full, ignored")
         msg_err = await manager.bot.edit_message_text(f"task is failed: queue is full.", chat, msg.message_id)
         await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
@@ -83,7 +83,7 @@ async def txt2img(msg: types.Message, state: FSMContext):
         # put task to queue
         await rdb.lpush(QUEUE_NAME, dumps(task))
 
-        logger.info(f"{prefix} task is queued, size is {task_size + 1}")
+        logger.info(f"{prefix} task is queued, size is {task_size}")
     except:
         msg_err = await manager.bot.edit_message_text(f"task is failed: put task to queue failed.", chat, reply.message_id)
         await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
