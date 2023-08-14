@@ -18,7 +18,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
     width = int(width)
     height = int(height)
 
-    step = 28
+    step = 20
     cfg_scale = 8
     sampler_name = "DPM++ 3M SDE Exponential"  # DDIM, DPM++ 3M SDE Exponential
 
