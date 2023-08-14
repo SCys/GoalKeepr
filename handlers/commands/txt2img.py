@@ -79,7 +79,7 @@ async def txt2img(msg: types.Message, state: FSMContext):
         # put task to queue
         await rdb.lpush(QUEUE_NAME, dumps(task))
 
-        logger.info(f"{prefix} task is queued")
+        logger.info(f"{prefix} task is queued, size is {task_size + 1}")
     except:
         await manager.bot.edit_message_text(
             f"task is failed, please try again later",
