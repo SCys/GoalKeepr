@@ -153,7 +153,7 @@ async def process_task(task):
     cost = datetime.now() - created_at
     await manager.bot.edit_message_text(
         f"task is started(create before {str(cost)[:-7]}), please wait(~45s). /txt2img to check system & task status",
-        chat.id,
+        chat,
         reply,
     )
 
@@ -170,8 +170,8 @@ async def process_task(task):
         cost = datetime.now() - created_at
 
         # output cost as 00:00
-        await manager.bot.send_photo(chat.id, input_file, caption=f"cost: {str(cost)[:-7]}")
+        await manager.bot.send_photo(chat, input_file, caption=f"cost: {str(cost)[:-7]}")
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
     except:
-        await manager.bot.send_message(chat.id, "task is failed, please try again later")
+        await manager.bot.send_message(chat, "task is failed, please try again later")
         logger.exception(f"{prefix} sd txt2img error")
