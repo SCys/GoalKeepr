@@ -42,7 +42,7 @@ async def txt2img(msg: types.Message, state: FSMContext):
     if user.id not in users and chat.id not in groups:
         logger.warning(f"{prefix} user {user.full_name} or group {chat.id} is not allowed, ignored")
         msg_err = await msg.reply(f"task is failed: no permission.")
-        await manager.lazy_delete_message(chat, msg_err.message_id)
+        await manager.lazy_delete_message(chat.id, msg_err.message_id)
         return
 
     prefix += f" user {user.full_name}"
@@ -59,7 +59,7 @@ async def txt2img(msg: types.Message, state: FSMContext):
     if task_size > GLOBAL_TASK_LIMIT:
         logger.warning(f"task queue is full, ignored")
         msg_err = await msg.reply(f"task is failed: task queue is full.")
-        await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.lazy_delete_message(chat.id, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
 
     task = {
@@ -86,7 +86,7 @@ async def txt2img(msg: types.Message, state: FSMContext):
         logger.info(f"{prefix} task is queued, size is {task_size}")
     except:
         msg_err = await manager.bot.edit_message_text(f"task is failed: put task to queue failed.", chat.id, reply.message_id)
-        await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.lazy_delete_message(chat.id, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
 
         logger.exception(f"{prefix} sd txt2img error")
 
@@ -135,9 +135,9 @@ async def process_task(task):
     }
     """
     raw = task["raw"]
-    chat = task["chat"]
+    chat_id = task["chat"]
     chat_fullname = task["chat_name"]
-    user = task["user"]
+    user_id = task["user"]
     user_fullname = task["user_name"]
     msg_reply = task["to"]
     msg_from = task["from"]
@@ -149,23 +149,23 @@ async def process_task(task):
         endpoint = config["sd_api"]["endpoint"]
     except:
         logger.exception("sd api endpoint is invalid")
-        msg_err = await manager.bot.edit_message_text(f"task is failed: sd api endpoint is invalid.", chat, msg_reply)
-        await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        msg_err = await manager.bot.edit_message_text(f"task is failed: sd api endpoint is invalid.", chat_id, msg_reply)
+        await manager.lazy_delete_message(chat_id, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
     if not endpoint:
         logger.warning("sd api endpoint is empty")
-        msg_err = await manager.bot.edit_message_text(f"task is failed: sd api endpoint is empty.", chat, msg_reply)
-        await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        msg_err = await manager.bot.edit_message_text(f"task is failed: sd api endpoint is empty.", chat_id, msg_reply)
+        await manager.lazy_delete_message(chat_id, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
 
     created_at = datetime.fromtimestamp(task["created_at"])
-    prefix = f"chat {chat}({chat_fullname}) msg {task['from']} user {user}({user_fullname})"
+    prefix = f"chat {chat_id}({chat_fullname}) msg {task['from']} user {user_id}({user_fullname})"
 
     # task is started, reply to user
     cost = datetime.now() - created_at
     await manager.bot.edit_message_text(
         f"task is started(cost {str(cost)[:-7]}), please wait(~45s).",
-        chat,
+        chat_id,
         msg_reply,
     )
 
@@ -184,16 +184,16 @@ async def process_task(task):
         cost = datetime.now() - created_at
 
         # delete reply and create new reply
-        await manager.bot.delete_message(chat, msg_reply)
-        await manager.bot.send_photo(chat, input_file, reply_to_message_id=msg_from, caption=f"cost {str(cost)[:-7]}")
+        await manager.bot.delete_message(chat_id, msg_reply)
+        await manager.bot.send_photo(chat_id, input_file, reply_to_message_id=msg_from, caption=f"cost {str(cost)[:-7]}")
 
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
     except:
         msg_err = await manager.bot.edit_message_text(
             f"task is failed(create before {str(cost)[:-7]}), please try again later",
-            chat,
+            chat_id,
             msg_reply,
         )
-        await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.lazy_delete_message(chat_id, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
 
         logger.exception(f"{prefix} sd txt2img error")
