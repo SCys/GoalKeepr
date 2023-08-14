@@ -1,5 +1,4 @@
 import asyncio
-import aiohttp
 from manager import manager
 
 
@@ -45,6 +44,8 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
             "send_images": True,
             "save_images": False,
         },
+        # timeout is 30s
+        timeout=30,
     ) as response:
         if response.status != 200:
             raise Exception(await response.text())

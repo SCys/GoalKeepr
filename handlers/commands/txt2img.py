@@ -107,9 +107,9 @@ async def worker():
             try:
                 task = loads(raw)
                 await process_task(task)
-                await asyncio.sleep(GLOBAL_FORCE_SLEEP)
             except:
                 logger.exception("process task error")
+            await asyncio.sleep(GLOBAL_FORCE_SLEEP)
 
         # sleep 1s
         await asyncio.sleep(1)
@@ -156,7 +156,7 @@ async def process_task(task):
     # task is started, reply to user
     cost = datetime.now() - created_at
     await manager.bot.edit_message_text(
-        f"task is started(create before {str(cost)[:-7]}), please wait(~45s). /txt2img to check system & task status",
+        f"task is started(cost {str(cost)[:-7]}), please wait(~45s). /txt2img to check system & task status",
         chat,
         reply,
     )
@@ -173,8 +173,12 @@ async def process_task(task):
         )
         cost = datetime.now() - created_at
 
-        # output cost as 00:00
-        await manager.bot.send_photo(chat, input_file, caption=f"cost: {str(cost)[:-7]}")
+        # @user and show cost time
+        await manager.bot.edit_message_media(
+            types.InputMediaPhoto(input_file, caption=f"cost {str(cost)[:-7]}"),
+            chat,
+            reply,
+        )
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
     except:
         await manager.bot.edit_message_text(
