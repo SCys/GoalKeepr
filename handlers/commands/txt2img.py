@@ -172,8 +172,10 @@ async def process_task(task):
     logger.info(f"{prefix} is processing task")
 
     try:
+        checkpoint = datetime.now()
         img_raw = await sd_api.txt2img(endpoint, raw)
-        logger.info(f"{prefix} task is processed")
+        cost = datetime.now() - checkpoint
+        logger.info(f"{prefix} task is processed, cost {str(cost)[:-7]}")
 
         input_file = types.InputFile(
             io.BytesIO(base64.b64decode(img_raw.split(",", 1)[0])),
