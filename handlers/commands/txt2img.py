@@ -110,7 +110,9 @@ async def worker():
         await asyncio.sleep(1)
 
         # tasks detail
-        logger.debug(f"task queue size: {await rdb.llen(QUEUE_NAME)}")
+        tasks_size = await rdb.llen(QUEUE_NAME)
+        if tasks_size > 0:
+            logger.debug(f"task queue size: {tasks_size}")
 
 
 async def process_task(task):
