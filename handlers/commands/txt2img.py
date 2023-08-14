@@ -41,7 +41,7 @@ async def txt2img(msg: types.Message, state: FSMContext):
 
     if user.id not in users and chat.id not in groups:
         logger.warning(f"{prefix} user {user.full_name} or group {chat.id} is not allowed, ignored")
-        msg_err = await manager.bot.edit_message_text(f"task is failed: queue is full.", chat.id, msg.message_id)
+        msg_err = await msg.reply(f"task is failed: no permission.")
         await manager.lazy_delete_message(chat, msg_err.message_id)
         return
 
@@ -58,7 +58,7 @@ async def txt2img(msg: types.Message, state: FSMContext):
     task_size = await rdb.llen(QUEUE_NAME) + 1
     if task_size > GLOBAL_TASK_LIMIT:
         logger.warning(f"task queue is full, ignored")
-        msg_err = await manager.bot.edit_message_text(f"task is failed: queue is full.", chat.id, msg.message_id)
+        msg_err = await msg.reply(f"task is failed: task queue is full.")
         await manager.lazy_delete_message(chat, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
 
@@ -141,7 +141,7 @@ async def process_task(task):
     user_fullname = task["user_name"]
     msg_reply = task["to"]
     msg_from = task["from"]
-    
+
     # load users and groups from configure
     config = manager.config
     endpoint = None
