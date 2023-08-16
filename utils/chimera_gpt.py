@@ -18,7 +18,7 @@ import aiohttp
 """
 
 
-DEFAULT_MODEL = "sdxl"
+DEFAULT_MODEL = "kandinsky-2.2"
 SUPPORT_MODELS = {
     "sdxl": {
         "owner": "StabilityAI",

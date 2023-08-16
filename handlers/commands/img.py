@@ -76,9 +76,9 @@ async def img(msg: types.Message, state: FSMContext):
         prompt = raw
 
     try:
+        logger.info(f"{prefix} is generating image with model {model}")
         urls = await image(api_key, endpoint, model, prompt)
-
-        logger.info(f"{prefix} image is generated")
+        logger.info(f"{prefix} image is generated with model {model}")
     except Exception as e:
         await msg.reply(f"image generate error:{str(e)}")
 
