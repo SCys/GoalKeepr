@@ -69,11 +69,13 @@ async def img(msg: types.Message, state: FSMContext):
         await manager.lazy_delete_message(chat.id, reply.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
         return
 
-    # limit prompt
-    prompt = prompt[:500]
     if model not in SUPPORT_MODELS:
         model = DEFAULT_MODEL
         prompt = raw
+
+    # cleanup prompt
+    prompt = prompt.strip()
+    prompt = prompt[:500]
 
     try:
         logger.info(f"{prefix} is generating image with model {model}")
