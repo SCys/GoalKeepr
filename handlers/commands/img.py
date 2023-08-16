@@ -24,6 +24,8 @@ async def img(msg: types.Message, state: FSMContext):
     try:
         users = [int(i) for i in config["image"]["users"].split(",") if i]
         groups = [int(i) for i in config["image"]["groups"].split(",") if i]
+        api_key = config["openai"]["api"]
+        endpoint = config["openai"]["endpoint"]
     except:
         logger.exception("image users or groups is invalid")
         return
@@ -39,7 +41,7 @@ async def img(msg: types.Message, state: FSMContext):
     try:
         # limit prompt
         prompt = msg.text[4:500]  # remove prefix
-        urls = await image(prompt)
+        urls = await image(api_key, endpoint, prompt)
 
         logger.info(f"{prefix} image is generated")
     except:
