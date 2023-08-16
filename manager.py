@@ -85,7 +85,7 @@ class Manager:
 
         # setup openai sdk config
         openai.api_key = self.config["openai"]["api"]
-        openai.api_base = self.config["openai"]["base_url"]
+        openai.api_base = self.config["openai"]["endpoint"]
         logger.info(f"openai is setup, base on {openai.api_base}")
 
         self.bot = Bot(token=token)

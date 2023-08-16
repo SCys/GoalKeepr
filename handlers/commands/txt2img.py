@@ -9,7 +9,6 @@ from orjson import dumps, loads
 
 from manager import manager
 from utils import sd_api
-from utils.chimera_gpt import image
 
 logger = manager.logger
 

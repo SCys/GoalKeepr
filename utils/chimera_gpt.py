@@ -9,7 +9,7 @@ MODEL = "kandinsky"  # -2.2?
 async def image(api_key, endpoint, prompt: str, n: int = 1, size: str = "512x512") -> List[str]:
     async with aiohttp.ClientSession() as session:
         async with session.post(
-            endpoint,
+            f"{endpoint}images/generations",
             headers={"Authorization": "Bearer " + api_key},
             json={
                 "prompt": prompt,
