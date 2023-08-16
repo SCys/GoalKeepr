@@ -1,10 +1,13 @@
 from aiogram import types
 import io
+from datetime import datetime, timedelta
 from aiogram.dispatcher.storage import FSMContext
 from manager import manager
-from utils.chimera_gpt import image
+from utils.chimera_gpt import image, SUPPORT_MODELS, DEFAULT_MODEL
 
 logger = manager.logger
+
+DELETED_AFTER = 3
 
 
 @manager.register("message", commands=["img"], commands_ignore_caption=True, commands_ignore_mention=True)
@@ -38,10 +41,31 @@ async def img(msg: types.Message, state: FSMContext):
 
     logger.info(f"{prefix} is generating image")
 
+    _, raw = msg.text.split(" ", maxsplit=1)
+    parts = raw.split(" ", maxsplit=1)
+    if len(parts) > 1:
+        model = parts[0]
+        prompt = " ".join(parts[1:])
+    else:
+        model = DEFAULT_MODEL
+        prompt = raw
+
+    if not prompt:
+        logger.debug(f"{prefix} prompt is empty")
+        reply = await msg.reply(f"prompt is empty,\n/img model prompt...")
+        await manager.lazy_delete_message(chat.id, reply.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+        return
+
+    # limit prompt
+    prompt = prompt[:100]
+    if model not in SUPPORT_MODELS:
+        logger.debug(f"{prefix} model {model} is not supported")
+        reply = await msg.reply(f"model {model} is not supported,\nsupport models:\n{', '.join(SUPPORT_MODELS)}\n/img model prompt...")
+        await manager.lazy_delete_message(chat.id, reply.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+        return
+
     try:
-        # limit prompt
-        prompt = msg.text[4:500]  # remove prefix
-        urls = await image(api_key, endpoint, prompt)
+        urls = await image(api_key, endpoint, model, prompt)
 
         logger.info(f"{prefix} image is generated")
     except:
