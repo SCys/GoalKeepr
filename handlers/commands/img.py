@@ -7,7 +7,7 @@ from utils.chimera_gpt import image, SUPPORT_MODELS, DEFAULT_MODEL
 
 logger = manager.logger
 
-DELETED_AFTER = 3
+DELETED_AFTER = 10
 
 
 @manager.register("message", commands=["img"], commands_ignore_caption=True, commands_ignore_mention=True)
