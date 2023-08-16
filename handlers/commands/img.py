@@ -80,8 +80,8 @@ async def img(msg: types.Message, state: FSMContext):
         urls = await image(api_key, endpoint, model, prompt)
 
         logger.info(f"{prefix} image is generated")
-    except:
-        await msg.reply("image generate error, please try again later")
+    except Exception as e:
+        await msg.reply(f"image generate error:{str(e)}")
 
         logger.exception(f"{prefix} image generate error")
         return

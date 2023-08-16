@@ -98,10 +98,13 @@ async def image(api_key, endpoint, model: str | None, prompt: str, n: int = 1, s
                 message = resp["error"]["message"]
                 type = resp["error"]["type"]
 
-                raise Exception(f"Error: {type}.{message}")
+                raise Exception(f"{type}.{message}")
 
             # unknown error ?
-            raise Exception(f"Unknown error: {resp}")
+            if "detail" in resp:
+                raise Exception(resp["detail"])
+
+            raise Exception(f"{resp}")
 
 
 # async def chat(prompt: str, model: str = "gpt-3"):
