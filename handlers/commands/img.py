@@ -41,6 +41,12 @@ async def img(msg: types.Message, state: FSMContext):
 
     logger.info(f"{prefix} is generating image")
 
+    # if empty raw, reply models list
+    if " " not in msg.text:
+        reply = await msg.reply(f"/img [model] prompt\nsupport models:\n{', '.join(SUPPORT_MODELS)}\n")
+        await manager.lazy_delete_message(chat.id, reply.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+        return
+
     try:
         _, raw = msg.text.split(" ", maxsplit=1)
         parts = raw.split(" ", maxsplit=1)
@@ -66,9 +72,7 @@ async def img(msg: types.Message, state: FSMContext):
     prompt = prompt[:100]
     if model not in SUPPORT_MODELS:
         logger.debug(f"{prefix} model {model} is not supported")
-        reply = await msg.reply(
-            f"model {model} is not supported,\nsupport models:\n{', '.join(SUPPORT_MODELS)}\n/img model prompt..."
-        )
+        reply = await msg.reply(f"/img [model] prompt\nsupport models:\n{', '.join(SUPPORT_MODELS)}\n")
         await manager.lazy_delete_message(chat.id, reply.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
         return
 
