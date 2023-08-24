@@ -186,7 +186,8 @@ async def process_task(task):
         # delete reply and create new reply
         await manager.bot.delete_message(chat_id, msg_reply)
         await manager.bot.send_photo(
-            chat_id, input_file, reply_to_message_id=msg_from, caption=f"cost {str(cost)[:-7]}", has_spoiler=True
+            chat_id, input_file, reply_to_message_id=msg_from, caption=f"cost {str(cost)[:-7]}"
+            #, has_spoiler=True no support
         )
 
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
