@@ -1,6 +1,8 @@
 import asyncio
 from manager import manager
 
+PROMPT_PREFIX = "masterpieces, best quality, illustration, ultra detail, solo, colorful, hdr, best quality,\n"
+
 
 async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") -> str:
     """return is base64 str png"""
@@ -20,13 +22,13 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
 
     step = 28
     cfg_scale = 8
-    sampler_name = "DPM++ 3M SDE Exponential"  # DDIM, DPM++ 3M SDE Exponential
+    sampler_name = "DPM++ 3M SDE Exponential"  # DDIM, DPM++ 3M SDE Exponential, DPM++ 2M SDE Heun Exponential
 
     session = await manager.bot.get_session()
     async with session.post(
         url=f"{endpoint}/sdapi/v1/txt2img",
         json={
-            "prompt": prompt,
+            "prompt": PROMPT_PREFIX + prompt,
             "negative_prompt": negative_prompt,
             "seed": -1,
             "sampler_name": sampler_name,
