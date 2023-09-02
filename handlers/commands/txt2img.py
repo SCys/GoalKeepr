@@ -9,6 +9,7 @@ from orjson import dumps, loads
 
 from manager import manager
 from utils import sd_api
+from utils.tg import strip_text_prefix
 
 logger = manager.logger
 
@@ -67,7 +68,7 @@ async def txt2img(msg: types.Message, state: FSMContext):
         "chat_name": msg.chat.full_name,
         "user": msg.from_user.id,
         "user_name": msg.from_user.full_name,
-        "raw": msg.text,
+        "raw": strip_text_prefix(msg.text),
         "from": msg.message_id,
         "to": -1,
         "created_at": datetime.now().timestamp(),
@@ -186,8 +187,11 @@ async def process_task(task):
         # delete reply and create new reply
         await manager.bot.delete_message(chat_id, msg_reply)
         await manager.bot.send_photo(
-            chat_id, input_file, reply_to_message_id=msg_from, caption=f"cost {str(cost)[:-7]}"
-            #, has_spoiler=True no support
+            chat_id,
+            input_file,
+            reply_to_message_id=msg_from,
+            caption=f"cost {str(cost)[:-7]}"
+            # , has_spoiler=True no support
         )
 
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
