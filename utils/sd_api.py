@@ -1,7 +1,8 @@
 import asyncio
 from manager import manager
 
-PROMPT_PREFIX = "masterpieces, best quality, illustration, ultra detail, solo, colorful, hdr, best quality,\n"
+PROMPT_PREFIX = """modelshoot style, photo realistic game cg, 8k, epic, symetrical features, Intricate, High Detail, Sharp focus, photorealistic, epic volumetric lighting, fine details, illustration, (masterpiece, best quality, highres),\n"""
+NEGATIVE_PROMPT_PREFIX = "(((simple background))),monochrome ,lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, lowres, bad anatomy, bad hands, text, error, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, ugly,pregnant,vore,duplicate,morbid,mut ilated,tran nsexual, hermaphrodite,long neck,mutated hands,poorly drawn hands,poorly drawn face,mutation,deformed,blurry,bad anatomy,bad proportions,malformed limbs,extra limbs,cloned face,disfigured,gross proportions, (((missing arms))),((( missing legs))), (((extra arms))),(((extra legs))),pubic hair, plump,bad legs,error legs,username,blurry,bad feet, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry,\n"
 
 
 async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") -> str:
@@ -29,7 +30,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
         url=f"{endpoint}/sdapi/v1/txt2img",
         json={
             "prompt": PROMPT_PREFIX + prompt,
-            "negative_prompt": negative_prompt,
+            "negative_prompt": NEGATIVE_PROMPT_PREFIX + negative_prompt,
             "seed": -1,
             "sampler_name": sampler_name,
             "batch_size": 1,
