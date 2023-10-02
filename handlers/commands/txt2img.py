@@ -19,7 +19,7 @@ QUEUE_NAME = "txt2img"
 DELETED_AFTER = 3  # 3s
 
 
-@manager.register("message", commands=["txt2img"], commands_ignore_caption=True, commands_ignore_mention=True)
+@manager.register("message", commands=["txt2img", "img"], commands_ignore_caption=True, commands_ignore_mention=True)
 async def txt2img(msg: types.Message, state: FSMContext):
     """sd txt2img"""
     chat = msg.chat
