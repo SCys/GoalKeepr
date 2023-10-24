@@ -16,7 +16,6 @@ from aiogram.utils.exceptions import (
     MessageCantBeDeleted,
     MessageToDeleteNotFound,
 )
-import openai
 
 import database
 
@@ -31,7 +30,6 @@ SETTINGS_TEMPLATE = {
         "google_recaptcha": False,  # enable google recaptcha detector
         "google_recaptcha_token": "",
     },
-    "openai": {"api": "", "base_url": ""},
     "image": {
         "users": [],  # allowed users(id list)
         "groups": [],  # allowed groups(id list)
@@ -82,11 +80,6 @@ class Manager:
         if not token:
             logger.error("telegram token is missing")
             sys.exit(1)
-
-        # setup openai sdk config
-        openai.api_key = self.config["openai"]["api"]
-        openai.api_base = self.config["openai"]["endpoint"]
-        logger.info(f"openai is setup, base on {openai.api_base}")
 
         self.bot = Bot(token=token)
         logger.info("bot is setup")
