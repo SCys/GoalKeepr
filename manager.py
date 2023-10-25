@@ -7,15 +7,8 @@ from typing import Optional, Union
 
 import aioredis
 import loguru
-from aiogram import Bot, Dispatcher, executor, types
-from aiogram.utils.exceptions import (
-    Unauthorized,
-    BotBlocked,
-    BotKicked,
-    BadRequest,
-    MessageCantBeDeleted,
-    MessageToDeleteNotFound,
-)
+from aiogram import Bot, Dispatcher, types
+from aiogram.enums import ParseMode
 
 import database
 
@@ -34,9 +27,9 @@ SETTINGS_TEMPLATE = {
         "users": [],  # allowed users(id list)
         "groups": [],  # allowed groups(id list)
     },
-    'sd_api': {
+    "sd_api": {
         "endpoint": "",
-    }
+    },
 }
 
 
@@ -81,7 +74,7 @@ class Manager:
             logger.error("telegram token is missing")
             sys.exit(1)
 
-        self.bot = Bot(token=token)
+        self.bot = Bot(token=token, parse_mode=ParseMode.MARKDOWN_V2)
         logger.info("bot is setup")
 
         self.dp = Dispatcher(self.bot)
@@ -92,10 +85,12 @@ class Manager:
         handlers = self.handlers
 
         for func, type_name, args, kwargs in handlers:
-            method = getattr(dp, f"register_{type_name}_handler")
-            if not callable(method):
+            observer = dp.observers.get(type_name, None)
+            if not observer or not hasattr(observer, "register"):
+                logger.warning(f"dispatcher:unknown type {type_name}")
                 continue
 
+            method = observer.register
             method(func, *args, **kwargs)
             logger.info(f"dispatcher:{method.__name__}({func.__name__}, {args}, {kwargs})")
 
@@ -135,15 +130,15 @@ class Manager:
 
         return wrapper
 
-    def start(self):
+    async def start(self):
         self.is_running = True
 
-        executor.start_polling(self.dp, fast=True)
+        await self.dp.start_polling(self.dp, fast=True)
 
-    def stop(self):
+    async def stop(self):
         self.is_running = False
 
-        self.dp.stop_polling()
+        await self.dp.stop_polling()
 
     def username(self, _user: Union[types.ChatMember, types.User]):
         """获取用户名"""
@@ -156,8 +151,8 @@ class Manager:
     async def is_admin(self, chat: types.Chat, member: types.User):
         try:
             admins = await self.bot.get_chat_administrators(chat.id)
-            return len([i for i in admins if i.is_chat_admin() and i.user.id == member.id]) > 0
-        except BadRequest as e:
+            return len([i for i in admins if i.can_delete_messages and i.user.id == member.id]) > 0
+        except Exception as e:
             logger.error(f"chat {chat.id} member {member.id} check failed:{e}")
 
         return False
@@ -165,8 +160,6 @@ class Manager:
     async def chat_member(self, chat: types.Chat, member_id: int):
         try:
             return await self.bot.get_chat_member(chat.id, member_id)
-        except BadRequest:
-            logger.error(f"chat {chat.id} member {member_id} check failed")
         except:
             logger.exception(f"chat {chat.id} member {member_id} check exception")
 
@@ -180,16 +173,16 @@ class Manager:
         try:
             await self.bot.delete_message(chat, msg)
             logger.info(f"chat {chat} message {msg} deleted")
-        except BotBlocked:
-            logger.info(f"chat {chat} message {msg} delete failed, bot blocked")
-        except BotKicked:
-            logger.info(f"chat {chat} message {msg} delete failed, bot kicked")
-        except Unauthorized:
-            logger.info(f"chat {chat} message {msg} delete failed, unauthorized(include kicked/blocked/...)")
-        except MessageCantBeDeleted:
-            logger.warning(f"chat {chat} message {msg} can not be deleted")
-        except MessageToDeleteNotFound:
-            logger.warning(f"chat {chat} message {msg} is deleted")
+        # except BotBlocked:
+        #     logger.info(f"chat {chat} message {msg} delete failed, bot blocked")
+        # except BotKicked:
+        #     logger.info(f"chat {chat} message {msg} delete failed, bot kicked")
+        # except Unauthorized:
+        #     logger.info(f"chat {chat} message {msg} delete failed, unauthorized(include kicked/blocked/...)")
+        # except MessageCantBeDeleted:
+        #     logger.warning(f"chat {chat} message {msg} can not be deleted")
+        # except MessageToDeleteNotFound:
+        #     logger.warning(f"chat {chat} message {msg} is deleted")
         except Exception:
             logger.exception(f"chat {chat} message {msg} delete error")
             return False

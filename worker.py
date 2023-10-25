@@ -1,6 +1,6 @@
 import asyncio
 
-from aiogram.bot.bot import Bot
+from aiogram import Bot
 
 import database
 from handlers.member_captcha import new_member_check, unban_member  # NOQA: 引入处理器
