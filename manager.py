@@ -37,7 +37,7 @@ class Manager:
     """管理模块"""
 
     bot: Bot
-    dp: Dispatcher
+    dp: Dispatcher = Dispatcher()  # static dispatcher
 
     rdb: Optional[aioredis.Redis] = None
 
@@ -74,11 +74,8 @@ class Manager:
             logger.error("telegram token is missing")
             sys.exit(1)
 
-        self.bot = Bot(token=token, parse_mode=ParseMode.MARKDOWN_V2)
+        self.bot = Bot(token, parse_mode=ParseMode.MARKDOWN_V2)
         logger.info("bot is setup")
-
-        self.dp = Dispatcher()
-        logger.info("dispatcher is setup")
 
     def load_handlers(self):
         dp = self.dp
