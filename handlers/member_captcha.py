@@ -14,7 +14,6 @@ import random
 from datetime import datetime, timedelta
 
 from aiogram import types, Bot
-from aiogram import Bot
 from aiogram.types.chat import Chat
 from aiogram.types.message import Message
 from aiogram.types.user import User
@@ -86,12 +85,16 @@ ICONS = {
 }
 
 
-@manager.register("message", content_types=[types.ContentType.NEW_CHAT_MEMBERS])
-async def member_captcha(msg: types.Message, state):
+@manager.register("message")
+async def member_captcha(msg: types.Message):
     chat = msg.chat
     members = msg.new_chat_members
 
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+
+    # ignore 
+    if not members:
+        return
 
     # 忽略太久之前的信息
     now = datetime.now()

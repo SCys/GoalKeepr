@@ -8,7 +8,7 @@ from manager import manager
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 
 
-@manager.register("message", content_types=[types.ContentType.LEFT_CHAT_MEMBER])
+@manager.register("message")
 async def left_member(msg: Message):
     chat = msg.chat
     user = msg.from_user
@@ -17,6 +17,10 @@ async def left_member(msg: Message):
 
     # chat checked
     if chat.type not in SUPPORT_GROUP_TYPES:
+        return
+
+    # ignore others left member
+    if not member:
         return
 
     # ignore others remove member

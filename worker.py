@@ -89,7 +89,6 @@ async def main():
     manager.setup()
 
     bot = manager.bot
-    Bot.set_current(bot)
 
     async with database.connection() as conn:
         await conn.execute(SQL_CREATE_MESSAGES)

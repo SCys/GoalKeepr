@@ -8,12 +8,17 @@ SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 logger = manager.logger
 
 
-@manager.register("message", content_types=[types.ContentType.TEXT])
+@manager.register("message")
 async def message_sent(msg: types.Message):
     chat = msg.chat
     member = msg.from_user
+    text = msg.text
 
     prefix = f"[message_sent]chat {chat.id}({chat.title}) msg {msg.message_id}"
+
+    if not text:
+        logger.debug(f"{prefix} message is not text")
+        return
 
     # 忽略太久之前的信息
     now = datetime.now()
@@ -28,34 +33,38 @@ async def message_sent(msg: types.Message):
     if member and await manager.is_admin(chat, member):
         return
 
-    # store member last message id and date
-    if rdb := await manager.get_redis():
-        key = f"{chat.id}_{member.id}"
+    rdb = await manager.get_redis()
+    if not rdb:
+        return
 
-        if await rdb.exists(key):
-            async with rdb.pipeline(transaction=True) as pipe:
-                await (
-                    pipe.expire(key, 5)
-                    .hset(key, "message", msg.message_id)
-                    .hset(key, "message_date", msg.date.isoformat())
-                    .hset(key, "message_text", msg.text)
-                    .execute()
-                )
+    key = f"{chat.id}_{member.id}"
 
-            logger.info(f"{prefix} update redis record {key} {msg.message_id} {msg.date}")
-        else:
-            async with rdb.pipeline(transaction=True) as pipe:
-                await (
-                    pipe.hmset(
-                        key,
-                        {
-                            "message": msg.message_id,
-                            "message_date": msg.date.isoformat(),
-                            "message_content": msg.text,
-                        },
-                    )
-                    .expire(key, 5)
-                    .execute()
-                )
+    # ignore if message is same
+    if await rdb.exists(key):
+        async with rdb.pipeline(transaction=True) as pipe:
+            await (
+                pipe.expire(key, 5)
+                .hset(key, "message", msg.message_id)
+                .hset(key, "message_date", msg.date.isoformat())
+                .hset(key, "message_text", text)
+                .execute()
+            )
 
-            logger.debug(f"{prefix} add redis record {key} {msg.message_id} {msg.date}")
+        logger.info(f"{prefix} update redis record {key} {msg.message_id} {msg.date}")
+        return
+
+    async with rdb.pipeline(transaction=True) as pipe:
+        await (
+            pipe.hmset(
+                key,
+                {
+                    "message": msg.message_id,
+                    "message_date": msg.date.isoformat(),
+                    "message_content": text,
+                },
+            )
+            .expire(key, 5)
+            .execute()
+        )
+
+    logger.debug(f"{prefix} add redis record {key} {msg.message_id} {msg.date}")
