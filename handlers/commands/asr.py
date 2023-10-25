@@ -3,6 +3,7 @@ import io
 from datetime import timedelta
 
 from aiogram import types
+from aiogram.filters.command import Command
 from async_timeout import asyncio
 from manager import manager
 from orjson import dumps
@@ -19,7 +20,7 @@ logger = manager.logger
 SUPPORT_GROUP_TYPES = ["supergroup", "group", "private"]
 
 
-@manager.register("message", commands=["asr"])
+@manager.register("message", Command("asr", ignore_case=True, ignore_mention=True))
 async def asr(msg: types.Message):
     config = manager.config
 

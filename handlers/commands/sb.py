@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from aiogram import types
+from aiogram.filters.command import Command
 from manager import manager
 
 DELETED_AFTER = 3
@@ -8,7 +9,7 @@ DELETED_AFTER = 3
 logger = manager.logger
 
 
-@manager.register("message", commands=["sb"], commands_ignore_caption=True, commands_ignore_mention=True)
+@manager.register("message", Command("sb", ignore_case=True, ignore_mention=True))
 async def sb(msg: types.Message):
     """将用户放入黑名单"""
     chat = msg.chat
