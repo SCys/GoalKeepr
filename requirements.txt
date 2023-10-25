@@ -4,7 +4,6 @@ aiosqlite
 loguru
 orjson
 pydub
-tencentcloud-sdk-python
 translators
 aiogram
 edge-tts

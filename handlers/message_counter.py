@@ -9,7 +9,7 @@ logger = manager.logger
 
 
 @manager.register("message")
-async def message_sent(msg: types.Message):
+async def message_counter(msg: types.Message):
     chat = msg.chat
     member = msg.from_user
     text = msg.text
