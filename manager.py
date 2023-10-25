@@ -77,7 +77,7 @@ class Manager:
         self.bot = Bot(token=token, parse_mode=ParseMode.MARKDOWN_V2)
         logger.info("bot is setup")
 
-        self.dp = Dispatcher(self.bot)
+        self.dp = Dispatcher()
         logger.info("dispatcher is setup")
 
     def load_handlers(self):
@@ -133,7 +133,7 @@ class Manager:
     async def start(self):
         self.is_running = True
 
-        await self.dp.start_polling(self.dp, fast=True)
+        await self.dp.start_polling(self.bot)
 
     async def stop(self):
         self.is_running = False
