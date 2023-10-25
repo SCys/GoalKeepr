@@ -4,7 +4,6 @@ from datetime import datetime
 
 import edge_tts
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
 from manager import manager
 from pydub import AudioSegment
 
@@ -17,7 +16,7 @@ RE_CLEAR = re.compile(r"/tts(@[a-zA-Z0-9]+\s?)?")
 
 
 @manager.register("message", commands=["tts"])
-async def tts(msg: types.Message, state: FSMContext):
+async def tts(msg: types.Message):
     chat = msg.chat
     if chat.type not in SUPPORT_GROUP_TYPES:
         logger.warning("chat type is not support")

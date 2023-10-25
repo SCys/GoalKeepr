@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
 from aiogram.types import Message
 
 from manager import manager
@@ -10,7 +9,7 @@ SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 
 
 @manager.register("message", content_types=[types.ContentType.LEFT_CHAT_MEMBER])
-async def left_member(msg: Message, state: FSMContext):
+async def left_member(msg: Message):
     chat = msg.chat
     user = msg.from_user
     member = msg.left_chat_member

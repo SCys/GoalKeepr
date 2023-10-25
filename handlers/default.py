@@ -1,5 +1,4 @@
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
 from manager import manager
 
 logger = manager.logger

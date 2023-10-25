@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
@@ -10,7 +9,7 @@ logger = manager.logger
 
 
 @manager.register("message", content_types=[types.ContentType.TEXT])
-async def message_sent(msg: types.Message, state: FSMContext):
+async def message_sent(msg: types.Message):
     chat = msg.chat
     member = msg.from_user
 

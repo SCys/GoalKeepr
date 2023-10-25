@@ -1,7 +1,6 @@
 from datetime import timedelta
 
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
 from manager import manager
 
 DELETED_AFTER = 3
@@ -10,7 +9,7 @@ logger = manager.logger
 
 
 @manager.register("message", commands=["sb"], commands_ignore_caption=True, commands_ignore_mention=True)
-async def sb(msg: types.Message, state: FSMContext):
+async def sb(msg: types.Message):
     """将用户放入黑名单"""
     chat = msg.chat
     user = msg.from_user

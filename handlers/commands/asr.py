@@ -3,7 +3,6 @@ import io
 from datetime import timedelta
 
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
 from async_timeout import asyncio
 from manager import manager
 from orjson import dumps
@@ -21,7 +20,7 @@ SUPPORT_GROUP_TYPES = ["supergroup", "group", "private"]
 
 
 @manager.register("message", commands=["asr"])
-async def asr(msg: types.Message, state: FSMContext):
+async def asr(msg: types.Message):
     config = manager.config
 
     chat = msg.chat

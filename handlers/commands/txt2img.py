@@ -4,7 +4,6 @@ import io
 from datetime import datetime, timedelta
 
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
 from orjson import dumps, loads
 
 from manager import manager
@@ -20,7 +19,7 @@ DELETED_AFTER = 3  # 3s
 
 
 @manager.register("message", commands=["txt2img", "img"], commands_ignore_caption=True, commands_ignore_mention=True)
-async def txt2img(msg: types.Message, state: FSMContext):
+async def txt2img(msg: types.Message):
     """sd txt2img"""
     chat = msg.chat
     user = msg.from_user

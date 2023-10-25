@@ -3,7 +3,6 @@ from datetime import datetime
 
 import translators as ts
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
 from manager import manager
 
 logger = manager.logger
@@ -12,7 +11,7 @@ RE_CLEAR = re.compile(r"/tr(anslate)?(@[a-zA-Z0-9]+\s?)?")
 
 
 @manager.register("message", commands=["tr"])
-async def translate(msg: types.Message, state: FSMContext):
+async def translate(msg: types.Message):
     user = msg.from_user
 
     target = msg
