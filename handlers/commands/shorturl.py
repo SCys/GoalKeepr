@@ -2,6 +2,7 @@ import re
 from datetime import timedelta
 
 from aiohttp import ClientTimeout, ClientSession
+from aiogram.filters.command import Command
 from asyncio.exceptions import TimeoutError
 from aiogram import types
 from manager import manager
@@ -16,7 +17,7 @@ URL_API = "https://api.iscys.com/api/shorturl"
 logger = manager.logger
 
 
-@manager.register("message", commands=["shorturl"])
+@manager.register("message", Command("shorturl", ignore_case=True, ignore_mention=True))
 async def shorturl(msg: types.Message):
     user = msg.from_user
     content = msg.text

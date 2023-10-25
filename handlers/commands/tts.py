@@ -4,6 +4,7 @@ from datetime import datetime
 
 import edge_tts
 from aiogram import types
+from aiogram.filters.command import Command
 from manager import manager
 from pydub import AudioSegment
 
@@ -15,7 +16,7 @@ SUPPORT_GROUP_TYPES = ["supergroup", "group", "private"]
 RE_CLEAR = re.compile(r"/tts(@[a-zA-Z0-9]+\s?)?")
 
 
-@manager.register("message", commands=["tts"])
+@manager.register("message", Command("tts", ignore_case=True, ignore_mention=True))
 async def tts(msg: types.Message):
     chat = msg.chat
     if chat.type not in SUPPORT_GROUP_TYPES:

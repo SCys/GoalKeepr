@@ -1,12 +1,13 @@
 from datetime import timedelta
 
 from aiogram import types
+from aiogram.filters.command import Command
 from manager import manager
 
 logger = manager.logger
 
 
-@manager.register("message", commands=["id"])
+@manager.register("message", Command("id", ignore_case=True, ignore_mention=True))
 async def whoami(msg: types.Message):
     """我的信息"""
     if msg.reply_to_message:

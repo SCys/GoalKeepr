@@ -3,6 +3,7 @@ from datetime import datetime
 
 import translators as ts
 from aiogram import types
+from aiogram.filters.command import Command
 from manager import manager
 
 logger = manager.logger
@@ -10,7 +11,7 @@ logger = manager.logger
 RE_CLEAR = re.compile(r"/tr(anslate)?(@[a-zA-Z0-9]+\s?)?")
 
 
-@manager.register("message", commands=["tr"])
+@manager.register("message", Command("tr", ignore_case=True, ignore_mention=True))
 async def translate(msg: types.Message):
     user = msg.from_user
 
