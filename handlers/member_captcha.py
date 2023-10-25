@@ -13,13 +13,11 @@ import re
 import random
 from datetime import datetime, timedelta
 
-from aiogram import types
-from aiogram.bot.bot import Bot
-from aiogram.dispatcher.storage import FSMContext
+from aiogram import types, Bot
+from aiogram import Bot
 from aiogram.types.chat import Chat
 from aiogram.types.message import Message
 from aiogram.types.user import User
-from aiogram.utils.exceptions import NotEnoughRightsToRestrict
 
 from manager import manager
 
@@ -73,7 +71,7 @@ ICONS = {
 
 
 @manager.register("message", content_types=[types.ContentType.NEW_CHAT_MEMBERS])
-async def member_captcha(msg: types.Message, state: FSMContext):
+async def member_captcha(msg: types.Message, state):
     chat = msg.chat
     members = msg.new_chat_members
 
@@ -114,7 +112,7 @@ async def member_captcha(msg: types.Message, state: FSMContext):
                 can_send_other_messages=False,
                 can_add_web_page_previews=False,
             )
-        except NotEnoughRightsToRestrict:
+        except Exception:
             logger.warning(f"{prefix} no right to restrict the member {member.id}({manager.username(member)}) rights")
             return
 
