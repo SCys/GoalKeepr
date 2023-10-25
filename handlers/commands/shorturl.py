@@ -2,7 +2,7 @@ import re
 from datetime import timedelta
 
 from aiohttp import ClientTimeout, ClientSession
-from aiogram.filters.command import Command
+from aiogram.filters import Command
 from asyncio.exceptions import TimeoutError
 from aiogram import types
 from manager import manager

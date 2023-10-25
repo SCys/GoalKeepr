@@ -4,7 +4,7 @@ import io
 from datetime import datetime, timedelta
 
 from aiogram import types
-from aiogram.filters.command import Command
+from aiogram.filters import Command
 from orjson import dumps, loads
 
 from manager import manager

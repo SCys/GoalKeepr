@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from aiogram import types
-from aiogram.filters.command import Command
+from aiogram.filters import Command
 from manager import manager
 
 DELETED_AFTER = 5

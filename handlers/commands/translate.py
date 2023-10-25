@@ -3,7 +3,7 @@ from datetime import datetime
 
 import translators as ts
 from aiogram import types
-from aiogram.filters.command import Command
+from aiogram.filters import Command
 from manager import manager
 
 logger = manager.logger

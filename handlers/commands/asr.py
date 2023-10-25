@@ -3,7 +3,7 @@ import io
 from datetime import timedelta
 
 from aiogram import types
-from aiogram.filters.command import Command
+from aiogram.filters import Command
 from async_timeout import asyncio
 from manager import manager
 from orjson import dumps
