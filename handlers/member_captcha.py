@@ -286,6 +286,9 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
         return
 
     member = await manager.chat_member(chat, member_id)
+    if member is None:
+        logger.warning(f"bot get chat {chat_id} failed: member is not found")
+        return
 
     prefix = f"chat {chat_id}({chat.title}) msg {message_id}"
 
@@ -297,14 +300,10 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
         logger.warning(f"{prefix} member {member_id} is kicked")
         return
 
-    if isinstance(member.status, types.ChatMemberMember):
-        logger.warning(
-            f"{prefix} member {member_id} is Represents a chat member that has no additional privileges or restrictions"
-        )
-        return
 
     # FIXME 某些情况下可能会出现问题，比如获取不到权限
     try:
+        member = member.resolve()
         if member.can_send_messages:
             logger.info(f"{prefix} member {member_id} is accepted")
             return
