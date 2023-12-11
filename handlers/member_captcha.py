@@ -112,7 +112,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     # ignore from administrator
     if event.from_user and await manager.is_admin(chat, event.from_user):
-        logger.info(f"{prefix} administrator {event.from_user.id} added members")
+        logger.info(f"{prefix} administrator {event.from_user.id} update member permission")
         return
 
     try:
