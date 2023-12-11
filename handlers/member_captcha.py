@@ -157,7 +157,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
     # checkout message sent after join 10ms
     try:
         if rdb := await manager.get_redis():
-            key = f"{chat.id}_{member.id}"
+            key = f"{chat.id}_{member_id}"
             if await rdb.exists(key):
                 message_id: bytes = await rdb.hget(key, "message")
                 message_content: bytes = await rdb.hget(key, "message_content")
