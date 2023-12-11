@@ -350,7 +350,11 @@ def build_new_member_message(member: Union[types.ChatMemberRestricted, types.Use
     """
     构建新用户验证信息的按钮和文字内容
     """
-    member_id = member.user.id
+    if isinstance(member, types.ChatMemberRestricted):
+        member_id = member.user.id
+    else:  # User
+        member_id = member.id
+
     member_name = manager.username(member)
 
     # 用户组
