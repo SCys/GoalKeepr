@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from aiogram import types
 from aiogram.filters import Command
+from aiogram.enums import ParseMode
 from manager import manager
 
 logger = manager.logger
@@ -19,7 +20,7 @@ async def whoami(msg: types.Message):
         return
 
     content = f"""ID：\t{user.id}\n完整名：\t{user.full_name}\n分享URL：{user.url}"""
-    msg_reply = await msg.reply(content, disable_notification=True)
+    msg_reply = await msg.reply(content, disable_notification=True, parse_mode=ParseMode.HTML)
     logger.info(f"[id]chat {msg.chat.id}({msg.chat.title}) msg {msg.message_id} user {user.id}({user.first_name})")
 
     # auto delete after 5s at (super)group
