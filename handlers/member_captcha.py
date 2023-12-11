@@ -386,10 +386,12 @@ async def accepted_member(chat: Chat, msg: Message, user: User):
     try:
         await chat.restrict(
             user.id,
-            can_send_messages=True,
-            can_send_media_messages=True,
-            can_send_other_messages=True,
-            can_add_web_page_previews=True,
+            permissions=types.ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+            ),
         )
     except Exception as e:
         logger.error(f"{prefix} restrict {user.id} error {e}")
