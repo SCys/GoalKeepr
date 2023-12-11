@@ -87,11 +87,11 @@ ICONS = {
 
 
 @manager.register("chat_member")
-async def member_captcha(msg: types.ChatMemberUpdated):
-    chat = msg.chat
-    member = msg.new_chat_member
+async def member_captcha(event: types.ChatMemberUpdated):
+    chat = event.chat
+    member = event.new_chat_member
 
-    prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+    prefix = f"chat {chat.id}({chat.title}) msg {event}"
 
     if member != types.ChatMemberMember:
         logger.info(f"{prefix} member {member.id}({manager.username(member)}) is member")
@@ -103,49 +103,49 @@ async def member_captcha(msg: types.ChatMemberUpdated):
 
     # 忽略太久之前的信息
     now = datetime.now()
-    if now > msg.date + timedelta(seconds=60):
-        logger.warning(f"{prefix} date is ignored:{now} > {msg.date + timedelta(seconds=60)}")
+    if now > event.date + timedelta(seconds=60):
+        logger.warning(f"{prefix} date is ignored:{now} > {event.date + timedelta(seconds=60)}")
         return
-    now = msg.date
+    now = event.date
 
     if chat.type not in SUPPORT_GROUP_TYPES:
         return
 
     # ignore from administrator
-    if msg.from_user and await manager.is_admin(chat, msg.from_user):
-        logger.info(f"{prefix} administrator {msg.from_user.id} added members")
+    if event.from_user and await manager.is_admin(chat, event.from_user):
+        logger.info(f"{prefix} administrator {event.from_user.id} added members")
         return
 
     try:
-        logger.info(f"{prefix} found new member at {now} ttl is {datetime.now() - msg.date}")
+        logger.info(f"{prefix} found new member at {now} ttl is {datetime.now() - event.date}")
     except Exception as e:
         logger.error(f"check point #1 failed:{e}")
 
     logger.info(f"{prefix} restrict new member:{member.id}({manager.username(member)})")
 
+    # 开始发出验证信息
+    member_id = member.user.id
+    member_name = member.user.full_name
+
     try:
         # 收紧权限
         await chat.restrict(
-            member.id,
+            member_id,
             can_send_messages=False,
             can_send_media_messages=False,
             can_send_other_messages=False,
             can_add_web_page_previews=False,
         )
     except Exception:
-        logger.warning(f"{prefix} no right to restrict the member {member.id}({manager.username(member)}) rights")
+        logger.warning(f"{prefix} no right to restrict the member {member_id}({member_name}) rights")
         return
 
-    if not await manager.delete_message(chat.id, msg.message_id):
-        await manager.lazy_delete_message(chat.id, msg.message_id, now)
+    # if not await manager.delete_message(chat.id, event.message_id):
+    #     await manager.lazy_delete_message(chat.id, event.message_id, now)
 
     # 睡眠3秒，兼容其他Bot处理事情
     await asyncio.sleep(2)
     # logger.debug(f"{prefix} new member event wait 5s")
-
-    # 开始发出验证信息
-    member_id = member.user.id
-    member_name = member.user.full_name
 
     # 如果已经被剔除，则不做处理
     member = await manager.chat_member(chat, member_id)
@@ -185,7 +185,7 @@ async def member_captcha(msg: types.ChatMemberUpdated):
         # reply = await msg.reply(content, parse_mode="markdown", reply_markup=reply_markup)
         reply = await manager.bot.send_message(chat.id, message_content, parse_mode="markdown", reply_markup=reply_markup)
 
-        await manager.lazy_session(chat.id, msg.id, member_id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
+        await manager.lazy_session(chat.id, -1, member_id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
         await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER))
 
 
@@ -337,7 +337,7 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
 async def unban_member(bot: Bot, chat_id: int, message_id: int, member_id: int):
     try:
         chat = await bot.get_chat(chat_id)
-        member = await manager.chat_member(chat, member_id)
+        # member = await manager.chat_member(chat, member_id)
     except Exception as e:
         logger.warning(f"bot get chat {chat_id} failed: {e}")
         return
