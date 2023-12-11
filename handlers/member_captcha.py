@@ -100,9 +100,9 @@ async def member_captcha(event: types.ChatMemberUpdated):
     prefix = f"chat {chat.id}({chat.title}) msg {event} member {member_id}({member_name})"
 
     # 忽略太久之前的信息
-    now = datetime.now(timezone.utc)
-    if now > event.date + timedelta(seconds=60):
-        logger.warning(f"{prefix} date is ignored:{now} > {event.date + timedelta(seconds=60)}")
+    now_ = datetime.now(timezone.utc)
+    if now_ > event.date + timedelta(seconds=60):
+        logger.warning(f"{prefix} date is ignored:{now_} > {event.date + timedelta(seconds=60)}")
         return
     now = event.date
 
@@ -115,7 +115,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
         return
 
     try:
-        logger.info(f"{prefix} found new member at {now} ttl is {datetime.now() - event.date}")
+        logger.info(f"{prefix} found new member at {now_} ttl is {now_ - event.date}")
     except Exception as e:
         logger.error(f"check point #1 failed:{e}")
 
