@@ -17,6 +17,7 @@ from aiogram import types, Bot
 from aiogram.types.chat import Chat
 from aiogram.types.message import Message
 from aiogram.types.user import User
+from aiogram.enums import ChatMemberStatus
 
 from manager import manager
 
@@ -86,15 +87,18 @@ ICONS = {
 
 
 @manager.register("chat_member")
-async def member_captcha(msg: types.Message):
+async def member_captcha(msg: types.ChatMemberUpdated):
     chat = msg.chat
-    members = msg.new_chat_members
+    member = msg.new_chat_member
 
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
 
-    # ignore
-    if not members:
-        logger.info(f"{prefix} no new member")
+    if member != types.ChatMemberMember:
+        logger.info(f"{prefix} member {member.id}({manager.username(member)}) is member")
+        return
+
+    if member.bot:
+        logger.info(f"{prefix} member {member.id}({manager.username(member)}) is bot")
         return
 
     # 忽略太久之前的信息
@@ -117,83 +121,71 @@ async def member_captcha(msg: types.Message):
     except Exception as e:
         logger.error(f"check point #1 failed:{e}")
 
-    for member in members:
-        if member.is_bot:
-            continue
+    logger.info(f"{prefix} restrict new member:{member.id}({manager.username(member)})")
 
-        logger.info(f"{prefix} restrict new member:{member.id}({manager.username(member)})")
-
-        try:
-            # 收紧权限
-            await chat.restrict(
-                member.id,
-                can_send_messages=False,
-                can_send_media_messages=False,
-                can_send_other_messages=False,
-                can_add_web_page_previews=False,
-            )
-        except Exception:
-            logger.warning(f"{prefix} no right to restrict the member {member.id}({manager.username(member)}) rights")
-            return
+    try:
+        # 收紧权限
+        await chat.restrict(
+            member.id,
+            can_send_messages=False,
+            can_send_media_messages=False,
+            can_send_other_messages=False,
+            can_add_web_page_previews=False,
+        )
+    except Exception:
+        logger.warning(f"{prefix} no right to restrict the member {member.id}({manager.username(member)}) rights")
+        return
 
     if not await manager.delete_message(chat.id, msg.message_id):
         await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
     # 睡眠3秒，兼容其他Bot处理事情
-    await asyncio.sleep(3)
+    await asyncio.sleep(2)
     # logger.debug(f"{prefix} new member event wait 5s")
 
     # 开始发出验证信息
-    for i in members:
-        if i.is_bot:
-            continue
+    member_id = member.user.id
+    member_name = member.user.full_name
 
-        member_id = i.id
-        member_name = manager.username(i)
+    # 如果已经被剔除，则不做处理
+    member = await manager.chat_member(chat, member_id)
+    if not member or not member.is_member:
+        logger.info(f"{prefix} new member {member_id}({member_name}) is left")
+        return
 
-        # 如果已经被剔除，则不做处理
-        member = await manager.chat_member(chat, i.id)
-        if not member or not member.is_member:
-            logger.info(f"{prefix} new member {member_id}({member_name}) is left")
-            continue
+    if member.can_send_messages:
+        logger.info(f"{prefix} new member {member_id}({member_name}) rights is accepted")
+        return
 
-        if member.is_chat_admin():
-            logger.info(f"{prefix} new member {member_id}({member_name}) is admin")
-            continue
+    # checkout message sent after join 10ms
+    try:
+        if rdb := await manager.get_redis():
+            key = f"{chat.id}_{member.id}"
+            if await rdb.exists(key):
+                message_id: bytes = await rdb.hget(key, "message")
+                message_content: bytes = await rdb.hget(key, "message_content")
+                message_date: bytes = await rdb.hget(key, "message_date")
 
-        if member.can_send_messages:
-            logger.info(f"{prefix} new member {member_id}({member_name}) rights is accepted")
-            continue
+                message_id = int(message_id.decode())
+                message_content = message_content.decode()
+                message_date = message_date.decode()
 
-        # checkout message sent after join 10ms
-        try:
-            if rdb := await manager.get_redis():
-                key = f"{chat.id}_{i.id}"
-                if await rdb.exists(key):
-                    message_id: bytes = await rdb.hget(key, "message")
-                    message_content: bytes = await rdb.hget(key, "message_content")
-                    message_date: bytes = await rdb.hget(key, "message_date")
+                logger.warning(
+                    f"{prefix} new member {member_id}({member_name}) sent message is the same as joining the group: content:'{message_content}', date:'{message_date}'"
+                )
 
-                    message_id = int(message_id.decode())
-                    message_content = message_content.decode()
-                    message_date = message_date.decode()
+                await chat.ban(member_id, until_date=timedelta(seconds=60), revoke_messages=True)
+                await chat.delete_message(message_id)
+                return
+    except Exception as e:
+        logger.error(f"{prefix} new member {member_id}({member_name}) is checking message failed:{e}")
 
-                    logger.warning(
-                        f"{prefix} new member {member_id}({member_name}) sent message is the same as joining the group: content:'{message_content}', date:'{message_date}'"
-                    )
-
-                    await chat.kick(i.id, until_date=timedelta(seconds=60), revoke_messages=True)
-                    await chat.delete_message(message_id)
-                    continue
-        except Exception as e:
-            logger.error(f"{prefix} new member {member_id}({member_name}) is checking message failed:{e}")
-
-        message_content, reply_markup = build_new_member_message(i, now)
+        message_content, reply_markup = build_new_member_message(member, now)
 
         # reply = await msg.reply(content, parse_mode="markdown", reply_markup=reply_markup)
         reply = await manager.bot.send_message(chat.id, message_content, parse_mode="markdown", reply_markup=reply_markup)
 
-        await manager.lazy_session(chat.id, msg.message_id, i.id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
+        await manager.lazy_session(chat.id, msg.id, member_id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
         await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER))
 
 
@@ -261,7 +253,7 @@ async def new_member_callback(query: types.CallbackQuery):
                 if not await manager.delete_message(chat.id, msg.message_id):
                     await manager.lazy_delete_message(chat.id, msg.message_id, now)
 
-                await chat.kick(member_id, until_date=timedelta(days=30), revoke_messages=True)
+                await chat.ban(member_id, until_date=timedelta(days=30), revoke_messages=True)
                 # await chat.unban(member_id)
 
                 logger.warning(
@@ -310,28 +302,30 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
 
     prefix = f"chat {chat_id}({chat.title}) msg {message_id}"
 
-    if member.is_chat_admin():
+    status = member.status
+    if status == ChatMemberStatus.ADMINISTRATOR:
         logger.info(f"{prefix} member {member_id} is admin")
         return
-
-    if not member.is_chat_member():
-        logger.warning(f"{prefix} member {member_id} is kicked")
+    elif status == ChatMemberStatus.CREATOR:
+        logger.info(f"{prefix} member {member_id} is creator")
+        return
+    elif status == ChatMemberStatus.LEFT:
+        logger.info(f"{prefix} member {member_id} is left")
+        return
+    elif status == ChatMemberStatus.KICKED:
+        logger.info(f"{prefix} member {member_id} is kicked")
         return
 
-    # FIXME 某些情况下可能会出现问题，比如获取不到权限
-    try:
-        member = member.resolve()
-        if member.can_send_messages:
-            logger.info(f"{prefix} member {member_id} is accepted")
-            return
-    except Exception as e:
-        logger.warning(f"{prefix} member {member_id} can_send_messages error {e}")
+    if member.can_send_messages:
+        logger.info(f"{prefix} member {member_id} rights is accepted")
+        return
+
+    logger.info(f"{prefix} member {member_id} status is {status}")
 
     try:
-        # await bot.ban_chat_member(chat_id, member_id)
-        await chat.kick(member_id, revoke_messages=True)
+        await chat.ban(member_id, revoke_messages=True, until_date=timedelta(seconds=60))
 
-        # unban member after 45s
+        # 45秒后解除禁言
         await manager.lazy_session(chat.id, message_id, member_id, "unban_member", datetime.now() + timedelta(seconds=45))
 
         logger.info(f"{prefix} member {member_id} is kicked by timeout")
@@ -349,10 +343,6 @@ async def unban_member(bot: Bot, chat_id: int, message_id: int, member_id: int):
         return
 
     prefix = f"chat {chat_id}({chat.title}) msg {message_id}"
-
-    if member.is_chat_admin():
-        logger.info(f"{prefix} member {member_id} is admin")
-        return
 
     try:
         await bot.unban_chat_member(chat_id, member_id, only_if_banned=True)
