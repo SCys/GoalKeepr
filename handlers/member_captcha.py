@@ -18,6 +18,7 @@ from aiogram.types.chat import Chat
 from aiogram.types.message import Message
 from aiogram.types.user import User
 from aiogram.enums import ChatMemberStatus
+from typing import Union
 
 from manager import manager
 
@@ -345,12 +346,12 @@ async def unban_member(bot: Bot, chat_id: int, message_id: int, member_id: int):
         logger.warning(f"{prefix} member {member_id} unbanned error {e}")
 
 
-def build_new_member_message(member: types.ChatMemberRestricted, msg_timestamp):
+def build_new_member_message(member: Union[types.ChatMemberRestricted, types.User], msg_timestamp):
     """
     构建新用户验证信息的按钮和文字内容
     """
     member_id = member.user.id
-    member_name = member.user.full_name
+    member_name = manager.username(member)
 
     # 用户组
     items = random.sample(list(ICONS.items()), k=5)
