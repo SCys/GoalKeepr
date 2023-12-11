@@ -345,18 +345,19 @@ async def unban_member(bot: Bot, chat_id: int, message_id: int, member_id: int):
         logger.warning(f"{prefix} member {member_id} unbanned error {e}")
 
 
-def build_new_member_message(member: User, msg_timestamp):
+def build_new_member_message(member: types.ChatMemberRestricted, msg_timestamp):
     """
     构建新用户验证信息的按钮和文字内容
     """
-    title = manager.username(member)
+    member_id = member.user.id
+    member_name = member.user.full_name
 
     # 用户组
     items = random.sample(list(ICONS.items()), k=5)
     button_user_ok, _ = random.choice(items)
     buttons_user = [
         types.InlineKeyboardButton(
-            text=i[1], callback_data="__".join([str(member.id), str(msg_timestamp), "!" if button_user_ok == i[0] else "?"])
+            text=i[1], callback_data="__".join([str(member_id), str(msg_timestamp), "!" if button_user_ok == i[0] else "?"])
         )
         for i in items
     ]
@@ -364,12 +365,12 @@ def build_new_member_message(member: User, msg_timestamp):
 
     # 管理组
     buttons_admin = [
-        types.InlineKeyboardButton(text="✔", callback_data="__".join([str(member.id), str(msg_timestamp), "O"])),
-        types.InlineKeyboardButton(text="❌", callback_data="__".join([str(member.id), str(msg_timestamp), "X"])),
+        types.InlineKeyboardButton(text="✔", callback_data="__".join([str(member_id), str(msg_timestamp), "O"])),
+        types.InlineKeyboardButton(text="❌", callback_data="__".join([str(member_id), str(msg_timestamp), "X"])),
     ]
 
     # 文字
-    content = WELCOME_TEXT % {"title": title, "user_id": member.id, "icon": button_user_ok}
+    content = WELCOME_TEXT % {"title": member_name, "user_id": member_id, "icon": button_user_ok}
 
     return content, types.InlineKeyboardMarkup(inline_keyboard=[buttons_user, buttons_admin])
 
