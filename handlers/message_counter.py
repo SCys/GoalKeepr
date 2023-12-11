@@ -17,7 +17,7 @@ async def message_counter(msg: types.Message):
     prefix = f"[message_sent]chat {chat.id}({chat.title}) msg {msg.message_id}"
 
     if not text:
-        logger.debug(f"{prefix} message is not text")
+        # logger.debug(f"{prefix} message is not text")
         return
 
     # 忽略太久之前的信息
