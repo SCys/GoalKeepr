@@ -85,15 +85,16 @@ ICONS = {
 }
 
 
-@manager.register("message")
+@manager.register("message", content_types=[types.ContentType.NEW_CHAT_MEMBERS])
 async def member_captcha(msg: types.Message):
     chat = msg.chat
     members = msg.new_chat_members
 
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
 
-    # ignore 
+    # ignore
     if not members:
+        logger.warning(f"{prefix} no new members")
         return
 
     # 忽略太久之前的信息
@@ -316,7 +317,6 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
     if not member.is_chat_member():
         logger.warning(f"{prefix} member {member_id} is kicked")
         return
-
 
     # FIXME 某些情况下可能会出现问题，比如获取不到权限
     try:
