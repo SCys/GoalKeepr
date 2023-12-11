@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
+from aiogram.filters import Command
 from manager import manager
 
 DELETED_AFTER = 5
@@ -10,8 +10,8 @@ BAN_MEMBER = 300  # 300s
 logger = manager.logger
 
 
-@manager.register("message", commands=["k"], commands_ignore_caption=True, commands_ignore_mention=True)
-async def k(msg: types.Message, state: FSMContext):
+@manager.register("message", Command("k", ignore_case=True, ignore_mention=True))
+async def k(msg: types.Message):
     """踢人功能"""
     chat = msg.chat
     user = msg.from_user

@@ -1,14 +1,14 @@
 from datetime import timedelta
 
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
+from aiogram.filters import Command
 from manager import manager
 
 logger = manager.logger
 
 
-@manager.register("message", commands=["id"])
-async def whoami(msg: types.Message, state: FSMContext):
+@manager.register("message", Command("id", ignore_case=True, ignore_mention=True))
+async def whoami(msg: types.Message):
     """我的信息"""
     if msg.reply_to_message:
         user = msg.reply_to_message.from_user

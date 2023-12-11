@@ -5,4 +5,4 @@ from .left_member import left_member
 from . import commands
 
 # fallback
-from .message_sent import message_sent
+from .message_counter import message_counter

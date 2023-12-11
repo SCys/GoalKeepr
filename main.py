@@ -4,7 +4,7 @@ from handlers import *  # noqa
 from manager import manager
 
 
-def main():
+async def main():
     manager.load_config()
     manager.setup()
     manager.load_handlers()
@@ -12,7 +12,7 @@ def main():
     try:
         manager.is_running = True
 
-        manager.start()
+        await manager.start()
     except KeyboardInterrupt:
         manager.stop()
     except InterruptedError:
@@ -20,4 +20,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+
+    asyncio.run(main())

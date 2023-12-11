@@ -4,7 +4,7 @@ import io
 from datetime import datetime, timedelta
 
 from aiogram import types
-from aiogram.dispatcher.storage import FSMContext
+from aiogram.filters import Command
 from orjson import dumps, loads
 
 from manager import manager
@@ -19,8 +19,8 @@ QUEUE_NAME = "txt2img"
 DELETED_AFTER = 3  # 3s
 
 
-@manager.register("message", commands=["txt2img"], commands_ignore_caption=True, commands_ignore_mention=True)
-async def txt2img(msg: types.Message, state: FSMContext):
+@manager.register("message", Command("txt2img", ignore_case=True, ignore_mention=True))
+async def txt2img(msg: types.Message):
     """sd txt2img"""
     chat = msg.chat
     user = msg.from_user

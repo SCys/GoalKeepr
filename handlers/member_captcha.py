@@ -13,13 +13,10 @@ import re
 import random
 from datetime import datetime, timedelta
 
-from aiogram import types
-from aiogram.bot.bot import Bot
-from aiogram.dispatcher.storage import FSMContext
+from aiogram import types, Bot
 from aiogram.types.chat import Chat
 from aiogram.types.message import Message
 from aiogram.types.user import User
-from aiogram.utils.exceptions import NotEnoughRightsToRestrict
 
 from manager import manager
 
@@ -69,15 +66,35 @@ ICONS = {
     "1/2": "½",
     "雪花|Snowflake": "❄",
     "眼镜|Eyeglasses": "👓",
+    "手枪|Pistol": "🔫",
+    "炸弹|Bomb": "💣",
+    "骷髅|Skull": "💀",
+    "骰子|Dice": "🎲",
+    "音乐|Music": "🎵",
+    "电影|Movie": "🎬",
+    "电话|Telephone": "☎️",
+    "电视|Television": "📺",
+    "相机|Camera": "📷",
+    "计算机|Computer": "💻",
+    "手机|Mobile phone": "📱",
+    "钱包|Wallet": "👛",
+    "钱|Money": "💰",
+    "书|Book": "📖",
+    "信封|Envelope": "✉️",
+    "礼物|Gift": "🎁",
 }
 
 
-@manager.register("message", content_types=[types.ContentType.NEW_CHAT_MEMBERS])
-async def member_captcha(msg: types.Message, state: FSMContext):
+@manager.register("message")
+async def member_captcha(msg: types.Message):
     chat = msg.chat
     members = msg.new_chat_members
 
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+
+    # ignore 
+    if not members:
+        return
 
     # 忽略太久之前的信息
     now = datetime.now()
@@ -114,7 +131,7 @@ async def member_captcha(msg: types.Message, state: FSMContext):
                 can_send_other_messages=False,
                 can_add_web_page_previews=False,
             )
-        except NotEnoughRightsToRestrict:
+        except Exception:
             logger.warning(f"{prefix} no right to restrict the member {member.id}({manager.username(member)}) rights")
             return
 
