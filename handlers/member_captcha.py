@@ -85,7 +85,7 @@ ICONS = {
 }
 
 
-@manager.register("message", content_types=[types.ContentType.NEW_CHAT_MEMBERS])
+@manager.register("chat_member")
 async def member_captcha(msg: types.Message):
     chat = msg.chat
     members = msg.new_chat_members
@@ -94,7 +94,7 @@ async def member_captcha(msg: types.Message):
 
     # ignore
     if not members:
-        logger.warning(f"{prefix} no new members")
+        logger.info(f"{prefix} no new member")
         return
 
     # 忽略太久之前的信息
