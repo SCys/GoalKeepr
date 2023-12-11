@@ -97,7 +97,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
     member_id = member.user.id
     member_name = member.user.full_name
 
-    prefix = f"chat {chat.id}({chat.title}) msg {event} member {member_id}({member_name})"
+    prefix = f"chat {chat.id}({chat.title}) chat member updated member {member_id}({member_name})"
 
     # 忽略太久之前的信息
     now_ = datetime.now(timezone.utc)
