@@ -92,13 +92,14 @@ async def member_captcha(event: types.ChatMemberUpdated):
     chat = event.chat
     member = event.new_chat_member
 
-    if not member:
-        return
-
     member_id = member.user.id
     member_name = member.user.full_name
 
     prefix = f"chat {chat.id}({chat.title}) chat member updated member {member_id}({member_name})"
+
+    if not member or not member.is_member:
+        logger.info(f"{prefix} is left or kicked")
+        return
 
     # 忽略太久之前的信息
     now_ = datetime.now(timezone.utc)
