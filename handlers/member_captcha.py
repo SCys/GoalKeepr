@@ -138,11 +138,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     logger.info(f"{prefix} is restricted")
 
-    # if not await manager.delete_message(chat.id, event.message_id):
-    #     await manager.lazy_delete_message(chat.id, event.message_id, now)
-
     # 睡眠3秒，兼容其他Bot处理事情
-    await asyncio.sleep(2)
+    await asyncio.sleep(3)
     # logger.debug(f"{prefix} new member event wait 5s")
 
     # 如果已经被剔除，则不做处理
@@ -176,13 +173,13 @@ async def member_captcha(event: types.ChatMemberUpdated):
     except Exception as e:
         logger.error(f"{prefix} redis error:{e}")
 
-        message_content, reply_markup = build_new_member_message(member, now)
+    message_content, reply_markup = build_new_member_message(member, now)
 
-        # reply = await msg.reply(content, parse_mode="markdown", reply_markup=reply_markup)
-        reply = await manager.bot.send_message(chat.id, message_content, parse_mode="markdown", reply_markup=reply_markup)
+    # reply = await msg.reply(content, parse_mode="markdown", reply_markup=reply_markup)
+    reply = await manager.bot.send_message(chat.id, message_content, parse_mode="markdown", reply_markup=reply_markup)
 
-        await manager.lazy_session(chat.id, -1, member_id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
-        await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER))
+    await manager.lazy_session(chat.id, -1, member_id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
+    await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER))
 
 
 @manager.register(
