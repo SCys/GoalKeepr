@@ -39,7 +39,7 @@ class Manager:
     bot: Bot
     dp: Dispatcher = Dispatcher()  # static dispatcher
 
-    rdb: Optional[aioredis.Redis] = None
+    rdb: Optional['aioredis.Redis'] = None
 
     config = ConfigParser()
 
@@ -75,6 +75,7 @@ class Manager:
             sys.exit(1)
 
         self.bot = Bot(token, parse_mode=ParseMode.MARKDOWN_V2)
+        #self.bot.session.proxy = 'http://10.1.3.16:3002'
         logger.info("bot is setup")
 
     def load_handlers(self):
@@ -148,7 +149,8 @@ class Manager:
     async def is_admin(self, chat: types.Chat, member: types.User):
         try:
             admins = await self.bot.get_chat_administrators(chat.id)
-            return len([i for i in admins if i.can_delete_messages and i.user.id == member.id]) > 0
+            #return len([i for i in admins if i.can_delete_messages and i.user.id == member.id]) > 0
+            return len([i for i in admins if i.user.id == member.id]) > 0
         except Exception as e:
             logger.error(f"chat {chat.id} member {member.id} check failed:{e}")
 
@@ -170,16 +172,6 @@ class Manager:
         try:
             await self.bot.delete_message(chat, msg)
             logger.info(f"chat {chat} message {msg} deleted")
-        # except BotBlocked:
-        #     logger.info(f"chat {chat} message {msg} delete failed, bot blocked")
-        # except BotKicked:
-        #     logger.info(f"chat {chat} message {msg} delete failed, bot kicked")
-        # except Unauthorized:
-        #     logger.info(f"chat {chat} message {msg} delete failed, unauthorized(include kicked/blocked/...)")
-        # except MessageCantBeDeleted:
-        #     logger.warning(f"chat {chat} message {msg} can not be deleted")
-        # except MessageToDeleteNotFound:
-        #     logger.warning(f"chat {chat} message {msg} is deleted")
         except Exception:
             logger.exception(f"chat {chat} message {msg} delete error")
             return False

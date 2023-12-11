@@ -119,8 +119,6 @@ async def member_captcha(event: types.ChatMemberUpdated):
     except Exception as e:
         logger.error(f"check point #1 failed:{e}")
 
-    logger.info(f"{prefix} is restricted")
-
     try:
         # 收紧权限
         await chat.restrict(
@@ -131,8 +129,10 @@ async def member_captcha(event: types.ChatMemberUpdated):
             can_add_web_page_previews=False,
         )
     except Exception:
-        logger.warning(f"{prefix} no right to restrict")
+        logger.exception(f"{prefix} no right to restrict")
         return
+
+    logger.info(f"{prefix} is restricted")
 
     # if not await manager.delete_message(chat.id, event.message_id):
     #     await manager.lazy_delete_message(chat.id, event.message_id, now)
