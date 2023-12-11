@@ -80,7 +80,7 @@ class Manager:
             logger.error("telegram token is missing")
             sys.exit(1)
 
-        self.bot = Bot(token, parse_mode=ParseMode.MARKDOWN_V2)
+        self.bot = Bot(token)
         # self.bot.session.proxy = 'http://10.1.3.16:3002'
         logger.info("bot is setup")
 
