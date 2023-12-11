@@ -133,7 +133,7 @@ class Manager:
 
         if "admin" in self.config["telegram"]:
             admin = self.config["telegram"]["admin"]
-        self.bot.send_message(admin, "bot is started")
+        await self.bot.send_message(admin, "bot is started")
 
         await self.dp.start_polling(self.bot)
 
