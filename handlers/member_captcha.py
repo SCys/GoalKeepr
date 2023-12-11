@@ -123,10 +123,12 @@ async def member_captcha(event: types.ChatMemberUpdated):
         # 收紧权限
         await chat.restrict(
             member_id,
-            can_send_messages=False,
-            can_send_media_messages=False,
-            can_send_other_messages=False,
-            can_add_web_page_previews=False,
+            permissions=types.ChatPermissions(
+                can_send_messages=False,
+                can_send_media_messages=False,
+                can_send_other_messages=False,
+                can_add_web_page_previews=False,
+            ),
         )
     except Exception:
         logger.exception(f"{prefix} no right to restrict")
