@@ -131,6 +131,10 @@ class Manager:
     async def start(self):
         self.is_running = True
 
+        if "admin" in self.config["telegram"]:
+            admin = self.config["telegram"]["admin"]
+        self.bot.send_message(admin, "bot is started")
+
         await self.dp.start_polling(self.bot)
 
     async def stop(self):
