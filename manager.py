@@ -69,6 +69,12 @@ class Manager:
                 pass
 
     def setup(self):
+        # 如果设置debug为True，重新设置logger
+        if self.config["default"].getboolean("debug", False):
+            logger.remove()
+            logger.add(sys.stderr, level="DEBUG")
+            logger.info("logger is setup with debug level")
+
         token = self.config["telegram"]["token"]
         if not token:
             logger.error("telegram token is missing")
