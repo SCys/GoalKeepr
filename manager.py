@@ -174,7 +174,6 @@ class Manager:
             logger.info(f"chat {chat} message {msg} deleted")
         except Exception as e:
             logger.error(f"chat {chat} message {msg} delete failed:{e}")
-            return False
 
         return True
 
