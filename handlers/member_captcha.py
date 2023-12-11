@@ -97,7 +97,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     prefix = f"chat {chat.id}({chat.title}) chat member updated member {member_id}({member_name})"
 
-    if not member or not member.is_member:
+    if not member or member.status not in [ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED]:
         logger.info(f"{prefix} is left or kicked")
         return
 
