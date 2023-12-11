@@ -178,8 +178,8 @@ async def process_task(task):
         cost = datetime.now() - checkpoint
         logger.info(f"{prefix} task is processed, cost {str(cost)[:-7]}")
 
-        input_file = types.InputFile(
-            io.BytesIO(base64.b64decode(img_raw.split(",", 1)[0])),
+        input_file = types.BufferedInputFile(
+            base64.b64decode(img_raw.split(",", 1)[0]),
             filename="sd_txt2img.png",
         )
         cost = datetime.now() - created_at
