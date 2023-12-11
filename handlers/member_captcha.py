@@ -91,15 +91,13 @@ async def member_captcha(event: types.ChatMemberUpdated):
     chat = event.chat
     member = event.new_chat_member
 
-    prefix = f"chat {chat.id}({chat.title}) msg {event}"
-
-    if member != types.ChatMemberMember:
-        logger.info(f"{prefix} member {member.id}({manager.username(member)}) is member")
+    if not member:
         return
 
-    if member.bot:
-        logger.info(f"{prefix} member {member.id}({manager.username(member)}) is bot")
-        return
+    member_id = member.user.id
+    member_name = member.user.full_name
+
+    prefix = f"chat {chat.id}({chat.title}) msg {event} member {member_id}({member_name})"
 
     # 忽略太久之前的信息
     now = datetime.now()
@@ -121,11 +119,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
     except Exception as e:
         logger.error(f"check point #1 failed:{e}")
 
-    logger.info(f"{prefix} restrict new member:{member.id}({manager.username(member)})")
-
-    # 开始发出验证信息
-    member_id = member.user.id
-    member_name = member.user.full_name
+    logger.info(f"{prefix} is restricted")
 
     try:
         # 收紧权限
@@ -137,7 +131,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
             can_add_web_page_previews=False,
         )
     except Exception:
-        logger.warning(f"{prefix} no right to restrict the member {member_id}({member_name}) rights")
+        logger.warning(f"{prefix} no right to restrict")
         return
 
     # if not await manager.delete_message(chat.id, event.message_id):
@@ -150,11 +144,11 @@ async def member_captcha(event: types.ChatMemberUpdated):
     # 如果已经被剔除，则不做处理
     member = await manager.chat_member(chat, member_id)
     if not member or not member.is_member:
-        logger.info(f"{prefix} new member {member_id}({member_name}) is left")
+        logger.info(f"{prefix} is left or kicked")
         return
 
     if member.can_send_messages:
-        logger.info(f"{prefix} new member {member_id}({member_name}) rights is accepted")
+        logger.info(f"{prefix} rights is accepted")
         return
 
     # checkout message sent after join 10ms
@@ -170,15 +164,13 @@ async def member_captcha(event: types.ChatMemberUpdated):
                 message_content = message_content.decode()
                 message_date = message_date.decode()
 
-                logger.warning(
-                    f"{prefix} new member {member_id}({member_name}) sent message is the same as joining the group: content:'{message_content}', date:'{message_date}'"
-                )
+                logger.warning(f"{prefix} found message {message_id}({message_content}) ")
 
                 await chat.ban(member_id, until_date=timedelta(seconds=60), revoke_messages=True)
                 await chat.delete_message(message_id)
                 return
     except Exception as e:
-        logger.error(f"{prefix} new member {member_id}({member_name}) is checking message failed:{e}")
+        logger.error(f"{prefix} redis error:{e}")
 
         message_content, reply_markup = build_new_member_message(member, now)
 
