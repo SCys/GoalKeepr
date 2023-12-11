@@ -45,9 +45,9 @@ async def sb(msg: types.Message):
         logger.info(f"{prefix} is left chat member message, ignored")
         return
 
-    resp = await ban_member(chat, msg, user, msg_reply.from_user)
-    for i in [msg, resp]:
-        await manager.lazy_delete_message(chat.id, i.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+    if resp := await ban_member(chat, msg, user, msg_reply.from_user):
+        await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+    await manager.lazy_delete_message(chat.id, msg.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
 
 
 async def ban_member(chat: types.Chat, msg: types.Message, administrator: types.User, member: types.User):
@@ -59,7 +59,7 @@ async def ban_member(chat: types.Chat, msg: types.Message, administrator: types.
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
 
     # 剔除以后就在黑名单中
-    if not await chat.kick(id, revoke_messages=True):
+    if not await chat.ban(id, revoke_messages=True):
         logger.warning(f"{prefix} user {id}({member.first_name}) ban is failed")
         return
 
