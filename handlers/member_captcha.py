@@ -11,7 +11,7 @@
 import asyncio
 import re
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from aiogram import types, Bot
 from aiogram.types.chat import Chat
@@ -100,7 +100,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
     prefix = f"chat {chat.id}({chat.title}) msg {event} member {member_id}({member_name})"
 
     # 忽略太久之前的信息
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     if now > event.date + timedelta(seconds=60):
         logger.warning(f"{prefix} date is ignored:{now} > {event.date + timedelta(seconds=60)}")
         return

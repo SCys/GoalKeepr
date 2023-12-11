@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from aiogram import types
 from manager import manager
@@ -21,7 +21,7 @@ async def message_counter(msg: types.Message):
         return
 
     # 忽略太久之前的信息
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     if now > msg.date + timedelta(seconds=60):
         logger.warning(f"{prefix} date is ignored:{now} > {msg.date + timedelta(seconds=60)}")
         return
