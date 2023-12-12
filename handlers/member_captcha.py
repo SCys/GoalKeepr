@@ -308,8 +308,11 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
     elif status == ChatMemberStatus.KICKED:
         logger.info(f"{prefix} member {member_id} is kicked")
         return
+    elif status == ChatMemberStatus.MEMBER:
+        logger.info(f"{prefix} member {member_id} is member")
+        return
 
-    if member.can_send_messages:
+    if status == ChatMemberStatus.RESTRICTED and member.can_send_messages:
         logger.info(f"{prefix} member {member_id} rights is accepted")
         return
 
