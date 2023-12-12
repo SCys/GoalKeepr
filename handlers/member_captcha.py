@@ -132,8 +132,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
                 can_add_web_page_previews=False,
             ),
         )
-    except Exception:
-        logger.exception(f"{prefix} no right to restrict")
+    except Exception as e:
+        logger.error(f"{prefix} no right to restrict: {e}")
         return
 
     logger.info(f"{prefix} is restricted")
