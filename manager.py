@@ -8,7 +8,6 @@ from typing import Optional, Union
 import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, types
-from aiogram.enums import ParseMode
 
 import database
 
@@ -74,6 +73,8 @@ class Manager:
             logger.remove()
             logger.add(sys.stderr, level="DEBUG")
             logger.info("logger is setup with debug level")
+        else:
+            logger.level = "INFO"
 
         token = self.config["telegram"]["token"]
         if not token:
