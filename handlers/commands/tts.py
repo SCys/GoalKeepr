@@ -5,6 +5,7 @@ from datetime import datetime
 import edge_tts
 from aiogram import types
 from aiogram.filters import Command
+from aiogram.types import BufferedInputFile
 from manager import manager
 from pydub import AudioSegment
 
@@ -59,11 +60,12 @@ async def tts(msg: types.Message):
     output = io.BytesIO()
     audio = AudioSegment.from_file(io.BytesIO(data), format="mp3")
     audio.export(output, codec="opus", format="ogg", parameters=["-strict", "-2"])
+    voice_file = BufferedInputFile(output.getvalue(), filename="tts.ogg")
 
     if msg.reply_to_message:
-        await msg.reply_to_message.reply_voice(output, disable_notification=True)
+        await msg.reply_to_message.reply_voice(voice_file, disable_notification=True)
     else:
-        await msg.reply_voice(output, disable_notification=True)
+        await msg.reply_voice(voice_file, disable_notification=True)
     logger.info(
         f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) cost {(datetime.now() - cost).total_seconds()}"
     )
