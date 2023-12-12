@@ -5,7 +5,7 @@ from datetime import datetime
 from functools import wraps
 from typing import Optional, Union
 
-# import aioredis
+import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, types
 
