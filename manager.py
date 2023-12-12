@@ -73,8 +73,6 @@ class Manager:
             logger.remove()
             logger.add(sys.stderr, level="DEBUG")
             logger.info("logger is setup with debug level")
-        else:
-            logger.level = "INFO"
 
         token = self.config["telegram"]["token"]
         if not token:
