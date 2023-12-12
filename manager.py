@@ -11,7 +11,7 @@ from aiogram import Bot, Dispatcher, types
 
 import database
 
-logger = loguru.logger
+logger = loguru.New()
 
 SETTINGS_TEMPLATE = {
     "default": {"debug": False},
@@ -83,14 +83,14 @@ class Manager:
         """设置logger"""
         logger = self.logger
 
-        if self.config["default"].getboolean("debug", False):
-            logger.remove()
-            logger.add(sys.stderr, level="DEBUG")
-            logger.info("logger is setup with debug level")
-            return
+        # if self.config["default"].getboolean("debug", False):
+        #     logger.remove()
+        #     logger.add(sys.stderr, level=loguru.DebugLevel)
+        #     logger.info("logger is setup with debug level")
+        #     return
 
-        logger.remove()
-        logger.add(sys.stderr, level="INFO")
+        # logger.remove()
+        # logger.add(sys.stderr, level=loguru.debug)
         logger.info("logger is setup")
 
     def load_handlers(self):
