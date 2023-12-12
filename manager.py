@@ -68,11 +68,7 @@ class Manager:
                 pass
 
     def setup(self):
-        # 如果设置debug为True，重新设置logger
-        if self.config["default"].getboolean("debug", False):
-            logger.remove()
-            logger.add(sys.stderr, level="DEBUG")
-            logger.info("logger is setup with debug level")
+        self.setup_logger()
 
         token = self.config["telegram"]["token"]
         if not token:
@@ -82,6 +78,20 @@ class Manager:
         self.bot = Bot(token)
         # self.bot.session.proxy = 'http://10.1.3.16:3002'
         logger.info("bot is setup")
+
+    def setup_logger(self):
+        """设置logger"""
+        logger = self.logger
+
+        if self.config["default"].getboolean("debug", False):
+            logger.remove()
+            logger.add(sys.stderr, level="DEBUG")
+            logger.info("logger is setup with debug level")
+            return
+
+        logger.remove()
+        logger.add(sys.stderr, level="INFO")
+        logger.info("logger is setup")
 
     def load_handlers(self):
         dp = self.dp
