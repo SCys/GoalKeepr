@@ -83,14 +83,14 @@ class Manager:
         """设置logger"""
         logger = self.logger
 
-        if self.config["default"].getboolean("debug", False):
-            logger.remove()
-            logger.add(sys.stderr, level=loguru.Level("debug"))
-            logger.info("logger is setup with debug level")
-            return
+        # if self.config["default"].getboolean("debug", False):
+        #     logger.remove()
+        #     logger.add(sys.stderr, level=loguru.Level("debug"))
+        #     logger.info("logger is setup with debug level")
+        #     return
 
-        logger.remove()
-        logger.add(sys.stderr, level=loguru.Level("info"))
+        # logger.remove()
+        # logger.add(sys.stderr, level=loguru.Level("info"))
         logger.info("logger is setup")
 
     def load_handlers(self):
