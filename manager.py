@@ -5,7 +5,7 @@ from datetime import datetime
 from functools import wraps
 from typing import Optional, Union
 
-import aioredis
+# import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, types
 
@@ -68,7 +68,9 @@ class Manager:
                 pass
 
     def setup(self):
+        print("setup")
         self.setup_logger()
+        print("setup logger")
 
         token = self.config["telegram"]["token"]
         if not token:
@@ -83,14 +85,14 @@ class Manager:
         """设置logger"""
         logger = self.logger
 
-        # if self.config["default"].getboolean("debug", False):
-        #     logger.remove()
-        #     logger.add(sys.stderr, level=loguru.Level("debug"))
-        #     logger.info("logger is setup with debug level")
-        #     return
+        if self.config["default"].getboolean("debug", False):
+            logger.remove()
+            logger.add(sys.stderr, level=10)
+            logger.debug("logger is setup with debug level")
+            return
 
-        # logger.remove()
-        # logger.add(sys.stderr, level=loguru.Level("info"))
+        logger.remove()
+        logger.add(sys.stderr, level=20)
         logger.info("logger is setup")
 
     def load_handlers(self):
