@@ -71,14 +71,6 @@ async def tts(msg: types.Message):
     )
 
 
-# def google_translate_tts(source: str):
-#     fp = BytesIO()
-#     tts = gTTS(source, lang="zh-CN")
-#     tts.write_to_fp(fp)
-#     fp.seek(0)
-#     return fp.read()
-
-
 async def edge_ext(source: str):
     communicate = edge_tts.Communicate(source, "zh-CN-XiaoxiaoNeural")
 
@@ -87,6 +79,6 @@ async def edge_ext(source: str):
         if chunk["type"] == "audio":
             data += chunk["data"]
         elif chunk["type"] == "WordBoundary":
-            logger.info(f"WordBoundary: {chunk}")
+            logger.debug(f"WordBoundary: {chunk}")
 
     return data
