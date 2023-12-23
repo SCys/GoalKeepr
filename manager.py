@@ -8,6 +8,7 @@ from typing import Optional, Union
 import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, types
+import google.generativeai as genai
 
 import database
 
@@ -22,6 +23,9 @@ SETTINGS_TEMPLATE = {
         "google_recaptcha": False,  # enable google recaptcha detector
         "google_recaptcha_token": "",
     },
+    "ai": {
+        "google_gemini": "",  # google gemini pro token
+    },
     "image": {
         "users": [],  # allowed users(id list)
         "groups": [],  # allowed groups(id list)
@@ -35,16 +39,24 @@ SETTINGS_TEMPLATE = {
 class Manager:
     """管理模块"""
 
+    # aiogram instance
     bot: Bot
     dp: Dispatcher = Dispatcher()  # static dispatcher
 
+    # redis connection
     rdb: Optional["aioredis.Redis"] = None
 
+    model_txt: Optional["genai.GenerativeModel"] = None
+    model_img: Optional["genai.GenerativeModel"] = None
+
+    # global config
     config = ConfigParser()
 
+    # routes
     handlers = []
     events = {}
 
+    # running status
     is_running = False
 
     logger = logger
@@ -68,9 +80,8 @@ class Manager:
                 pass
 
     def setup(self):
-        print("setup")
         self.setup_logger()
-        print("setup logger")
+        self.setup_google_gemini()
 
         token = self.config["telegram"]["token"]
         if not token:
@@ -94,6 +105,27 @@ class Manager:
         logger.remove()
         logger.add(sys.stderr, level=20)
         logger.info("logger is setup")
+
+    def setup_google_gemini(self):
+        try:
+            config = self.config["ai"]
+            token = config["google_gemini"]
+            if not token:
+                logger.error("google gemini pro token is missing")
+                return
+
+            genai.configure(api_key=token)
+
+            # list models
+            for model in genai.list_models():
+                logger.info(f"Google Gemini Pro model: {model}")
+
+            self.model_txt = genai.GenerativeModel("gemini-pro")
+            self.model_img = genai.GenerativeModel("gemini-pro-vision")
+
+            logger.info("Google Gemini Pro is setup")
+        except:
+            logger.exception("setup genai failed")
 
     def load_handlers(self):
         dp = self.dp
