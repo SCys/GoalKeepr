@@ -24,9 +24,9 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
     width = int(width)
     height = int(height)
 
-    step = 28
+    step = 20
     cfg_scale = 8
-    sampler_name = "DPM++ 2M SDE Karras"  # DPM++ 2M SDE Karras, DDIM, DPM++ 3M SDE Exponential, DPM++ 2M SDE Heun Exponential
+    sampler_name = "DPM++ 2M Karras"  # DPM++ 2M SDE Karras, DDIM, DPM++ 3M SDE Exponential, DPM++ 2M SDE Heun Exponential
 
     session = await manager.bot.session.create_session()
     async with session.post(
