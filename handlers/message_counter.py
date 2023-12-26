@@ -5,11 +5,11 @@ from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 
-logger = manager.logger
-
 
 @manager.register("message")
 async def message_counter(msg: types.Message):
+    logger = manager.logger
+
     chat = msg.chat
     member = msg.from_user
     text = msg.text
