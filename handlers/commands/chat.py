@@ -97,14 +97,6 @@ async def chat(msg: types.Message):
         logger.warning(f"{prefix} message without text, ignored")
         return
 
-    if len(text) < 5:
-        logger.warning(f"{prefix} message too short, ignored")
-        return
-
-    if len(text) > 1024:
-        logger.warning(f"{prefix} message too long, ignored")
-        return
-
     if text == "stat":
         try:
             stat = await get_stat()
@@ -119,6 +111,14 @@ async def chat(msg: types.Message):
             logger.error(f"{prefix} get stat error: {e}")
             await msg.reply(f"error: {e}")
 
+        return
+
+    if len(text) < 5:
+        logger.warning(f"{prefix} message too short, ignored")
+        return
+
+    if len(text) > 1024:
+        logger.warning(f"{prefix} message too long, ignored")
         return
 
     try:
