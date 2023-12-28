@@ -86,7 +86,7 @@ async def chat(msg: types.Message):
             logger.warning(f"{prefix} generate text error, ignored")
             return
 
-        await msg.reply(text)
+        await msg.reply(text, parse_mode="MarkdownV2", disable_web_page_preview=True)
     except Exception as e:
         logger.error(f"{prefix} text {text} error: {e}")
         await msg.reply(f"error: {e}")
