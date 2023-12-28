@@ -79,7 +79,7 @@ async def generate_text(prompt: str):
         return data["data"]["text"]
 
 
-@manager.register("message", Command("chat", ignore_case=True, ignore_mention=True))
+@manager.register("message", Command("chat", ignore_case=True, ignore_mention=True, remove_caption=True))
 async def chat(msg: types.Message):
     """Answer Google Gemini Pro"""
     chat = msg.chat
@@ -91,6 +91,8 @@ async def chat(msg: types.Message):
         return
 
     text = msg.text
+    text = text.replace("/chat", "", 1).strip()
+
     if not text:
         logger.warning(f"{prefix} message without text, ignored")
         return
@@ -120,12 +122,12 @@ async def chat(msg: types.Message):
         return
 
     try:
-        text = await generate_text(text)
-        if not text:
+        text_resp = await generate_text(text)
+        if not text_resp:
             logger.warning(f"{prefix} generate text error, ignored")
             return
 
-        await msg.reply(text, parse_mode="MarkdownV2", disable_web_page_preview=True)
+        await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
     except Exception as e:
         logger.error(f"{prefix} text {text} error: {e}")
         await msg.reply(f"error: {e}")
