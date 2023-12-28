@@ -267,7 +267,7 @@ def text_generation():
         except Exception as e:
             logger.error(f"incr request count failed: {e}")
 
-    logger.info(f"text generation request prompt {text} text {resp.text} feedback {feedback} candidates {candidates}")
+    logger.info(f"text generation request prompt {text} text {resp.text}")
     return jsonify({"data": {"text": resp.text, "prompt": text}})
 
 
