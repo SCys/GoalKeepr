@@ -79,7 +79,7 @@ async def generate_text(prompt: str):
         return data["data"]["text"]
 
 
-@manager.register("message", Command("chat", ignore_case=True, ignore_mention=True, remove_caption=True))
+@manager.register("message", Command("chat", ignore_case=True, ignore_mention=True))
 async def chat(msg: types.Message):
     """Answer Google Gemini Pro"""
     chat = msg.chat
