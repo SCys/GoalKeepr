@@ -17,12 +17,43 @@ generation_config = {
     "max_output_tokens": 2048,
 }
 
-safety_settings = [
-    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "block_none"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "block_none"},
-    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "block_none"},
-    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "block_none"},
-]
+
+async def generate_text(prompt: str):
+    config = manager.config
+
+    host = config['ai']['google_gemini_host']
+    if not host:
+        logger.error("google gemini host is empty")
+        return
+    
+
+
+    url = f"http://{host}/api/ai/google/gemini/text_generation"
+    payload = {
+        "params": {
+            "text": prompt,
+            **generation_config,
+        }
+    }
+
+    session = await manager.bot.session.create_session()
+    async with session.post(url, json=payload, headers={
+        'Token': config['ai']['google_gemini_token']
+    }) as response:
+        if response.status != 200:
+            logger.error(f"generate text error: {response.status} {await response.text()}")
+            return
+
+        data = await response.json()
+
+        # check error
+        if "error" in data:
+            code = data["error"]["code"]
+            message = data["error"]["message"]
+            logger.error(f"generate text error: {code} {message}")
+            return
+
+        return data["data"]["text"]
 
 
 @manager.register("message", Command("chat", ignore_case=True, ignore_mention=True))
@@ -54,16 +85,12 @@ async def chat(msg: types.Message):
         return
 
     try:
-        model = manager.model_txt
-        response = model.generate_content(text, generation_config=generation_config, safety_settings=safety_settings)
-
-        if not response:
-            logger.warning(f"{prefix} text {text} response is None, ignored")
+        text = await generate_text(text)
+        if not text:
+            logger.warning(f"{prefix} generate text error, ignored")
             return
 
-        logger.info(f"{prefix} text {text} feedback: {response.prompt_feedback}")
-        logger.info(f"{prefix} text {text} response: {response.text}")
-        await msg.reply(response.text)
+        await msg.reply(text)
     except Exception as e:
         logger.error(f"{prefix} text {text} error: {e}")
         await msg.reply(f"error: {e}")

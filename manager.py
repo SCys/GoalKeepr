@@ -24,7 +24,8 @@ SETTINGS_TEMPLATE = {
         "google_recaptcha_token": "",
     },
     "ai": {
-        "google_gemini": "",  # google gemini pro token
+        "google_gemini_host": "",
+        "google_gemini_token": "",
     },
     "image": {
         "users": [],  # allowed users(id list)
@@ -81,7 +82,6 @@ class Manager:
 
     def setup(self):
         self.setup_logger()
-        self.setup_google_gemini()
 
         token = self.config["telegram"]["token"]
         if not token:
@@ -105,27 +105,6 @@ class Manager:
         logger.remove()
         logger.add(sys.stderr, level=20)
         logger.info("logger is setup")
-
-    def setup_google_gemini(self):
-        try:
-            config = self.config["ai"]
-            token = config["google_gemini"]
-            if not token:
-                logger.error("google gemini pro token is missing")
-                return
-
-            genai.configure(api_key=token)
-
-            # list models
-            for model in genai.list_models():
-                logger.info(f"Google Gemini Pro model: {model}")
-
-            self.model_txt = genai.GenerativeModel("gemini-pro")
-            self.model_img = genai.GenerativeModel("gemini-pro-vision")
-
-            logger.info("Google Gemini Pro is setup")
-        except:
-            logger.exception("setup genai failed")
 
     def load_handlers(self):
         dp = self.dp
