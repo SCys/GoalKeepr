@@ -1,6 +1,4 @@
-from datetime import datetime, timedelta
-
-from aiogram import types
+from aiogram import types, exceptions
 from aiogram.filters import Command
 from manager import manager
 
@@ -126,8 +124,16 @@ async def chat(msg: types.Message):
         if not text_resp:
             logger.warning(f"{prefix} generate text error, ignored")
             return
-
-        await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
     except Exception as e:
         logger.error(f"{prefix} text {text} error: {e}")
+        await msg.reply(f"error: {e}")
+
+
+    try:
+        await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
+    except exceptions.TelegramBadRequest as e:
+        logger.warning(f"{prefix} invalid text {text_resp}, error: {e}")
+        await msg.reply(text_resp, parse_mode="HTML", disable_web_page_preview=True)
+    except Exception as e:
+        logger.error(f"{prefix} reply error: {e}")
         await msg.reply(f"error: {e}")
