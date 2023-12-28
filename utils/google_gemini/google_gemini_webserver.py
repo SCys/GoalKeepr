@@ -38,6 +38,70 @@ statistic in redis, text_generation prefix is statistic:ai:google:gemini
 
 """
 
+"""
+HARM_PROBABILITY_UNSPECIFIED (0):
+    Probability is unspecified.
+NEGLIGIBLE (1):
+    Content has a negligible chance of being
+    unsafe.
+LOW (2):
+    Content has a low chance of being unsafe.
+MEDIUM (3):
+    Content has a medium chance of being unsafe.
+HIGH (4):
+    Content has a high chance of being unsafe.
+"""
+HarmProbability = {
+    0: "HARM_PROBABILITY_UNSPECIFIED",
+    1: "NEGLIGIBLE",
+    2: "LOW",
+    3: "MEDIUM",
+    4: "HIGH",
+}
+
+"""
+HARM_CATEGORY_UNSPECIFIED (0):
+    Category is unspecified.
+HARM_CATEGORY_DEROGATORY (1):
+    Negative or harmful comments targeting
+    identity and/or protected attribute.
+HARM_CATEGORY_TOXICITY (2):
+    Content that is rude, disrepspectful, or
+    profane.
+HARM_CATEGORY_VIOLENCE (3):
+    Describes scenarios depictng violence against
+    an individual or group, or general descriptions
+    of gore.
+HARM_CATEGORY_SEXUAL (4):
+    Contains references to sexual acts or other
+    lewd content.
+HARM_CATEGORY_MEDICAL (5):
+    Promotes unchecked medical advice.
+HARM_CATEGORY_DANGEROUS (6):
+    Dangerous content that promotes, facilitates,
+    or encourages harmful acts.
+HARM_CATEGORY_HARASSMENT (7):
+    Harasment content.
+HARM_CATEGORY_HATE_SPEECH (8):
+    Hate speech and content.
+HARM_CATEGORY_SEXUALLY_EXPLICIT (9):
+    Sexually explicit content.
+HARM_CATEGORY_DANGEROUS_CONTENT (10):
+    Dangerous content.
+"""
+HarmCategory = {
+    0: "Category is unspecified.",
+    1: "Negative or harmful comments targeting identity and/or protected attribute.",
+    2: "Content that is rude, disrepspectful, or profane.",
+    3: "Describes scenarios depictng violence against an individual or group, or general descriptions of gore.",
+    4: "Contains references to sexual acts or other lewd content.",
+    5: "Promotes unchecked medical advice.",
+    6: "Dangerous content that promotes, facilitates, or encourages harmful acts.",
+    7: "Harasment content.",
+    8: "Hate speech and content.",
+    9: "Sexually explicit content.",
+    10: "Dangerous content.",
+}
 
 RDB_KEY = "statistic:ai:google:gemini"
 
@@ -67,10 +131,10 @@ safety_settings = [
     # {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
     # {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
     # default
-    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_LOW_AND_ABOVE"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_LOW_AND_ABOVE"},
-    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_LOW_AND_ABOVE"},
-    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_LOW_AND_ABOVE"},
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
 ]
 
 
@@ -194,7 +258,7 @@ def text_generation():
 
         if not rdb:
             return jsonify({"data": {"status": "ok"}})
-        
+
         total = rdb.get(f"{RDB_KEY}:text_generation:total")
         if total is None:
             total = 0
@@ -255,7 +319,6 @@ def text_generation():
     )
 
     feedback = resp.prompt_feedback
-    candidates = resp.candidates
 
     # 记录请求数量和请求QPM到Redis内
     if rdb:
@@ -267,8 +330,34 @@ def text_generation():
         except Exception as e:
             logger.error(f"incr request count failed: {e}")
 
-    logger.info(f"text generation request prompt {text} text {resp.text}")
-    return jsonify({"data": {"text": resp.text, "prompt": text}})
+    try:
+        if resp.candidates:
+            output = resp.text
+        else:
+            output = "empty response from google gemini pro"
+
+            # block by google
+            if feedback:
+                output = "google ai reject this request"
+                for rate in feedback.safety_ratings:
+                    # only block by high
+                    if rate.probability == rate.HarmProbability.NEGLIGIBLE:
+                        continue
+
+                    category = HarmCategory.get(rate.category, "UNKNOWN")
+                    probability = HarmProbability.get(rate.probability, "UNKNOWN")
+                    blocked = "is blocked" if rate.probability == rate.HarmProbability.HIGH else "is ignored"
+
+                    output += f"\n\r{category}\nlevel is {probability}, {blocked}"
+
+    except ValueError as e:
+        output = str(e)
+
+        logger.warning(f"output text is invalid: {e}")
+        return jsonify({"data": {"text": output, "prompt": text}})
+
+    logger.info(f"text generation request prompt {text!r} text {output!r}")
+    return jsonify({"data": {"text": output, "prompt": text}})
 
 
 if __name__ == "__main__":
