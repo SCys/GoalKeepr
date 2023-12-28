@@ -28,7 +28,7 @@ async def generate_text(prompt: str):
     
 
 
-    url = f"http://{host}/api/ai/google/gemini/text_generation"
+    url = f"{host}/api/ai/google/gemini/text_generation"
     payload = {
         "params": {
             "text": prompt,
