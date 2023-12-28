@@ -67,16 +67,12 @@ async def chat(msg: types.Message):
         logger.warning(f"{prefix} message without user, ignored")
         return
 
-    if manager.model_txt is None:
-        logger.warning(f"{prefix} model is None, ignored")
-        return
-
     text = msg.text
     if not text:
         logger.warning(f"{prefix} message without text, ignored")
         return
 
-    if len(text) < 3:
+    if len(text) < 5:
         logger.warning(f"{prefix} message too short, ignored")
         return
 
