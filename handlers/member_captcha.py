@@ -144,7 +144,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     # 如果已经被剔除，则不做处理
     member = await manager.chat_member(chat, member_id)
-    if not member or not member.is_member:
+    if not member or member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.KICKED]:
         logger.info(f"{prefix} is left or kicked")
         return
 
