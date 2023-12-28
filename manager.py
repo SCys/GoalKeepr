@@ -47,9 +47,6 @@ class Manager:
     # redis connection
     rdb: Optional["aioredis.Redis"] = None
 
-    model_txt: Optional["genai.GenerativeModel"] = None
-    model_img: Optional["genai.GenerativeModel"] = None
-
     # global config
     config = ConfigParser()
 
