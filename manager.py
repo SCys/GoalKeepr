@@ -8,7 +8,6 @@ from typing import Optional, Union
 import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, types
-import google.generativeai as genai
 
 import database
 
