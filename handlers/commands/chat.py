@@ -18,15 +18,40 @@ generation_config = {
 }
 
 
-async def generate_text(prompt: str):
+async def get_stat():
     config = manager.config
 
-    host = config['ai']['google_gemini_host']
+    host = config["ai"]["google_gemini_host"]
     if not host:
         logger.error("google gemini host is empty")
         return
-    
 
+    url = f"{host}/api/ai/google/gemini/text_generation"
+    session = await manager.bot.session.create_session()
+    async with session.get(url) as response:
+        if response.status != 200:
+            logger.error(f"get stat error: {response.status} {await response.text()}")
+            return
+
+        data = await response.json()
+
+        # check error
+        if "error" in data:
+            code = data["error"]["code"]
+            message = data["error"]["message"]
+            logger.error(f"get stat error: {code} {message}")
+            return
+
+        return data["data"]
+
+
+async def generate_text(prompt: str):
+    config = manager.config
+
+    host = config["ai"]["google_gemini_host"]
+    if not host:
+        logger.error("google gemini host is empty")
+        return
 
     url = f"{host}/api/ai/google/gemini/text_generation"
     payload = {
@@ -37,9 +62,7 @@ async def generate_text(prompt: str):
     }
 
     session = await manager.bot.session.create_session()
-    async with session.post(url, json=payload, headers={
-        'Token': config['ai']['google_gemini_token']
-    }) as response:
+    async with session.post(url, json=payload, headers={"Token": config["ai"]["google_gemini_token"]}) as response:
         if response.status != 200:
             logger.error(f"generate text error: {response.status} {await response.text()}")
             return
@@ -78,6 +101,22 @@ async def chat(msg: types.Message):
 
     if len(text) > 1024:
         logger.warning(f"{prefix} message too long, ignored")
+        return
+
+    if text == "stat":
+        try:
+            stat = await get_stat()
+            if not stat:
+                logger.warning(f"{prefix} get stat error, ignored")
+                return
+
+            total = stat["total"]
+            qps = stat["qps"]
+            await msg.reply(f"total: {total}\nqps: {qps}")
+        except Exception as e:
+            logger.error(f"{prefix} get stat error: {e}")
+            await msg.reply(f"error: {e}")
+
         return
 
     try:
