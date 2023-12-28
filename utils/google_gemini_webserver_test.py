@@ -1,15 +1,11 @@
 import requests
 
-HOST= "http://10.1.3.26:5000"
+HOST= "http://localhost:5000"
+TOKEN = ""
 
-def test_text_generation():
+def test_text_generation_gen():
     url = f"{HOST}/api/ai/google/gemini/text_generation"
-    headers = {"Content-Type": "application/json"}
-
-    # Test GET method
-    response = requests.get(url)
-    assert response.status_code == 200
-    assert response.json()["data"]["status"] == "ok"
+    headers = {"Content-Type": "application/json", "Token": TOKEN}
 
     # Test POST method
     request_body = {
@@ -22,12 +18,30 @@ def test_text_generation():
         }
     }
     response = requests.post(url, json=request_body, headers=headers)
+    data = response.json()
     assert response.status_code == 200, f"response: {response.status_code}"
-    assert "error" not in response.json()
-    assert "data" in response.json()
-    assert "text" in response.json()["data"]
-    assert "prompt" in response.json()["data"]
+    assert "error" not in data
+    assert "data" in data
+    assert "text" in data["data"]
+    assert "prompt" in data["data"]
 
-    print("All tests passed!")
+    print("gen test passed!")
 
-test_text_generation()
+
+def test_text_generation_stat():
+    url = f"{HOST}/api/ai/google/gemini/text_generation"
+
+    # Test GET method
+    response = requests.get(url)
+    data = response.json()
+    assert response.status_code == 200
+    assert data["data"]["status"] == "ok"
+    assert "total" in data["data"]
+    assert "qps" in data["data"]
+    
+    # print total and qps
+    print(data['data']['total'], data['data']['qps'])
+    print("stat test passed!")
+
+# test_text_generation_stat()
+test_text_generation_gen()

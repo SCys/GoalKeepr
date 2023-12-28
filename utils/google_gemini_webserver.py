@@ -1,14 +1,11 @@
+import time
 from configparser import ConfigParser
-from datetime import datetime, timedelta
 from typing import Optional
 
 import google.generativeai as genai
+import redis
 from flask import Flask, jsonify, request
 from loguru import logger
-from manager import manager
-import time
-import asyncio
-import redis
 
 """
 request/response body is json
@@ -106,6 +103,7 @@ def setup_redis():
     global rdb, config
 
     rdb = redis.from_url(config["DEFAULT"]["redis"])
+    logger.info(f"redis is setup")
 
 
 def check_token():
@@ -196,12 +194,19 @@ def text_generation():
 
         if not rdb:
             return jsonify({"data": {"status": "ok"}})
+        
+        total = rdb.get(f"{RDB_KEY}:text_generation:total")
+        if total is None:
+            total = 0
+            rdb.set(f"{RDB_KEY}:text_generation:total", total)
+        else:
+            total = int(total)
 
         return jsonify(
             {
                 "data": {
                     "status": "ok",
-                    "total": int(rdb.get(f"{RDB_KEY}:text_generation:total")),
+                    "total": total,
                     "qps": len(rdb.keys(f"{RDB_KEY}:counter:*")),
                 }
             }
@@ -269,6 +274,7 @@ def text_generation():
 if __name__ == "__main__":
     config.read("main.ini")
 
+    setup_redis()
     setup_google_gemini()
 
     app.run(debug=True, host=config["DEFAULT"]["host"], port=config["DEFAULT"]["port"])
