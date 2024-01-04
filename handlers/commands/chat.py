@@ -128,6 +128,7 @@ async def chat(msg: types.Message):
         logger.error(f"{prefix} text {text} error: {e}")
         await msg.reply(f"error: {e}")
 
+    text_resp += "\n\n---\n\n *Powered by Google Gemini Pro*"
 
     try:
         await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
