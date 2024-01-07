@@ -1,6 +1,7 @@
 from aiogram import types, exceptions
 from aiogram.filters import Command
 from manager import manager
+import markdown
 
 DELETED_AFTER = 5
 BAN_MEMBER = 300  # 300s
@@ -131,7 +132,9 @@ async def chat(msg: types.Message):
     text_resp += "\n\n---\n\n *Powered by Google Gemini Pro*"
 
     try:
-        await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
+        html = markdown.markdown(your_text_string)
+        await msg.reply(html, parse_mode="HTML", disable_web_page_preview=True)
+        #await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
     except exceptions.TelegramBadRequest as e:
         logger.warning(f"{prefix} invalid text {text_resp}, error: {e}")
         await msg.reply(text_resp, disable_web_page_preview=True)

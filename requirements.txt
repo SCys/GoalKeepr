@@ -8,3 +8,4 @@ translators
 aiogram
 edge-tts
 aioredis
+markdown
