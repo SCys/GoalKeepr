@@ -1,7 +1,7 @@
 from aiogram import types, exceptions
 from aiogram.filters import Command
 from manager import manager
-import markdown
+import re
 
 DELETED_AFTER = 5
 BAN_MEMBER = 300  # 300s
@@ -130,6 +130,11 @@ async def chat(msg: types.Message):
         await msg.reply(f"error: {e}")
 
     text_resp += "\n\n---\n\n *Powered by Google Gemini Pro*"
+
+    try:
+        text_resp = re.sub(r"([\_\*\[\]\(\)\~\`\>\#\+\-\=\|\{\}\.\!])", r"\\\1", text_resp)
+    except:
+        logger.error(f"{prefix} excap somehting error")
 
     try:
         #html = markdown.markdown(text_resp)
