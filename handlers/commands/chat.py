@@ -137,8 +137,9 @@ async def chat(msg: types.Message):
     #     logger.error(f"{prefix} excap somehting error")
 
     try:
+        await msg.reply(text_resp, parse_mode="Markdown", disable_web_page_preview=True)
+        
         #html = markdown.markdown(text_resp)
-        await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
         #await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
     except exceptions.TelegramBadRequest as e:
         logger.warning(f"{prefix} invalid text {text_resp}, error: {e}")
