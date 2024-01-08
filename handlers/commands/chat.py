@@ -132,8 +132,8 @@ async def chat(msg: types.Message):
     text_resp += "\n\n---\n\n *Powered by Google Gemini Pro*"
 
     try:
-        html = markdown.markdown(text_resp)
-        await msg.reply(html, parse_mode="HTML", disable_web_page_preview=True)
+        #html = markdown.markdown(text_resp)
+        await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
         #await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
     except exceptions.TelegramBadRequest as e:
         logger.warning(f"{prefix} invalid text {text_resp}, html {html}, error: {e}")
