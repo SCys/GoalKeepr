@@ -132,7 +132,7 @@ async def chat(msg: types.Message):
     text_resp += "\n\n---\n\n *Powered by Google Gemini Pro*"
 
     try:
-        text_resp = re.sub(r"([\_\*\[\]\(\)\~\`\>\#\+\-\=\|\{\}\.\!])", r"\\\1", text_resp)
+        text_resp = re.sub(r"([\+\-\|\{\}\.\!])", r"\\\1", text_resp)
     except:
         logger.error(f"{prefix} excap somehting error")
 
