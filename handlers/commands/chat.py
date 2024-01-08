@@ -131,10 +131,10 @@ async def chat(msg: types.Message):
 
     text_resp += "\n\n---\n\n *Powered by Google Gemini Pro*"
 
-    try:
-        text_resp = re.sub(r"([\+\-\|\{\}\.\!])", r"\\\1", text_resp)
-    except:
-        logger.error(f"{prefix} excap somehting error")
+    # try:
+    #     text_resp = re.sub(r"([\+\-\|\{\}\!])", r"\\\1", text_resp)
+    # except:
+    #     logger.error(f"{prefix} excap somehting error")
 
     try:
         #html = markdown.markdown(text_resp)
