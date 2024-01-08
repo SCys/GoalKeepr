@@ -136,7 +136,7 @@ async def chat(msg: types.Message):
         await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
         #await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
     except exceptions.TelegramBadRequest as e:
-        logger.warning(f"{prefix} invalid text {text_resp}, html {html}, error: {e}")
+        logger.warning(f"{prefix} invalid text {text_resp}, error: {e}")
         await msg.reply(text_resp, disable_web_page_preview=True)
     except Exception as e:
         logger.error(f"{prefix} reply error: {e}")
