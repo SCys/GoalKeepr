@@ -6,3 +6,4 @@ from .tts import tts
 from .txt2img import txt2img
 from .whoami import whoami
 from .chat import chat
+from .sdxl import sdxl
