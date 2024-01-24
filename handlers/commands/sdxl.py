@@ -42,7 +42,7 @@ async def sdxl(msg: types.Message):
     # API URL: https://iscys.com/api/cf/ai/txt2img
     session = await manager.bot.session.create_session()
     async with session.post(
-        "https://iscys.com/api/cf/ai/sdxl",
+        "https://iscys.com/api/cf/ai/txt2img",
         json={
             "params": {
                 "prompt": strip_text_prefix(msg.text),
