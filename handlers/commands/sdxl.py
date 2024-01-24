@@ -6,8 +6,6 @@ from utils.tg import strip_text_prefix
 
 logger = manager.logger
 
-QUEUE_NAME = "sdxl"
-
 
 @manager.register("message", Command("sdxl", ignore_case=True, ignore_mention=True))
 async def sdxl(msg: types.Message):
@@ -47,7 +45,7 @@ async def sdxl(msg: types.Message):
         "https://iscys.com/api/cf/ai/sdxl",
         json={
             "params": {
-                "prompt": strip_text_prefix(msg.text, "sdxl"),
+                "prompt": strip_text_prefix(msg.text),
                 "step": 20,  # default is max step
             },
         },
