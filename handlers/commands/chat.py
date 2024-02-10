@@ -128,7 +128,7 @@ async def chat(msg: types.Message):
     if not text:
         logger.warning(f"{prefix} message without text, ignored")
         return
-    
+
     rdb = await manager.get_redis()
 
     if text == "stat":
@@ -153,8 +153,8 @@ async def chat(msg: types.Message):
             await msg.reply(f"会话已经重置\nYour chat history has been reset.")
 
         return
-    
-    elif text == 'detail':
+
+    elif text == "detail":
         if rdb:
             chat_history = await rdb.get(f"chat:history:{user.id}")
             if chat_history:
@@ -166,11 +166,31 @@ async def chat(msg: types.Message):
                 # expired at
                 expired_at = await rdb.ttl(f"chat:history:{user.id}")
 
-                await msg.reply(f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token，将会在{expired_at}秒后过期。\nThere are {len(chat_history)} messages in the chat history, a total of {tokens} tokens, and it will expire in {expired_at} seconds.")
+                await msg.reply(
+                    f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token，将会在{expired_at}秒后过期。\n"
+                    f"There are {len(chat_history)} messages in the chat history, "
+                    f"a total of {tokens} tokens, and it will expire in {expired_at} seconds."
+                )
             else:
                 await msg.reply(f"没有会话历史\nNo chat history.")
         return
 
+    elif text == "help":
+        await msg.reply(
+            "使用方法：\n"
+            # "/chat stat - 获取AI状态\n"
+            "/chat reset - 重置会话\n"
+            "/chat detail - 查看会话详情\n"
+            "/chat settings:system_prompt <text> - 设置对话系统的提示\n"
+            "/chat settings:clear - 清除对话设置\n"
+            "Method of use:\n"
+            # "/chat stat - Get AI status\n"
+            "/chat reset - Reset the conversation\n"
+            "/chat detail - View conversation details\n"
+            "/chat settings:system_prompt <text> - Set the prompt for the conversation system\n"
+            "/chat settings:clear - Clear the conversation settings"
+        )
+        return
 
     # split the text into prompt and message
     try:
@@ -178,7 +198,7 @@ async def chat(msg: types.Message):
             parts = text.split(" ", 1)
             if len(parts) > 1:
                 subcommand, text = parts
-                if subcommand == "settings:prompt_system":
+                if subcommand == "settings:system_prompt":
                     # 设置对话系统的提示
                     await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": text}), ex=3600)
                     await msg.reply(f"你的对话中系统Prompt设置成功。\nYour chat system prompt has been set.")
