@@ -9,3 +9,4 @@ aiogram
 edge-tts
 aioredis
 markdown
+tiktoken
