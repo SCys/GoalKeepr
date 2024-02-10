@@ -154,7 +154,7 @@ async def chat(msg: types.Message):
 
         return
     
-    elif text == 'count':
+    elif text == 'detail':
         if rdb:
             chat_history = await rdb.get(f"chat:history:{user.id}")
             if chat_history:
