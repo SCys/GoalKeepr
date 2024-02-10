@@ -160,8 +160,8 @@ async def chat(msg: types.Message):
             if chat_history:
                 chat_history = loads(chat_history)
                 tokens = 0
-                for msg in chat_history:
-                    tokens += count_tokens(msg["content"])
+                for i in chat_history:
+                    tokens += count_tokens(i["content"])
                 await msg.reply(f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token\nThere are {len(chat_history)} messages in the chat history, a total of {tokens} tokens.")
             else:
                 await msg.reply(f"没有会话历史\nNo chat history.")
