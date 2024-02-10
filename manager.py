@@ -25,6 +25,8 @@ SETTINGS_TEMPLATE = {
     "ai": {
         "google_gemini_host": "",
         "google_gemini_token": "",
+        "proxy_host": "",
+        "proxy_token": "",
     },
     "image": {
         "users": [],  # allowed users(id list)

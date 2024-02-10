@@ -14,7 +14,7 @@ logger = manager.logger
 async def get_stat():
     config = manager.config
 
-    host = config["ai"]["google_gemini_host"]
+    host = config["ai"]["proxy_host"]
     if not host:
         logger.error("google gemini host is empty")
         return
@@ -41,10 +41,12 @@ async def get_stat():
 async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str):
     config = manager.config
 
-    host = config["ai"]["google_gemini_host"]
+    host = config["ai"]["proxy_host"]
     if not host:
-        logger.error("google gemini host is empty")
+        logger.error("proxy host is empty")
         return
+    
+    proxy_token = config["ai"]["proxy_token"]
 
     # default prompts
     prompt_system = "You are a chatbot. You are a helpful and friendly chatbot."
@@ -87,7 +89,9 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
     }
 
     session = await manager.bot.session.create_session()
-    async with session.post(url, json=data) as response:
+    async with session.post(url, json=data, headers={
+        "Authorization": f"Bearer {proxy_token}"
+    }) as response:
         if response.status != 200:
             logger.error(f"generate text error: {response.status} {await response.text()}")
             return
