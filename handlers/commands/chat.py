@@ -162,7 +162,11 @@ async def chat(msg: types.Message):
                 tokens = 0
                 for i in chat_history:
                     tokens += count_tokens(i["content"])
-                await msg.reply(f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token\nThere are {len(chat_history)} messages in the chat history, a total of {tokens} tokens.")
+
+                # expired at
+                expired_at = await rdb.ttl(f"chat:history:{user.id}")
+
+                await msg.reply(f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token，将会在{expired_at}秒后过期。\nThere are {len(chat_history)} messages in the chat history, a total of {tokens} tokens, and it will expire in {expired_at} seconds.")
             else:
                 await msg.reply(f"没有会话历史\nNo chat history.")
         return
