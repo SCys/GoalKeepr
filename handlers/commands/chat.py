@@ -105,13 +105,13 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
             logger.error(f"generate text error: {code} {message}")
             return
 
+        text = data["choices"][0]["message"]["content"]
         if rdb:
             # 保存到Redis，确保保存的TTL为10分钟
-            chat_history.append({"role": "assistant", "content": data["data"]["text"]})
+            chat_history.append({"role": "assistant", "content": text})
             await rdb.set(f"chat:history:{member.id}", dumps(chat_history), ex=600)
 
-        return data["data"]["text"]
-
+        return text
 
 @manager.register("message", Command("chat", ignore_case=True, ignore_mention=True))
 async def chat(msg: types.Message):
