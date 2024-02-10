@@ -45,7 +45,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
     if not host:
         logger.error("proxy host is empty")
         return
-    
+
     proxy_token = config["ai"]["proxy_token"]
 
     # default prompts
@@ -89,9 +89,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
     }
 
     session = await manager.bot.session.create_session()
-    async with session.post(url, json=data, headers={
-        "Authorization": f"Bearer {proxy_token}"
-    }) as response:
+    async with session.post(url, json=data, headers={"Authorization": f"Bearer {proxy_token}"}) as response:
         if response.status != 200:
             logger.error(f"generate text error: {response.status} {await response.text()}")
             return
@@ -113,6 +111,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
 
         return text
 
+
 @manager.register("message", Command("chat", ignore_case=True, ignore_mention=True))
 async def chat(msg: types.Message):
     """Google Gemini Pro"""
@@ -129,6 +128,8 @@ async def chat(msg: types.Message):
     if not text:
         logger.warning(f"{prefix} message without text, ignored")
         return
+    
+    rdb = await manager.get_redis()
 
     if text == "stat":
         try:
@@ -146,9 +147,29 @@ async def chat(msg: types.Message):
 
         return
 
+    elif text == "reset":
+        if rdb:
+            await rdb.delete(f"chat:history:{user.id}")
+            await msg.reply(f"会话已经重置\nYour chat history has been reset.")
+
+        return
+    
+    elif text == 'count':
+        if rdb:
+            chat_history = await rdb.get(f"chat:history:{user.id}")
+            if chat_history:
+                chat_history = loads(chat_history)
+                tokens = 0
+                for msg in chat_history:
+                    tokens += count_tokens(msg["content"])
+                await msg.reply(f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token\nThere are {len(chat_history)} messages in the chat history, a total of {tokens} tokens.")
+            else:
+                await msg.reply(f"没有会话历史\nNo chat history.")
+        return
+
+
     # split the text into prompt and message
     try:
-        rdb = await manager.get_redis()
         if rdb:
             parts = text.split(" ", 1)
             if len(parts) > 1:
