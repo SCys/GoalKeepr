@@ -304,7 +304,11 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
         return True
 
     raw = await rdb.hget(f"chat:user:{uid}", "disabled")
-    if raw is None or raw == 1:
+    if raw is None:
+        return False
+    
+    if raw == 1:
+        logger.warning(f"user {uid} is disabled for chat command")
         return False
 
     # check qutoa
