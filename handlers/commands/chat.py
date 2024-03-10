@@ -249,7 +249,7 @@ async def admin_operations(
     rdb: "aioredis.Redis", msg: types.Message, chat: types.Chat, user: types.User, subcommand: str, arguments: List[str]
 ) -> bool:
     administrator = manager.config["ai"]["administrator"]
-    if not administrator or user.id != administrator:
+    if not administrator or user.id != int(administrator):
         return False
 
     target_user_id = None
