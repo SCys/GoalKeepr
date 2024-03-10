@@ -236,6 +236,7 @@ async def chat(msg: types.Message):
 
     if success:
         await increase_user_count(rdb, user.id)
+        logger.info(f"{prefix} do chat command, send token {count_tokens(text)}, response token {count_tokens(text_resp)}")
 
 
 def count_tokens(string: str) -> int:
