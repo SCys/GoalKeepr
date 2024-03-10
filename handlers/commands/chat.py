@@ -6,6 +6,7 @@ import tiktoken
 from orjson import loads, dumps
 from datetime import datetime
 import aioredis
+from typing import List
 
 """
 user info as hash in redis, key prefix is chat:user:{{ user_id }}. 
@@ -197,7 +198,7 @@ async def chat(msg: types.Message):
                 return
 
             # administrator operations
-            if await admin_operations(rdb, msg, chat, user, subcommand, parts[1:]):
+            if await admin_operations(rdb, msg, chat, user, subcommand, parts):
                 return
     except:
         pass
@@ -245,7 +246,7 @@ def count_tokens(string: str) -> int:
 
 
 async def admin_operations(
-    rdb: "aioredis.Redis", msg: types.Message, chat: types.Chat, user: types.User, subcommand: str, arguments: str
+    rdb: "aioredis.Redis", msg: types.Message, chat: types.Chat, user: types.User, subcommand: str, arguments: List[str]
 ) -> bool:
     administrator = manager.config["ai"]["administrator"]
     if not administrator or user.id != administrator:
@@ -255,8 +256,9 @@ async def admin_operations(
     pre_msg = msg.reply_to_message
     if pre_msg and pre_msg.from_user:
         target_user_id = pre_msg.from_user.id
-    elif len(arguments) > 0:
-        target_user_id = int(arguments[0])
+    elif len(arguments) > 1:
+        target_user_id = int(arguments[1])
+        arguments.pop(1)
 
     if subcommand == "admin:ban" and target_user_id:
         await ban_user(rdb, target_user_id)
