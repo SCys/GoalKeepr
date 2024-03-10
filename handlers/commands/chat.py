@@ -181,12 +181,12 @@ async def chat(msg: types.Message):
         # split the text into prompt and message
         parts = text.split(" ", 1)
         if len(parts) > 1:
-            subcommand, text = parts
+            subcommand, argument = parts
 
             # user settings
             if subcommand == "settings:system_prompt":
                 # 设置对话系统的提示
-                await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": text}), ex=3600)
+                await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": argument}), ex=3600)
                 await msg.reply(f"你的对话中系统Prompt设置成功。\nYour chat system prompt has been set.")
                 return
             elif subcommand == "settings:clear":
@@ -196,7 +196,7 @@ async def chat(msg: types.Message):
                 return
 
             # administrator operations
-            if await admin_operations(rdb, msg, chat, user, subcommand, text):
+            if await admin_operations(rdb, msg, chat, user, subcommand, argument):
                 return
     except:
         pass
