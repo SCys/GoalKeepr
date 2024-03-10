@@ -180,11 +180,11 @@ async def chat(msg: types.Message):
     try:
         # split the text into prompt and message
         parts = text.split(" ", 1)
-        if len(parts) > 1:
+        if len(parts) > 0:
             subcommand = parts[0]
 
             # user settings
-            if subcommand == "settings:system_prompt" and len(parts) > 2:
+            if subcommand == "settings:system_prompt" and len(parts) > 1:
                 # 设置对话系统的提示
                 prompt = " ".join(parts[1:])
                 await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": prompt}), ex=3600)
