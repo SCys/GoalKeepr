@@ -262,25 +262,32 @@ async def admin_operations(
 
     if subcommand == "admin:ban" and target_user_id:
         await ban_user(rdb, target_user_id)
+        await msg.reply(f"用户{target_user_id}已经被禁用chat命令。\nUser {target_user_id} has been disabled from using the chat command.")
+        logger.info(f"admin:ban {target_user_id}")
         return True
     elif subcommand == "admin:allow" and target_user_id:
         await allow_user(rdb, target_user_id)
+        await msg.reply(f"用户{target_user_id}可以是用chat命令了。\nUser {target_user_id} can use the chat command.")
+        logger.info(f"admin:allow {target_user_id}")
         return True
     elif subcommand == "admin:quota" and target_user_id:
         try:
             quota = int(arguments[1])
             await update_user_quota(rdb, target_user_id, quota)
             await msg.reply(f"用户{user.id}的配额已经设置为{quota}。\nUser {user.id}'s quota has been set to {quota}.")
+            logger.info(f"admin:quota {target_user_id} {quota}")
         except:
-            await msg.reply(f"设置配额失败。\nFailed to set quota.")
+            logger.exception(f"admin:quota {target_user_id} {quota}")
         return True
     elif subcommand == "admin:total_used":
         total = await total_user_requested(rdb)
         await msg.reply(f"总共请求了{total}次。\nA total of {total} requests have been made.")
+        logger.info(f"admin:total_used {total}")
         return True
     elif subcommand == "admin:total_user":
         total = await count_user(rdb)
         await msg.reply(f"总共有{total}个用户。\nThere are a total of {total} users.")
+        logger.info(f"admin:total_user {total}")
         return True
 
     return False
