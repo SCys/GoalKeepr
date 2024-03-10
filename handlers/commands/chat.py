@@ -302,6 +302,16 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
 
     if uid == int(administrator):
         return True
+    
+    manage_group = manager.config["ai"]["manage_group"]
+    if manage_group and chat_id == int(manage_group):
+        # if uid is admini in group
+        member = await manager.bot.get_chat_member(chat_id, uid)
+        if member.status in ("administrator", "creator"):
+            logger.info(f"user {uid} is admin in group {chat_id}")
+            return True
+        
+        return True
 
     raw = await rdb.hget(f"chat:user:{uid}", "disabled")
     if raw is None:
