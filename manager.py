@@ -27,6 +27,8 @@ SETTINGS_TEMPLATE = {
         "google_gemini_token": "",
         "proxy_host": "",
         "proxy_token": "",
+        "administrator": 0,  # admin user id
+        "manage_group": 0,  # manage group id
     },
     "image": {
         "users": [],  # allowed users(id list)

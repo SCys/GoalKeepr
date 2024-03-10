@@ -1,41 +1,29 @@
 from aiogram import exceptions, types
 from aiogram.filters import Command
-
+import re
 from manager import manager
 import tiktoken
 from orjson import loads, dumps
+from datetime import datetime
+import aioredis
+
+"""
+user info as hash in redis, key prefix is chat:user:{{ user_id }}. 
+
+include hash:
+
+- disabled: bool (default False)
+- count: integer (default 0)
+- quota: integer (default -1, means no limit)
+- last: datetime string (default '1970-01-01T00:00:00Z')
+"""
 
 DELETED_AFTER = 5
 BAN_MEMBER = 300  # 300s
 
 logger = manager.logger
 
-
-async def get_stat():
-    config = manager.config
-
-    host = config["ai"]["proxy_host"]
-    if not host:
-        logger.error("google gemini host is empty")
-        return
-
-    url = f"{host}/api/ai/google/gemini/text_generation"
-    session = await manager.bot.session.create_session()
-    async with session.get(url) as response:
-        if response.status != 200:
-            logger.error(f"get stat error: {response.status} {await response.text()}")
-            return
-
-        data = await response.json()
-
-        # check error
-        if "error" in data:
-            code = data["error"]["code"]
-            message = data["error"]["message"]
-            logger.error(f"get stat error: {code} {message}")
-            return
-
-        return data["data"]
+RE_CLEAR = re.compile(r"/chat(@[a-zA-Z0-9]+\s?)?")
 
 
 async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str):
@@ -124,55 +112,47 @@ async def chat(msg: types.Message):
         return
 
     text = msg.text
-    text = text.replace("/chat", "", 1).strip()
+    if text.startswith("/chat"):
+        text = RE_CLEAR.sub("", text, 1).strip()
     if not text:
         logger.warning(f"{prefix} message without text, ignored")
         return
 
     rdb = await manager.get_redis()
-
-    if text == "stat":
-        try:
-            stat = await get_stat()
-            if not stat:
-                logger.warning(f"{prefix} get stat error, ignored")
-                return
-
-            total = stat["total"]
-            qps = stat["qps"]
-            await msg.reply(f"total: {total}\nqps: {qps}")
-        except Exception as e:
-            logger.error(f"{prefix} get stat error: {e}")
-            await msg.reply(f"error: {e}")
-
+    if not rdb:
+        logger.error(f"{prefix} redis not connected")
+        # reply system error with redis is missed
+        await msg.reply("System error: Redis is missed.")
         return
 
-    elif text == "reset":
-        if rdb:
-            await rdb.delete(f"chat:history:{user.id}")
-            await msg.reply(f"会话已经重置\nYour chat history has been reset.")
+    if not await check_user_permission(rdb, chat.id, user.id):
+        logger.warning(f"{prefix} user {user.id} in chat {chat.id} has no permission")
+        return
 
+    # normal user
+    if text == "reset":
+        await rdb.delete(f"chat:history:{user.id}")
+        await msg.reply(f"会话已经重置\nYour chat history has been reset.")
         return
 
     elif text == "detail":
-        if rdb:
-            chat_history = await rdb.get(f"chat:history:{user.id}")
-            if chat_history:
-                chat_history = loads(chat_history)
-                tokens = 0
-                for i in chat_history:
-                    tokens += count_tokens(i["content"])
+        chat_history = await rdb.get(f"chat:history:{user.id}")
+        if chat_history:
+            chat_history = loads(chat_history)
+            tokens = 0
+            for i in chat_history:
+                tokens += count_tokens(i["content"])
 
-                # expired at
-                expired_at = await rdb.ttl(f"chat:history:{user.id}")
+            # expired at
+            expired_at = await rdb.ttl(f"chat:history:{user.id}")
 
-                await msg.reply(
-                    f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token，将会在{expired_at}秒后过期。\n"
-                    f"There are {len(chat_history)} messages in the chat history, "
-                    f"a total of {tokens} tokens, and it will expire in {expired_at} seconds."
-                )
-            else:
-                await msg.reply(f"没有会话历史\nNo chat history.")
+            await msg.reply(
+                f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token，将会在{expired_at}秒后过期。\n"
+                f"There are {len(chat_history)} messages in the chat history, "
+                f"a total of {tokens} tokens, and it will expire in {expired_at} seconds."
+            )
+        else:
+            await msg.reply(f"没有会话历史\nNo chat history.")
         return
 
     elif text == "help":
@@ -192,22 +172,28 @@ async def chat(msg: types.Message):
         )
         return
 
-    # split the text into prompt and message
+    # settings or administrator
     try:
-        if rdb:
-            parts = text.split(" ", 1)
-            if len(parts) > 1:
-                subcommand, text = parts
-                if subcommand == "settings:system_prompt":
-                    # 设置对话系统的提示
-                    await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": text}), ex=3600)
-                    await msg.reply(f"你的对话中系统Prompt设置成功。\nYour chat system prompt has been set.")
-                    return
-                elif subcommand == "settings:clear":
-                    # 清除对话设置
-                    await rdb.delete(f"chat:settings:{user.id}")
-                    await msg.reply(f"你的对话设置已被清除。\nYour chat settings have been cleared.")
-                    return
+        # split the text into prompt and message
+        parts = text.split(" ", 1)
+        if len(parts) > 1:
+            subcommand, text = parts
+
+            # user settings
+            if subcommand == "settings:system_prompt":
+                # 设置对话系统的提示
+                await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": text}), ex=3600)
+                await msg.reply(f"你的对话中系统Prompt设置成功。\nYour chat system prompt has been set.")
+                return
+            elif subcommand == "settings:clear":
+                # 清除对话设置
+                await rdb.delete(f"chat:settings:{user.id}")
+                await msg.reply(f"你的对话设置已被清除。\nYour chat settings have been cleared.")
+                return
+
+            # administrator operations
+            if await admin_operations(rdb, msg, chat, user, subcommand, text):
+                return
     except:
         pass
 
@@ -229,15 +215,21 @@ async def chat(msg: types.Message):
         await msg.reply(f"error: {e}")
 
     text_resp += "\n\n---\n\n *Powered by Google Gemini Pro*"
+    success = False
 
     try:
         await msg.reply(text_resp, parse_mode="Markdown", disable_web_page_preview=True)
+        success = True
     except exceptions.TelegramBadRequest as e:
         logger.warning(f"{prefix} invalid text {text_resp}, error: {e}")
         await msg.reply(text_resp, disable_web_page_preview=True)
+        success = True
     except Exception as e:
         logger.error(f"{prefix} reply error: {e}")
         await msg.reply(f"error: {e}")
+
+    if success:
+        await increase_user_count(rdb, user.id)
 
 
 def count_tokens(string: str) -> int:
@@ -245,3 +237,135 @@ def count_tokens(string: str) -> int:
     encoding = tiktoken.get_encoding("cl100k_base")
     num_tokens = len(encoding.encode(string))
     return num_tokens
+
+
+async def admin_operations(
+    rdb: "aioredis.Redis", msg: types.Message, chat: types.Chat, user: types.User, subcommand: str, text: str
+) -> bool:
+    administrator = manager.config["ai"]["administrator"]
+    if not administrator or user.id != administrator:
+        return False
+
+    pre_msg = msg.reply_to_message
+    from_user = pre_msg.from_user
+
+    if subcommand == "admin:ban":
+        await ban_user(rdb, from_user.id)
+        return True
+    elif subcommand == "admin:allow":
+        await allow_user(rdb, from_user.id)
+        return True
+    elif subcommand == "admin:quota":
+        try:
+            quota = int(text)
+            await update_user_quota(rdb, from_user.id, quota)
+            await msg.reply(f"用户{user.id}的配额已经设置为{quota}。\nUser {user.id}'s quota has been set to {quota}.")
+        except:
+            await msg.reply(f"设置配额失败。\nFailed to set quota.")
+        return True
+    elif subcommand == "admin:total_used":
+        total = await total_user_requested(rdb)
+        await msg.reply(f"总共请求了{total}次。\nA total of {total} requests have been made.")
+        return True
+    elif subcommand == "admin:total_user":
+        total = await count_user(rdb)
+        await msg.reply(f"总共有{total}个用户。\nThere are a total of {total} users.")
+        return True
+
+    return False
+
+
+async def check_user_permission(rdb: "aioredis.Redis", uid: int) -> bool:
+    administrator = manager.config["ai"]["administrator"]
+
+    # miss administator
+    if not administrator:
+        return False
+
+    if administrator and uid == administrator:
+        return True
+
+    raw = await rdb.hget(f"chat:user:{uid}", "disabled")
+    if raw is None or raw:  # True or None is disabled or no user info
+        return False
+
+    # check qutoa
+    quota = await rdb.hget(f"chat:user:{uid}", "quota")
+    if quota and int(quota) > 0:
+        count = await rdb.hget(f"chat:user:{uid}", "count")
+        if count and int(count) >= int(quota):
+            return False
+
+    return True
+
+
+async def init_user(rdb: "aioredis.Redis", uid: int):
+    await rdb.hset(f"chat:user:{uid}", "disabled", False)
+    await rdb.hset(f"chat:user:{uid}", "count", 0)
+    await rdb.hset(f"chat:user:{uid}", "quota", -1)
+    await rdb.hset(f"chat:user:{uid}", "last", "1970-01-01T00:00:00Z")
+
+
+async def ban_user(rdb: "aioredis.Redis", uid: int):
+    # check & set
+    if not await rdb.hexists(f"chat:user:{uid}", "disabled"):
+        await init_user(rdb, uid)
+        return
+
+    await rdb.hset(f"chat:user:{uid}", "disabled", True)
+
+
+async def allow_user(rdb: "aioredis.Redis", uid: int):
+    # check & set, use hexists
+    if not await rdb.hexists(f"chat:user:{uid}", "disabled"):
+        await init_user(rdb, uid)
+        return
+
+    await rdb.hset(f"chat:user:{uid}", "disabled", False)
+
+
+async def increase_user_count(rdb: "aioredis.Redis", uid: int):
+    # check & set
+    if not await rdb.hexists(f"chat:user:{uid}", "count"):
+        await init_user(rdb, uid)
+        return
+
+    await rdb.hincrby(f"chat:user:{uid}", "count", 1)
+    await rdb.hset(f"chat:user:{uid}", "last", datetime.now().isoformat())
+
+
+async def update_user_quota(rdb: "aioredis.Redis", uid: int, quota: int):
+    # check & set
+    if not await rdb.hexists(f"chat:user:{uid}", "quota"):
+        await init_user(rdb, uid)
+        return
+
+    await rdb.hset(f"chat:user:{uid}", "quota", quota)
+
+
+async def count_user(rdb: "aioredis.Redis") -> int:
+    # use scan
+    cursor = b"0"
+    total = 0
+    while cursor:
+        cursor, keys = await rdb.scan(cursor, match="chat:user:*", count=100)
+        total += len(keys)
+
+    return total
+
+
+async def total_user_requested(rdb: "aioredis.Redis") -> int:
+    """
+    计算所有的 chat:user:{uid}:count 总量
+    """
+    # use scan
+    cursor = b"0"
+    total = 0
+    while cursor:
+        cursor, keys = await rdb.scan(cursor, match="chat:user:*", count=100)
+        for key in keys:
+            count = await rdb.hget(key, "count")
+            if count:
+                total += int(count)
+
+    return total
