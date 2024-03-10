@@ -256,7 +256,7 @@ async def admin_operations(
     if pre_msg and pre_msg.from_user:
         target_user_id = pre_msg.from_user.id
     elif len(arguments) > 0:
-        target_user_id = 0
+        target_user_id = int(arguments[0])
 
     if subcommand == "admin:ban" and target_user_id:
         await ban_user(rdb, target_user_id)
