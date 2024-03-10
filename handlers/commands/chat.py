@@ -105,7 +105,11 @@ async def chat(msg: types.Message):
     """Google Gemini Pro"""
     chat = msg.chat
     user = msg.from_user
-    prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+
+    if chat.title is None:
+        prefix = f"chat {chat.id} msg {msg.message_id}"
+    else:
+        prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
 
     if not user:
         logger.warning(f"{prefix} message without user, ignored")
@@ -282,7 +286,7 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
     if not administrator:
         return False
 
-    if administrator and uid == administrator:
+    if uid == int(administrator):
         return True
 
     raw = await rdb.hget(f"chat:user:{uid}", "disabled")
