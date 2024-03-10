@@ -264,11 +264,7 @@ async def admin_operations(
         await ban_user(rdb, target_user_id)
         return True
     elif subcommand == "admin:allow" and target_user_id:
-        if pre_msg and pre_msg.from_user:
-            await allow_user(rdb, target_user_id)
-        else:
-            await allow_user(rdb, user.id)
-
+        await allow_user(rdb, target_user_id)
         return True
     elif subcommand == "admin:quota" and target_user_id:
         try:
