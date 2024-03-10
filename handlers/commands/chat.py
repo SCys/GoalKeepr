@@ -290,7 +290,7 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
         return True
 
     raw = await rdb.hget(f"chat:user:{uid}", "disabled")
-    if raw is None or raw:  # True or None is disabled or no user info
+    if raw is None or raw == 1:
         return False
 
     # check qutoa
@@ -304,7 +304,7 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
 
 
 async def init_user(rdb: "aioredis.Redis", uid: int):
-    await rdb.hset(f"chat:user:{uid}", "disabled", False)
+    await rdb.hset(f"chat:user:{uid}", "disabled", 0)
     await rdb.hset(f"chat:user:{uid}", "count", 0)
     await rdb.hset(f"chat:user:{uid}", "quota", -1)
     await rdb.hset(f"chat:user:{uid}", "last", "1970-01-01T00:00:00Z")
@@ -316,7 +316,7 @@ async def ban_user(rdb: "aioredis.Redis", uid: int):
         await init_user(rdb, uid)
         return
 
-    await rdb.hset(f"chat:user:{uid}", "disabled", True)
+    await rdb.hset(f"chat:user:{uid}", "disabled", 1)
 
 
 async def allow_user(rdb: "aioredis.Redis", uid: int):
@@ -325,7 +325,7 @@ async def allow_user(rdb: "aioredis.Redis", uid: int):
         await init_user(rdb, uid)
         return
 
-    await rdb.hset(f"chat:user:{uid}", "disabled", False)
+    await rdb.hset(f"chat:user:{uid}", "disabled", 0)
 
 
 async def increase_user_count(rdb: "aioredis.Redis", uid: int):
