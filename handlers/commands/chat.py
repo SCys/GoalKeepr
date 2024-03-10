@@ -181,12 +181,13 @@ async def chat(msg: types.Message):
         # split the text into prompt and message
         parts = text.split(" ", 1)
         if len(parts) > 1:
-            subcommand, argument = parts
+            subcommand = parts[0]
 
             # user settings
-            if subcommand == "settings:system_prompt":
+            if subcommand == "settings:system_prompt" and len(parts) > 2:
                 # 设置对话系统的提示
-                await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": argument}), ex=3600)
+                prompt = " ".join(parts[1:])
+                await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": prompt}), ex=3600)
                 await msg.reply(f"你的对话中系统Prompt设置成功。\nYour chat system prompt has been set.")
                 return
             elif subcommand == "settings:clear":
@@ -196,7 +197,7 @@ async def chat(msg: types.Message):
                 return
 
             # administrator operations
-            if await admin_operations(rdb, msg, chat, user, subcommand, argument):
+            if await admin_operations(rdb, msg, chat, user, subcommand, parts[1:]):
                 return
     except:
         pass
@@ -244,25 +245,33 @@ def count_tokens(string: str) -> int:
 
 
 async def admin_operations(
-    rdb: "aioredis.Redis", msg: types.Message, chat: types.Chat, user: types.User, subcommand: str, text: str
+    rdb: "aioredis.Redis", msg: types.Message, chat: types.Chat, user: types.User, subcommand: str, arguments: str
 ) -> bool:
     administrator = manager.config["ai"]["administrator"]
     if not administrator or user.id != administrator:
         return False
 
+    target_user_id = None
     pre_msg = msg.reply_to_message
-    from_user = pre_msg.from_user
+    if pre_msg and pre_msg.from_user:
+        target_user_id = pre_msg.from_user.id
+    elif len(arguments) > 0:
+        target_user_id = 0
 
-    if subcommand == "admin:ban":
-        await ban_user(rdb, from_user.id)
+    if subcommand == "admin:ban" and target_user_id:
+        await ban_user(rdb, target_user_id)
         return True
-    elif subcommand == "admin:allow":
-        await allow_user(rdb, from_user.id)
+    elif subcommand == "admin:allow" and target_user_id:
+        if pre_msg and pre_msg.from_user:
+            await allow_user(rdb, target_user_id)
+        else:
+            await allow_user(rdb, user.id)
+
         return True
-    elif subcommand == "admin:quota":
+    elif subcommand == "admin:quota" and target_user_id:
         try:
-            quota = int(text)
-            await update_user_quota(rdb, from_user.id, quota)
+            quota = int(arguments[1])
+            await update_user_quota(rdb, target_user_id, quota)
             await msg.reply(f"用户{user.id}的配额已经设置为{quota}。\nUser {user.id}'s quota has been set to {quota}.")
         except:
             await msg.reply(f"设置配额失败。\nFailed to set quota.")
