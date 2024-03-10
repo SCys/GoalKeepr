@@ -275,7 +275,7 @@ async def admin_operations(
     return False
 
 
-async def check_user_permission(rdb: "aioredis.Redis", uid: int) -> bool:
+async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -> bool:
     administrator = manager.config["ai"]["administrator"]
 
     # miss administator
