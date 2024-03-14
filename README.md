@@ -29,7 +29,6 @@ tr - 将输入的文本翻译为中文 translate the input text into Chinese
 txt2img - 通过文本生成图像 generate images through text(on mini machine, only support English)
 sdxl - 通过文本生成图像 generate images through text(power by cloudflare)
 chat - 支持上下文的聊天功能，允许配置相关参数，详情请输入 /chat help chat function with context, allow to configure related parameters, please enter /chat help for details
-answer - 无上下文的聊天功能 chat function without context
 </pre>
 
 配置文件 main.ini
