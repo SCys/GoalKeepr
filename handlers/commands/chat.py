@@ -263,7 +263,9 @@ async def admin_operations(
 
     if subcommand == "admin:ban" and target_user_id:
         await ban_user(rdb, target_user_id)
-        await msg.reply(f"用户{target_user_id}已经被禁用chat命令。\nUser {target_user_id} has been disabled from using the chat command.")
+        await msg.reply(
+            f"用户{target_user_id}已经被禁用chat命令。\nUser {target_user_id} has been disabled from using the chat command."
+        )
         logger.info(f"admin:ban {target_user_id}")
         return True
     elif subcommand == "admin:allow" and target_user_id:
@@ -303,7 +305,7 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
 
     if uid == int(administrator):
         return True
-    
+
     manage_group = manager.config["ai"]["manage_group"]
     if manage_group and chat_id == int(manage_group):
         # administrator or creator
@@ -311,13 +313,15 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
         if member.status in ("administrator", "creator"):
             logger.info(f"user {uid} is admin in group {chat_id}")
             return True
-        
+
+        logger.warning(f"user {uid} is not admin(creator) in group {chat_id}")
         return False
 
     raw = await rdb.hget(f"chat:user:{uid}", "disabled")
     if raw is None:
+        logger.warning(f"user {uid} is not in chat command")
         return False
-    
+
     if raw == 1:
         logger.warning(f"user {uid} is disabled for chat command")
         return False
@@ -327,8 +331,10 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
     if quota and int(quota) > 0:
         count = await rdb.hget(f"chat:user:{uid}", "count")
         if count and int(count) >= int(quota):
+            logger.warning(f"user {uid} has reached the quota")
             return False
 
+    logger.info(f"user {uid} is allowed for chat command")
     return True
 
 
