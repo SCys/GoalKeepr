@@ -203,13 +203,13 @@ async def chat(msg: types.Message):
     except:
         pass
 
-    if len(text) < 5:
+    if len(text) < 3:
         logger.warning(f"{prefix} message too short, ignored")
         return
 
-    if len(text) > 1024:
-        logger.warning(f"{prefix} message too long, ignored")
-        return
+    # if len(text) > 1024:
+    #     logger.warning(f"{prefix} message too long, ignored")
+    #     return
 
     try:
         text_resp = await generate_text(chat, user, text)
