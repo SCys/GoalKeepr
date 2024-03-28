@@ -282,15 +282,11 @@ async def admin_operations(
         except:
             logger.exception(f"admin:quota {target_user_id} {quota}")
         return True
-    elif subcommand == "admin:total_used":
-        total = await total_user_requested(rdb)
-        await msg.reply(f"总共请求了{total}次。\nA total of {total} requests have been made.")
-        logger.info(f"admin:total_used {total}")
-        return True
-    elif subcommand == "admin:total_user":
-        total = await count_user(rdb)
-        await msg.reply(f"总共有{total}个用户。\nThere are a total of {total} users.")
-        logger.info(f"admin:total_user {total}")
+    elif subcommand == "admin:stats":
+        total_used = await total_user_requested(rdb)
+        total_user = await count_user(rdb)
+        await msg.reply(f"请求量:{total_used} 用户:{total_user}\nTotal requests:{total_used} users:{total_user}")
+        logger.info(f"admin:stats {total_used} {total_user}")
         return True
 
     return False
