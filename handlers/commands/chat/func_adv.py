@@ -96,7 +96,7 @@ async def operations_admin(
         # check user is setup prompt
         user_settings = await rdb.get(f"chat:settings:{target_user_id}")
         user_settings = loads(user_settings) if user_settings else {}
-        user_is_setup_prompt_system = "prompt_system" in user_settings and user_settings["prompt_system"]
+        user_is_setup_prompt_system = "yes" if "prompt_system" in user_settings and user_settings["prompt_system"] else "no"
         user_prompt_system_length = len(user_settings["prompt_system"]) if user_is_setup_prompt_system else 0
 
         # chat_history = await rdb.get(f"chat:history:{user.id}")
