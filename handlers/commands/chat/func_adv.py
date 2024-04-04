@@ -10,11 +10,13 @@ from .func_user import ban_user, allow_user, update_user_quota, count_user, tota
 logger = manager.logger
 
 
-async def operations_settings(rdb, msg, user, subcommand, parts):
+async def operations_settings(
+    rdb: "aioredis.Redis", msg: types.Message, user: types.User, subcommand: str, arguments: List[str]
+):
     # user settings
-    if subcommand == "settings:system_prompt" and len(parts) > 1:
+    if subcommand == "settings:system_prompt" and len(arguments) > 1:
         # 设置对话系统的提示
-        prompt = " ".join(parts[1:])
+        prompt = " ".join(arguments[1:])
         await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": prompt}), ex=3600)
         await msg.reply(f"你的对话中系统Prompt设置成功。\nYour chat system prompt has been set.")
         return True
@@ -118,7 +120,7 @@ async def operations_admin(
         if user_chat_history := await rdb.get(f"chat:history:{target_user_id}"):
             user_chat_history = loads(user_chat_history)
             user_chat_history_length = len(user_chat_history)
-            
+
             tokens = 0
             for i in user_chat_history:
                 tokens += count_tokens(i["content"])
@@ -126,17 +128,17 @@ async def operations_admin(
             user_chat_history_expired_at = await rdb.ttl(f"chat:history:{user.id}")
 
             # setup user_cached_history_detail
-            user_cached_history_detail = \
-                "\n聊天历史统计:\n" \
-                f"历史消息数量: {user_chat_history_length}\n" \
-                f"Token数量: {user_chat_history_tokens_size}\n" \
+            user_cached_history_detail = (
+                "\n聊天历史统计:\n"
+                f"历史消息数量: {user_chat_history_length}\n"
+                f"Token数量: {user_chat_history_tokens_size}\n"
                 f"过期时间: {user_chat_history_expired_at}秒\n"
-            
+            )
+
         await msg.reply(
             f"用户{target_user_id}的状态：\n"
             f"禁用:{disabled} 请求次数:{count} 配额:{quota}\n最后请求时间:{last}\n"
-            f"设置System Prompt:{user_is_setup_prompt_system} 长度:{user_prompt_system_length}"
-            + user_cached_history_detail
+            f"设置System Prompt:{user_is_setup_prompt_system} 长度:{user_prompt_system_length}" + user_cached_history_detail
         )
         logger.info(f"admin:stats_user {target_user_id}")
         return True

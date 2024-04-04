@@ -106,15 +106,15 @@ async def chat(msg: types.Message):
 
     try:
         # split the text into prompt and message
-        if parts := text.split(" ", 1) and len(parts) > 0:
-            subcommand = parts[0]
+        parts = text.split(" ", 1)
+        subcommand = parts[0]
 
-            if await operations_settings(rdb, msg, user, text, subcommand, parts):
-                return
+        if await operations_settings(rdb, msg, user, subcommand, parts):
+            return
 
-            # administrator operations
-            if await operations_admin(rdb, msg, user, subcommand, parts):
-                return
+        # administrator operations
+        if await operations_admin(rdb, msg, user, subcommand, parts):
+            return
     except:
         logger.exception(f"{prefix} operations error")
 
