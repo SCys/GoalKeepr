@@ -288,14 +288,26 @@ async def admin_operations(
         await msg.reply(f"请求量:{total_used} 用户:{total_user}\nTotal requests:{total_used} users:{total_user}")
         logger.info(f"admin:stats {total_used} {total_user}")
         return True
-    
+
     # get user stats from redis
     elif subcommand == "admin:stats_user" and target_user_id:
         user_key = f"chat:user:{target_user_id}"
+
+        # check exists
+        if not await rdb.exists(user_key):
+            await msg.reply(f"用户{target_user_id}不存在\nUser {target_user_id} not exists")
+            return True
+
         disabled = await rdb.hget(user_key, "disabled")
         count = await rdb.hget(user_key, "count")
         quota = await rdb.hget(user_key, "quota")
         last = await rdb.hget(user_key, "last")
+
+        disabled = bool(int(disabled)) if disabled else False
+        count = int(count) if count else 0
+        quota = int(quota) if quota else -1
+        last = last.decode() if last else "none"
+
         await msg.reply(
             f"用户{target_user_id}的状态：\n"
             f"禁用:{disabled} 请求次数:{count} 配额:{quota} 最后请求时间:{last}\n"
