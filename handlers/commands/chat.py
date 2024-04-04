@@ -303,7 +303,7 @@ async def admin_operations(
         quota = await rdb.hget(user_key, "quota")
         last = await rdb.hget(user_key, "last")
 
-        disabled = "yes" if disabled else "no"
+        disabled = "yes" if disabled and int(disabled) else "no"
         count = int(count) if count else 0
         quota = int(quota) if quota else -1
         last = last.decode() if last else "none"
