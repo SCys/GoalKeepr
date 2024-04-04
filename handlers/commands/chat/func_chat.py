@@ -5,7 +5,7 @@ from manager import manager
 from orjson import loads, dumps
 
 from .utils import count_tokens
-from .func_settings import process_settings
+from .func_adv import operations_admin, operations_settings
 from .func_txt import generate_text
 from .func_user import check_user_permission, increase_user_count
 
@@ -103,7 +103,20 @@ async def chat(msg: types.Message):
         )
         return
 
-    await process_settings(rdb, msg, user, text)
+    try:
+        # split the text into prompt and message
+        parts = text.split(" ", 1)
+        if len(parts) > 0:
+            subcommand = parts[0]
+
+            if await operations_settings(rdb, msg, user, text, subcommand, parts):
+                return
+
+            # administrator operations
+            if await operations_admin(rdb, msg, user, subcommand, parts):
+                return
+    except:
+        pass
 
     if len(text) < 3:
         logger.warning(f"{prefix} message too short, ignored")

@@ -9,34 +9,25 @@ from .func_user import ban_user, allow_user, update_user_quota, count_user, tota
 logger = manager.logger
 
 
-async def process_settings(rdb, msg, user, text):
-    try:
-        # split the text into prompt and message
-        parts = text.split(" ", 1)
-        if len(parts) > 0:
-            subcommand = parts[0]
+async def operations_settings(rdb, msg, user, subcommand, parts):
+    # user settings
+    if subcommand == "settings:system_prompt" and len(parts) > 1:
+        # 设置对话系统的提示
+        prompt = " ".join(parts[1:])
+        await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": prompt}), ex=3600)
+        await msg.reply(f"你的对话中系统Prompt设置成功。\nYour chat system prompt has been set.")
+        return True
 
-            # user settings
-            if subcommand == "settings:system_prompt" and len(parts) > 1:
-                # 设置对话系统的提示
-                prompt = " ".join(parts[1:])
-                await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": prompt}), ex=3600)
-                await msg.reply(f"你的对话中系统Prompt设置成功。\nYour chat system prompt has been set.")
-                return
-            elif subcommand == "settings:clear":
-                # 清除对话设置
-                await rdb.delete(f"chat:settings:{user.id}")
-                await msg.reply(f"你的对话设置已被清除。\nYour chat settings have been cleared.")
-                return
+    elif subcommand == "settings:clear":
+        # 清除对话设置
+        await rdb.delete(f"chat:settings:{user.id}")
+        await msg.reply(f"你的对话设置已被清除。\nYour chat settings have been cleared.")
+        return True
 
-            # administrator operations
-            if await admin_operations(rdb, msg, user, subcommand, parts):
-                return
-    except:
-        pass
+    return False
 
 
-async def admin_operations(
+async def operations_admin(
     rdb: "aioredis.Redis", msg: types.Message, user: types.User, subcommand: str, arguments: List[str]
 ) -> bool:
     administrator = manager.config["ai"]["administrator"]
