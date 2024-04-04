@@ -1,3 +1,10 @@
+from aiogram import types
+from manager import manager
+from orjson import loads, dumps
+
+from .utils import count_tokens
+
+logger = manager.logger
 
 
 async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str):

@@ -5,7 +5,7 @@ from manager import manager
 from orjson import loads, dumps
 
 from .utils import count_tokens
-from .func_admin import admin_operations
+from .func_settings import process_settings
 from .func_txt import generate_text
 from .func_user import check_user_permission, increase_user_count
 
@@ -30,7 +30,6 @@ RE_CLEAR = re.compile(r"/chat(@[a-zA-Z0-9]+\s?)?")
 
 @manager.register("message", Command("chat", ignore_case=True, ignore_mention=True))
 async def chat(msg: types.Message):
-    """Google Gemini Pro"""
     chat = msg.chat
     user = msg.from_user
 
@@ -104,31 +103,7 @@ async def chat(msg: types.Message):
         )
         return
 
-    # settings or administrator
-    try:
-        # split the text into prompt and message
-        parts = text.split(" ", 1)
-        if len(parts) > 0:
-            subcommand = parts[0]
-
-            # user settings
-            if subcommand == "settings:system_prompt" and len(parts) > 1:
-                # 设置对话系统的提示
-                prompt = " ".join(parts[1:])
-                await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": prompt}), ex=3600)
-                await msg.reply(f"你的对话中系统Prompt设置成功。\nYour chat system prompt has been set.")
-                return
-            elif subcommand == "settings:clear":
-                # 清除对话设置
-                await rdb.delete(f"chat:settings:{user.id}")
-                await msg.reply(f"你的对话设置已被清除。\nYour chat settings have been cleared.")
-                return
-
-            # administrator operations
-            if await admin_operations(rdb, msg, chat, user, subcommand, parts):
-                return
-    except:
-        pass
+    await process_settings(rdb, msg, user, text)
 
     if len(text) < 3:
         logger.warning(f"{prefix} message too short, ignored")
