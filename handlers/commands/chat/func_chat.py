@@ -106,8 +106,7 @@ async def chat(msg: types.Message):
 
     try:
         # split the text into prompt and message
-        parts = text.split(" ", 1)
-        if len(parts) > 0:
+        if parts := text.split(" ", 1) and len(parts) > 0:
             subcommand = parts[0]
 
             if await operations_settings(rdb, msg, user, text, subcommand, parts):
@@ -117,7 +116,7 @@ async def chat(msg: types.Message):
             if await operations_admin(rdb, msg, user, subcommand, parts):
                 return
     except:
-        pass
+        logger.exception(f"{prefix} operations error")
 
     if len(text) < 3:
         logger.warning(f"{prefix} message too short, ignored")
