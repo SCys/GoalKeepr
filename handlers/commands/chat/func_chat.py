@@ -84,6 +84,7 @@ async def chat(msg: types.Message):
             )
         else:
             await msg.reply(f"没有会话历史\nNo chat history.")
+
         return
 
     elif text == "help":
