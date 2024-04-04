@@ -303,16 +303,16 @@ async def admin_operations(
         quota = await rdb.hget(user_key, "quota")
         last = await rdb.hget(user_key, "last")
 
-        disabled = bool(int(disabled)) if disabled else False
+        disabled = "yes" if disabled else "no"
         count = int(count) if count else 0
         quota = int(quota) if quota else -1
         last = last.decode() if last else "none"
 
         await msg.reply(
             f"用户{target_user_id}的状态：\n"
-            f"禁用:{disabled} 请求次数:{count} 配额:{quota} 最后请求时间:{last}\n"
+            f"禁用:{disabled} 请求次数:{count} 配额:{quota}\n最后请求时间:{last}\n"
             f"User {target_user_id} status:\n"
-            f"Disabled:{disabled} Request count:{count} Quota:{quota} Last request time:{last}"
+            f"Disabled:{disabled} Request count:{count} Quota:{quota}\nLast request time:{last}"
         )
         logger.info(f"admin:stats_user {target_user_id}")
         return True
