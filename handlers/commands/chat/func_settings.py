@@ -5,7 +5,6 @@ from typing import List
 from orjson import dumps
 
 from .func_user import ban_user, allow_user, update_user_quota, count_user, total_user_requested
-from .func_settings import process_settings
 
 logger = manager.logger
 
