@@ -99,23 +99,6 @@ async def operations_admin(
         user_is_setup_prompt_system = "yes" if "prompt_system" in user_settings and user_settings["prompt_system"] else "no"
         user_prompt_system_length = len(user_settings["prompt_system"]) if user_is_setup_prompt_system == "yes" else 0
 
-        # chat_history = await rdb.get(f"chat:history:{user.id}")
-        # if chat_history:
-        #     chat_history = loads(chat_history)
-        #     tokens = 0
-        #     for i in chat_history:
-        #         tokens += count_tokens(i["content"])
-
-        #     # expired at
-        #     expired_at = await rdb.ttl(f"chat:history:{user.id}")
-
-        #     await msg.reply(
-        #         f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token，将会在{expired_at}秒后过期。\n"
-        #         f"There are {len(chat_history)} messages in the chat history, "
-        #         f"a total of {tokens} tokens, and it will expire in {expired_at} seconds."
-        #     )
-        # else:
-        #     await msg.reply(f"没有会话历史\nNo chat history.")
         user_cached_history_detail = ""
         if user_chat_history := await rdb.get(f"chat:history:{target_user_id}"):
             user_chat_history = loads(user_chat_history)
