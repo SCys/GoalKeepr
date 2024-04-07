@@ -34,8 +34,9 @@ async def k(msg: types.Message):
     # 如果回复的是一个新加入信息，则直接踢掉用户
     if msg_reply.new_chat_members:
         for member in msg_reply.new_chat_members:
-            resp = await kick_member(chat, msg, user, member)
-            await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+            await manager.delete_message(
+                chat, await kick_member(chat, msg, user, member), msg.date + timedelta(seconds=DELETED_AFTER)
+            )
 
         return
 
@@ -45,10 +46,10 @@ async def k(msg: types.Message):
         return
 
     if resp := await kick_member(chat, msg, user, msg_reply.from_user):
-        await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat, resp, msg.date + timedelta(seconds=DELETED_AFTER))
 
     for i in [msg, msg_reply]:
-        await manager.lazy_delete_message(chat.id, i.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat, i, msg.date + timedelta(seconds=DELETED_AFTER))
 
 
 async def kick_member(chat: types.Chat, msg: types.Message, administrator: types.User, member: types.User):

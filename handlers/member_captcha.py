@@ -179,7 +179,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
     reply = await manager.bot.send_message(chat.id, message_content, parse_mode="markdown", reply_markup=reply_markup)
 
     await manager.lazy_session(chat.id, -1, member_id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
-    await manager.lazy_delete_message(chat.id, reply.message_id, now + timedelta(seconds=DELETED_AFTER))
+    await manager.delete_message(chat, reply, now + timedelta(seconds=DELETED_AFTER))
 
 
 @manager.register(
@@ -231,9 +231,7 @@ async def new_member_callback(query: types.CallbackQuery):
 
             # accept
             if op == "O":
-                if not await manager.delete_message(chat.id, msg.message_id):
-                    await manager.lazy_delete_message(chat.id, msg.message_id, now)
-
+                await manager.delete_message(chat, msg)
                 await accepted_member(chat, msg, member.user)
 
                 logger.info(
@@ -243,11 +241,8 @@ async def new_member_callback(query: types.CallbackQuery):
 
             # reject
             elif op == "X":
-                if not await manager.delete_message(chat.id, msg.message_id):
-                    await manager.lazy_delete_message(chat.id, msg.message_id, now)
-
+                await manager.delete_message(chat, msg)
                 await chat.ban(member_id, until_date=timedelta(days=30), revoke_messages=True)
-                # await chat.unban(member_id)
 
                 logger.warning(
                     f"{prefix} admin {operator.id}({manager.username(operator)}) kick "
@@ -260,7 +255,7 @@ async def new_member_callback(query: types.CallbackQuery):
     # user is chat member
     elif is_self:
         if data.endswith("__!"):
-            await manager.lazy_delete_message(chat.id, msg.message_id, msg.date)
+            await manager.delete_message(chat, msg, msg.date)
 
             await accepted_member(chat, msg, operator)
 
@@ -419,6 +414,7 @@ async def accepted_member(chat: Chat, msg: Message, user: User):
     except:
         logger.exception("get profile photos error")
 
-    resp = await msg.answer(content, parse_mode="markdown")
-    await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+    await manager.delete_message(
+        chat, await msg.answer(content, parse_mode="markdown"), msg.date + timedelta(seconds=DELETED_AFTER)
+    )
     await manager.lazy_session_delete(chat.id, user.id, "new_member_check")

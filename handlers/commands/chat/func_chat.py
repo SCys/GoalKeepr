@@ -1,3 +1,4 @@
+from datetime import timedelta
 from aiogram import exceptions, types
 from aiogram.filters import Command
 import re
@@ -63,7 +64,11 @@ async def chat(msg: types.Message):
     # normal user
     if text == "reset":
         await rdb.delete(f"chat:history:{user.id}")
-        await msg.reply(f"会话已经重置\nYour chat history has been reset.")
+        await manager.delete_message(
+            chat,
+            await msg.reply(f"会话已经重置\nYour chat history has been reset."),
+            msg.date + timedelta(seconds=DELETED_AFTER),
+        )
         return
 
     elif text == "detail":

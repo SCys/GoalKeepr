@@ -13,4 +13,3 @@ from .sdxl import sdxl
 
 # text completion
 from .chat import chat
-#from .answer import answer

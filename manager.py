@@ -194,39 +194,37 @@ class Manager:
         except:
             logger.exception(f"chat {chat.id} member {member_id} check exception")
 
-    async def delete_message(self, chat: int, msg: int):
-        """
-        删除消息
-        chat: chat with msg
-        msg: msg will be deleted
-        deleted_at: message deleted after the timestamp
-        """
-        try:
-            await self.bot.delete_message(chat, msg)
-            logger.info(f"chat {chat} message {msg} deleted")
-        except Exception as e:
-            logger.error(f"chat {chat} message {msg} delete failed:{e}")
-
-        return True
-
-    async def lazy_delete_message(self, chat: int, msg: int, deleted_at: datetime):
+    async def delete_message(
+        self, chat: Union[int, types.Chat], msg: Union[int, types.Message], deleted_at: Union[datetime, None] = None
+    ):
         """
         延缓删除消息
         chat: chat with msg
         msg: msg will be deleted
         deleted_at: message deleted after the timestamp
         """
-        await database.execute(
-            "insert into lazy_delete_messages(chat,msg,deleted_at) values($1,$2,$3)",
-            (chat, msg, deleted_at),
-        )
+        if isinstance(chat, types.Chat):
+            chat = chat.id
 
-        logger.debug(f"chat {chat} message {msg} delete at {deleted_at}")
+        if isinstance(msg, types.Message):
+            msg = msg.message_id
+
+        if deleted_at is not None:
+            await database.execute(
+                "insert into lazy_delete_messages(chat,msg,deleted_at) values($1,$2,$3)",
+                (chat, msg, deleted_at),
+            )
+            logger.debug(f"chat {chat} message {msg} delete at {deleted_at}")
+        else:
+            try:
+                await self.bot.delete_message(chat, msg)
+                logger.info(f"chat {chat} message {msg} deleted")
+            except Exception as e:
+                logger.exception(f"chat {chat} message {msg} delete failed")
+
+        return True
 
     async def lazy_session(self, chat: int, msg: int, member: int, type: str, deleted_at: datetime):
-        """
-        延缓检查的会话
-        """
         await database.execute(
             "insert into lazy_sessions(chat,msg,member,type,checkout_at) values($1,$2,$3,$4,$5)",
             (chat, msg, member, type, deleted_at),
@@ -235,9 +233,6 @@ class Manager:
         logger.debug(f"chat {chat} message {msg} member {member} after {deleted_at}")
 
     async def lazy_session_delete(self, chat: int, member: int, type: str):
-        """
-        延缓检查的会话
-        """
         await database.execute(
             "delete from lazy_sessions where chat=$1 and member=$2 and type=$3",
             (chat, member, type),

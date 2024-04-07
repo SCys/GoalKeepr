@@ -30,13 +30,13 @@ async def sb(msg: types.Message):
         logger.info(f"{prefix} no reply message")
         return
 
-    await manager.lazy_delete_message(chat.id, msg_reply.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+    await manager.delete_message(chat, msg_reply, msg.date + timedelta(seconds=DELETED_AFTER))
 
     # 如果回复的是一个新加入信息，则直接踢掉用户
     if msg_reply.new_chat_members:
         for member in msg_reply.new_chat_members:
             resp = await ban_member(chat, msg, user, member)
-            await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+            await manager.delete_message(chat, resp, msg.date + timedelta(seconds=DELETED_AFTER))
 
         return
 
@@ -46,8 +46,8 @@ async def sb(msg: types.Message):
         return
 
     if resp := await ban_member(chat, msg, user, msg_reply.from_user):
-        await manager.lazy_delete_message(chat.id, resp.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
-    await manager.lazy_delete_message(chat.id, msg.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat, resp, msg.date + timedelta(seconds=DELETED_AFTER))
+    await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER))
 
 
 async def ban_member(chat: types.Chat, msg: types.Message, administrator: types.User, member: types.User):

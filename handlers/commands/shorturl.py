@@ -27,7 +27,7 @@ async def shorturl(msg: types.Message):
     matched = re.search(RE_URL, content)
     if not matched:
         msg_reply = await msg.reply("没有匹配到任何URL，稍后自动删除")
-        await manager.lazy_delete_message(msg.chat.id, msg_reply.message_id, msg.date + timedelta(seconds=5))
+        await manager.delete_message(msg.chat, msg_reply, msg.date + timedelta(seconds=5))
         return
 
     for i in matched.groups():

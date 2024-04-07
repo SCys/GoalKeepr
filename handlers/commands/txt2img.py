@@ -43,7 +43,7 @@ async def txt2img(msg: types.Message):
     if user.id not in users and chat.id not in groups:
         logger.warning(f"{prefix} user {user.full_name} or group {chat.id} is not allowed, ignored")
         msg_err = await msg.reply(f"task is failed: no permission.")
-        await manager.lazy_delete_message(chat.id, msg_err.message_id)
+        await manager.delete_message(chat, msg_err)
         return
 
     prefix += f" user {user.full_name}"
@@ -60,7 +60,7 @@ async def txt2img(msg: types.Message):
     if task_size > GLOBAL_TASK_LIMIT:
         logger.warning(f"task queue is full, ignored")
         msg_err = await msg.reply(f"task is failed: task queue is full.")
-        await manager.lazy_delete_message(chat.id, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
 
     task = {
@@ -87,7 +87,7 @@ async def txt2img(msg: types.Message):
         logger.info(f"{prefix} task is queued, size is {task_size}")
     except:
         msg_err = await manager.bot.edit_message_text(f"task is failed: put task to queue failed.", chat.id, reply.message_id)
-        await manager.lazy_delete_message(chat.id, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
 
         logger.exception(f"{prefix} sd txt2img error")
 
@@ -151,12 +151,12 @@ async def process_task(task):
     except:
         logger.exception("sd api endpoint is invalid")
         msg_err = await manager.bot.edit_message_text(f"task is failed: sd api endpoint is invalid.", chat_id, msg_reply)
-        await manager.lazy_delete_message(chat_id, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat_id, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
     if not endpoint:
         logger.warning("sd api endpoint is empty")
         msg_err = await manager.bot.edit_message_text(f"task is failed: sd api endpoint is empty.", chat_id, msg_reply)
-        await manager.lazy_delete_message(chat_id, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat_id, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
 
     created_at = datetime.fromtimestamp(task["created_at"])
@@ -201,6 +201,6 @@ async def process_task(task):
             chat_id,
             msg_reply,
         )
-        await manager.lazy_delete_message(chat_id, msg_err.message_id, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat_id, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
 
         logger.exception(f"{prefix} sd txt2img error")

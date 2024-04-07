@@ -34,7 +34,7 @@ async def sdxl(msg: types.Message):
     if user.id not in users and chat.id not in groups:
         logger.warning(f"{prefix} user {user.full_name} or group {chat.id} is not allowed, ignored")
         msg_err = await msg.reply(f"task is failed: no permission.")
-        await manager.lazy_delete_message(chat.id, msg_err.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat, msg_err, msg.date + timedelta(seconds=DELETED_AFTER))
         return
 
     prefix += f" user {user.full_name}"
@@ -56,7 +56,7 @@ async def sdxl(msg: types.Message):
         if response.status != 200:
             logger.error(f"{prefix} cloudflare worker return {response.status}")
             msg_err = await msg.reply(f"task is failed: cloudflare worker return {response.status}.")
-            await manager.lazy_delete_message(chat.id, msg_err.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+            await manager.delete_message(chat, msg_err, msg.date + timedelta(seconds=DELETED_AFTER))
             return
 
         try:
@@ -64,7 +64,7 @@ async def sdxl(msg: types.Message):
         except:
             logger.exception(f"{prefix} cloudflare worker return invalid json")
             msg_err = await msg.reply(f"task is failed: cloudflare worker return invalid json.")
-            await manager.lazy_delete_message(chat.id, msg_err.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+            await manager.delete_message(chat, msg_err, msg.date + timedelta(seconds=DELETED_AFTER))
             return
 
     # send image
@@ -77,7 +77,7 @@ async def sdxl(msg: types.Message):
     except:
         logger.exception(f"{prefix} send image failed")
         msg_err = await msg.reply(f"task is failed: send image failed.")
-        await manager.lazy_delete_message(chat.id, msg_err.message_id, msg.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat, msg_err, msg.date + timedelta(seconds=DELETED_AFTER))
         return
 
     logger.info(f"{prefix} task is done")

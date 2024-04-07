@@ -25,4 +25,4 @@ async def whoami(msg: types.Message):
 
     # auto delete after 5s at (super)group
     if msg.chat.type in ["supergroup", "group"]:
-        await manager.lazy_delete_message(msg.chat.id, msg_reply.message_id, msg.date + timedelta(seconds=15))
+        await manager.delete_message(msg.chat, msg_reply, msg.date + timedelta(seconds=15))

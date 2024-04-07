@@ -1,8 +1,5 @@
 from datetime import datetime, timedelta
-
-from aiogram import types
 from aiogram.types import Message
-
 from manager import manager
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
@@ -25,7 +22,7 @@ async def left_member(msg: Message):
 
     # ignore others remove member
     if manager.bot.id == user.id:
-        await manager.lazy_delete_message(chat.id, msg.message_id, now + timedelta(seconds=5))
+        await manager.delete_message(chat, msg, now + timedelta(seconds=5))
 
     manager.logger.info(
         f"chat {chat.id}({chat.title}) message {msg.message_id} " f"member {member.id}({manager.username(member)}) is left"
