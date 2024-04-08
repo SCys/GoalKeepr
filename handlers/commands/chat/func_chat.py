@@ -6,7 +6,7 @@ from manager import manager
 from orjson import loads, dumps
 
 from .utils import count_tokens
-from .func_adv import operations_admin, operations_settings
+from .func_adv import operations_admin, operations_person
 from .func_txt import generate_text
 from .func_user import check_user_permission, increase_user_count
 
@@ -61,64 +61,16 @@ async def chat(msg: types.Message):
         logger.warning(f"{prefix} user {user.id} in chat {chat.id} has no permission")
         return
 
-    # normal user
-    if text == "reset":
-        await rdb.delete(f"chat:history:{user.id}")
-        await manager.delete_message(
-            chat,
-            await msg.reply(f"会话已经重置\nYour chat history has been reset."),
-            msg.date + timedelta(seconds=DELETED_AFTER),
-        )
-        return
-
-    elif text == "detail":
-        chat_history = await rdb.get(f"chat:history:{user.id}")
-        if chat_history:
-            chat_history = loads(chat_history)
-            tokens = 0
-            for i in chat_history:
-                tokens += count_tokens(i["content"])
-
-            # expired at
-            expired_at = await rdb.ttl(f"chat:history:{user.id}")
-
-            await msg.reply(
-                f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token，将会在{expired_at}秒后过期。\n"
-                f"There are {len(chat_history)} messages in the chat history, "
-                f"a total of {tokens} tokens, and it will expire in {expired_at} seconds."
-            )
-        else:
-            await msg.reply(f"没有会话历史\nNo chat history.")
-
-        return
-
-    elif text == "help":
-        await msg.reply(
-            "使用方法：\n"
-            # "/chat stat - 获取AI状态\n"
-            "/chat reset - 重置会话\n"
-            "/chat detail - 查看会话详情\n"
-            "/chat settings:system_prompt <text> - 设置对话系统的提示\n"
-            "/chat settings:clear - 清除对话设置\n"
-            "Method of use:\n"
-            # "/chat stat - Get AI status\n"
-            "/chat reset - Reset the conversation\n"
-            "/chat detail - View conversation details\n"
-            "/chat settings:system_prompt <text> - Set the prompt for the conversation system\n"
-            "/chat settings:clear - Clear the conversation settings"
-        )
-        return
-
     try:
         # split the text into prompt and message
         parts = text.split(" ", 1)
         subcommand = parts[0]
 
-        if await operations_settings(rdb, msg, user, subcommand, parts):
+        if await operations_person(rdb, msg, user, subcommand, parts):
             return
 
         # administrator operations
-        if await operations_admin(rdb, msg, user, subcommand, parts):
+        if await operations_admin(rdb, chat, msg, user, subcommand, parts):
             return
     except:
         logger.exception(f"{prefix} operations error")

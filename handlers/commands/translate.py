@@ -8,7 +8,7 @@ from manager import manager
 
 logger = manager.logger
 
-RE_CLEAR = re.compile(r"/tr(anslate)?(@[a-zA-Z0-9]+\s?)?")
+RE_CLEAR = re.compile(r"/tr(@[a-zA-Z0-9]+\s?)?")
 
 
 @manager.register("message", Command("tr", ignore_case=True, ignore_mention=True))

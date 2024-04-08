@@ -1,3 +1,4 @@
+from datetime import timedelta
 from aiogram import types
 from manager import manager
 import aioredis
@@ -7,14 +8,58 @@ from orjson import dumps, loads
 from .utils import count_tokens
 from .func_user import ban_user, allow_user, update_user_quota, count_user, total_user_requested
 
+DELETED_AFTER = 5
 logger = manager.logger
 
+HELPER_TEXT = """Usage:
+/chat reset - 重置会话|Reset the conversation
+/chat detail - 查看会话详情|View conversation details
+/chat settings:system_prompt <text> - 设置对话系统的提示|Set the prompt for the conversation system
+/chat settings:clear - 清除对话设置|Clear the conversation settings
+"""
 
-async def operations_settings(
-    rdb: "aioredis.Redis", msg: types.Message, user: types.User, subcommand: str, arguments: List[str]
+
+async def operations_person(
+    rdb: "aioredis.Redis", chat: types.Chat, msg: types.Message, user: types.User, subcommand: str, arguments: List[str]
 ):
-    # user settings
-    if subcommand == "settings:system_prompt" and len(arguments) > 1:
+    if subcommand == "help":
+        await msg.reply(HELPER_TEXT)
+        return True
+
+    # simple commands
+    if subcommand == "reset":
+        await rdb.delete(f"chat:history:{user.id}")
+        await manager.reply(
+            msg,
+            f"会话已经重置\nYour chat history has been reset.",
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+        )
+        return True
+
+    elif subcommand == "detail":
+        chat_history = await rdb.get(f"chat:history:{user.id}")
+        if chat_history:
+            chat_history = loads(chat_history)
+            tokens = 0
+            for i in chat_history:
+                tokens += count_tokens(i["content"])
+
+            # expired at
+            expired_at = await rdb.ttl(f"chat:history:{user.id}")
+
+            await manager.reply(
+                f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token，将会在{expired_at}秒后过期。\n"
+                f"There are {len(chat_history)} messages in the chat history, "
+                f"a total of {tokens} tokens, and it will expire in {expired_at} seconds.",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
+        else:
+            await manager.reply(f"没有会话历史\nNo chat history.", auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER))
+
+        return True
+
+    # settings
+    elif subcommand == "settings:system_prompt" and len(arguments) > 1:
         # 设置对话系统的提示
         prompt = " ".join(arguments[1:])
         await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": prompt}), ex=3600)
@@ -27,11 +72,19 @@ async def operations_settings(
         await msg.reply(f"你的对话设置已被清除。\nYour chat settings have been cleared.")
         return True
 
+    # select models
+    elif subcommand == "settings:model" and len(arguments) > 1:
+        # 设置对话系统的模型
+        model = " ".join(arguments[1:])
+        await rdb.set(f"chat:settings:{user.id}", dumps({"model": model}), ex=3600)
+        await msg.reply(f"你的对话系统模型设置成功。\nYour chat system model has been set.")
+        return True
+
     return False
 
 
 async def operations_admin(
-    rdb: "aioredis.Redis", msg: types.Message, user: types.User, subcommand: str, arguments: List[str]
+    rdb: "aioredis.Redis", chat: types.Chat, msg: types.Message, user: types.User, subcommand: str, arguments: List[str]
 ) -> bool:
     administrator = manager.config["ai"]["administrator"]
     if not administrator or user.id != int(administrator):
@@ -48,28 +101,33 @@ async def operations_admin(
     if subcommand == "admin:ban" and target_user_id:
         await ban_user(rdb, target_user_id)
         await msg.reply(
-            f"用户{target_user_id}已经被禁用chat命令。\nUser {target_user_id} has been disabled from using the chat command."
+            f"用户{target_user_id}禁用chat命令。\nUser {target_user_id} has been disabled from using the chat command."
         )
         logger.info(f"admin:ban {target_user_id}")
         return True
     elif subcommand == "admin:allow" and target_user_id:
         await allow_user(rdb, target_user_id)
-        await msg.reply(f"用户{target_user_id}可以是用chat命令了。\nUser {target_user_id} can use the chat command.")
+        await msg.reply(f"用户{target_user_id}可以使用chat命令了。\nUser {target_user_id} can use the chat command.")
         logger.info(f"admin:allow {target_user_id}")
         return True
     elif subcommand == "admin:quota" and target_user_id:
-        try:
-            quota = int(arguments[1])
-            await update_user_quota(rdb, target_user_id, quota)
-            await msg.reply(f"用户{user.id}的配额已经设置为{quota}。\nUser {user.id}'s quota has been set to {quota}.")
-            logger.info(f"admin:quota {target_user_id} {quota}")
-        except:
-            logger.exception(f"admin:quota {target_user_id} {quota}")
+        quota = int(arguments[1])
+        await update_user_quota(rdb, target_user_id, quota)
+        await manager.reply(
+            msg,
+            f"用户{user.id}的配额已经设置为{quota}。\nUser {user.id}'s quota has been set to {quota}.",
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+        )
+        logger.info(f"admin:quota {target_user_id} {quota}")
         return True
     elif subcommand == "admin:stats":
         total_used = await total_user_requested(rdb)
         total_user = await count_user(rdb)
-        await msg.reply(f"请求量:{total_used} 用户:{total_user}\nTotal requests:{total_used} users:{total_user}")
+        await manager.reply(
+            msg,
+            f"请求量:{total_used} 用户:{total_user}\nTotal requests:{total_used} users:{total_user}",
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+        )
         logger.info(f"admin:stats {total_used} {total_user}")
         return True
 
@@ -118,10 +176,12 @@ async def operations_admin(
                 f"过期时间: {user_chat_history_expired_at}秒\n"
             )
 
-        await msg.reply(
+        await manager.reply(
+            msg,
             f"用户{target_user_id}的状态：\n"
             f"禁用:{disabled} 请求次数:{count} 配额:{quota}\n最后请求时间:{last}\n"
-            f"设置System Prompt:{user_is_setup_prompt_system} 长度:{user_prompt_system_length}" + user_cached_history_detail
+            f"设置System Prompt:{user_is_setup_prompt_system} 长度:{user_prompt_system_length}" + user_cached_history_detail,
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
         )
         logger.info(f"admin:stats_user {target_user_id}")
         return True

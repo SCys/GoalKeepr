@@ -255,18 +255,22 @@ class Manager:
 
         return True
 
-    async def reply(self, chat: int, message_id: int, msg: str, **kwargs):
+    async def reply(self, msg: types.Message, content: str, auto_deleted_at: datetime = None, *args, **kwargs):
         """
         回复消息
-        chat: chat with msg
-        msg: msg will be sent
+        msg: reply to message
+        content: reply content
+        auto_deleted_at: message deleted after the timestamp
         """
         try:
-            await self.bot.send_message(chat, msg, reply_to_message_id=message_id, **kwargs)
-            logger.info(f"chat {chat} message {msg} sent")
+            resp = await msg.reply(content, *args, **kwargs)
+            logger.info(f"chat {msg.chat.id} message {msg.message_id} replied")
         except:
-            logger.exception(f"chat {chat} message {msg} send error")
+            logger.exception(f"chat {msg.chat.id} message {msg.message_id} reply error")
             return False
+
+        if auto_deleted_at is not None:
+            await self.delete_message(msg.chat, resp, auto_deleted_at)
 
         return True
 
