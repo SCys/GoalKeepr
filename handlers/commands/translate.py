@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import timedelta
 
 import translators as ts
 from aiogram import types
@@ -8,7 +8,8 @@ from manager import manager
 
 logger = manager.logger
 
-RE_CLEAR = re.compile(r"/tr(@[a-zA-Z0-9]+\s?)?")
+RE_CLEAR = re.compile(r"/tr(@[a-zA-Z0-9]+)?\s?")
+DELETED_AFTER = 5
 
 
 @manager.register("message", Command("tr", ignore_case=True, ignore_mention=True))
@@ -21,12 +22,11 @@ async def translate(msg: types.Message):
         content = msg.reply_to_message.text
         target = msg.reply_to_message
 
+    content = RE_CLEAR.sub("", content, 1)
+
     if not content:
         await msg.answer("Please send me a text to translate")
         return
-
-    if content.startswith("/tr"):
-        content = RE_CLEAR.sub("", content, 1)
 
     # split content with space, if first argument in en, zh, convert it to en
     to_language = "zh-CN"
@@ -35,13 +35,16 @@ async def translate(msg: types.Message):
         to_language = "en" if parts[0] == "en" else "zh-CN"
         content = parts[1]
 
-    ts_create = datetime.now()
     try:
         result = ts.translate_text(content, to_language=to_language, translator="google")
         await target.reply(result)
     except Exception as e:
         logger.exception("translate failed")
 
-        await msg.reply("Translate failed with:{}".format(e))
+        await manager.reply(
+            msg,
+            "Translate failed, please try again later.",
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+        )
 
-    logger.info(f"user ({user.full_name} / {user.id}) start a translate task, cost {datetime.now() - ts_create}")
+    logger.info(f"user ({user.full_name} / {user.id}) start a translate task")
