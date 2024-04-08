@@ -5,6 +5,7 @@ import translators as ts
 from aiogram import types
 from aiogram.filters import Command
 from manager import manager
+from utils.tts import reply_tts
 
 logger = manager.logger
 
@@ -37,7 +38,7 @@ async def translate(msg: types.Message):
 
     try:
         result = ts.translate_text(content, to_language=to_language, translator="google")
-        await target.reply(result)
+        await reply_tts(target, result, show_original=True)
     except Exception as e:
         logger.exception("translate failed")
 

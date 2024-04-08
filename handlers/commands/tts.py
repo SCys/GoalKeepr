@@ -1,13 +1,11 @@
-import io
 import re
 from datetime import datetime
 
 import edge_tts
 from aiogram import types
 from aiogram.filters import Command
-from aiogram.types import BufferedInputFile
 from manager import manager
-from pydub import AudioSegment
+from utils.tts import reply_tts
 
 logger = manager.logger
 
@@ -21,12 +19,10 @@ RE_CLEAR = re.compile(r"/tts(@[a-zA-Z0-9]+\s?)?")
 async def tts(msg: types.Message):
     chat = msg.chat
     if chat.type not in SUPPORT_GROUP_TYPES:
-        logger.warning("chat type is not support")
         return
 
     user = msg.from_user
     if not user:
-        logger.warning(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) user is not found")
         return
 
     txt = msg.text
@@ -37,48 +33,11 @@ async def tts(msg: types.Message):
         txt = RE_CLEAR.sub("", txt, 1)
 
     txt = txt.strip()
-
     if not txt:
-        logger.warning(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) send empty text")
         return
-
-    logger.info(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) message size is {len(txt)}")
-
-    cost = datetime.now()
-
-    try:
-        # data = google_translate_tts(txt)
-        data = await edge_ext(txt)
-    except Exception:
-        logger.exception(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) error")
-        return
-
-    if not data or len(data) == 0:
-        logger.warning(f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) is empty data")
-        return
-
-    output = io.BytesIO()
-    audio = AudioSegment.from_file(io.BytesIO(data), format="mp3")
-    audio.export(output, codec="opus", format="ogg", parameters=["-strict", "-2"])
-    voice_file = BufferedInputFile(output.getvalue(), filename="tts.ogg")
 
     if msg.reply_to_message:
-        await msg.reply_to_message.reply_voice(voice_file, disable_notification=True)
+        await reply_tts(msg.reply_to_message, txt)
     else:
-        await msg.reply_voice(voice_file, disable_notification=True)
-    logger.info(
-        f"user {user.full_name}({user.id}) chat {chat.full_name}({chat.id}) cost {(datetime.now() - cost).total_seconds()}"
-    )
-
-
-async def edge_ext(source: str):
-    communicate = edge_tts.Communicate(source, "zh-CN-XiaoxiaoNeural")
-
-    data = b""
-    async for chunk in communicate.stream():
-        if chunk["type"] == "audio":
-            data += chunk["data"]
-        elif chunk["type"] == "WordBoundary":
-            logger.debug(f"WordBoundary: {chunk}")
-
-    return data
+        await reply_tts(msg, txt)
+    logger.info(f"chat {chat.id} user {user.full_name} is using tts")
