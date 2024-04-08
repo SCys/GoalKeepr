@@ -30,7 +30,7 @@ async def translate(msg: types.Message):
 
     ts_create = datetime.now()
     try:
-        result = ts.google(content, to_language="zh-CN")
+        result = ts.translate_text(content, to_language="zh-CN", translator='google')
         await target.reply(result)
     except Exception as e:
         logger.exception("translate failed")
