@@ -28,9 +28,16 @@ async def translate(msg: types.Message):
     if content.startswith("/tr"):
         content = RE_CLEAR.sub("", content, 1)
 
+    # split content with space, if first argument in en, zh, convert it to en
+    to_language = "zh-CN"
+    parts = content.split(" ", 1)
+    if len(parts) > 1 and parts[0] in ["en", "zh"]:
+        to_language = "en" if parts[0] == "en" else "zh-CN"
+        content = parts[1]
+
     ts_create = datetime.now()
     try:
-        result = ts.translate_text(content, to_language="zh-CN", translator='google')
+        result = ts.translate_text(content, to_language=to_language, translator="google")
         await target.reply(result)
     except Exception as e:
         logger.exception("translate failed")
