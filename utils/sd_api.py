@@ -24,13 +24,11 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
     width = int(width)
     height = int(height)
 
-    cfg_scale = 7
-
-    #step = 20
-    #sampler_name = "DPM++ 2M Karras"
-
-    step = 9
-    sampler_name = "Restart"
+    cfg_scale = 2
+    step = 8
+    sampler_name = "DPM++ 2M Karras"
+    # step = 9
+    # sampler_name = "Restart"
 
     session = await manager.bot.session.create_session()
     async with session.post(
