@@ -48,13 +48,14 @@ async def operations_person(
             expired_at = await rdb.ttl(f"chat:history:{user.id}")
 
             await manager.reply(
+                msg,
                 f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token，将会在{expired_at}秒后过期。\n"
                 f"There are {len(chat_history)} messages in the chat history, "
                 f"a total of {tokens} tokens, and it will expire in {expired_at} seconds.",
                 auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
             )
         else:
-            await manager.reply(f"没有会话历史\nNo chat history.", auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER))
+            await manager.reply(msg, f"没有会话历史\nNo chat history.", auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER))
 
         return True
 
