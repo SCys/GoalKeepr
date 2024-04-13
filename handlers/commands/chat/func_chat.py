@@ -67,10 +67,12 @@ async def chat(msg: types.Message):
         subcommand = parts[0]
 
         if await operations_person(rdb, chat, msg, user, subcommand, parts):
+            await manager.delete_message(msg, auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER))
             return
 
         # administrator operations
         if await operations_admin(rdb, chat, msg, user, subcommand, parts):
+            await manager.delete_message(msg, auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER))
             return
     except:
         logger.exception(f"{prefix} operations error")
