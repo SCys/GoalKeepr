@@ -55,7 +55,9 @@ async def operations_person(
                 auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
             )
         else:
-            await manager.reply(msg, f"没有会话历史\nNo chat history.", auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER))
+            await manager.reply(
+                msg, f"没有会话历史\nNo chat history.", auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER)
+            )
 
         return True
 
@@ -96,7 +98,11 @@ async def operations_admin(
     if pre_msg and pre_msg.from_user:
         target_user_id = pre_msg.from_user.id
     elif len(arguments) > 1:
-        target_user_id = int(arguments[1])
+        try:
+            target_user_id = int(arguments[1])
+        except ValueError:
+            return False
+
         arguments.pop(1)
 
     if subcommand == "admin:ban" and target_user_id:
