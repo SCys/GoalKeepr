@@ -66,7 +66,7 @@ async def chat(msg: types.Message):
         parts = text.split(" ", 1)
         subcommand = parts[0]
 
-        if await operations_person(rdb, msg, user, subcommand, parts):
+        if await operations_person(rdb, chat, msg, user, subcommand, parts):
             return
 
         # administrator operations
