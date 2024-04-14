@@ -4,6 +4,7 @@ import aioredis
 
 logger = manager.logger
 
+
 async def init_user(rdb: "aioredis.Redis", uid: int):
     await rdb.hset(f"chat:user:{uid}", "disabled", 0)
     await rdb.hset(f"chat:user:{uid}", "count", 0)
@@ -94,8 +95,8 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
             logger.info(f"user {uid} is admin in group {chat_id}")
             return True
 
-        logger.warning(f"user {uid} is not admin(creator) in group {chat_id}")
-        return False
+        # logger.warning(f"user {uid} is not admin(creator) in group {chat_id}")
+        # return False
 
     raw = await rdb.hget(f"chat:user:{uid}", "disabled")
     if raw is None:

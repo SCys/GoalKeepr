@@ -104,7 +104,7 @@ async def chat(msg: types.Message):
     success = False
 
     try:
-        text_resp = re.sub(r"[.!]", lambda x: "\\" + x.group(), text_resp)
+        text_resp = re.sub(r"[\{\}-.!]", lambda x: "\\" + x.group(), text_resp)
 
         await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
         success = True
