@@ -6,7 +6,7 @@ from .utils import count_tokens
 
 logger = manager.logger
 
-output_format_contorl = "response output format as telegram markdown v2."
+output_format_contorl = "Please ensure the output format is Telegram MarkdownV2."
 
 
 async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str):

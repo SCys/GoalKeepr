@@ -87,37 +87,39 @@ async def chat(msg: types.Message):
         logger.warning(f"{prefix} message too short, ignored")
         return
 
-    # if len(text) > 1024:
-    #     logger.warning(f"{prefix} message too long, ignored")
-    #     return
-
     try:
         text_resp = await generate_text(chat, user, text)
         if not text_resp:
             logger.warning(f"{prefix} generate text error, ignored")
             return
     except Exception as e:
-        logger.exception(f"{prefix} with invalid format:\n{text}\n")
+        logger.exception(f"{prefix} generate text failed")
 
         await msg.reply(f"error: {e}")
 
-    text_resp += "\n\n---\n\n *Powered by Google Gemini Pro*"
+    # if success is False, the message will be deleted
     success = False
 
     try:
-        # text_resp = re.sub(r"[-.!]", lambda x: "\\" + x.group(), text_resp)
-        text_resp = escape(text_resp)
-
-        await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
+        # text_resp = escape(text_resp)
+        await msg.reply(text_resp, parse_mode="MarkdownV2")
         success = True
+
     except exceptions.TelegramBadRequest as e:
-        logger.warning(f"{prefix} invalid text {text_resp}, error: {e}")
+        logger.exception(f"{prefix} invalid text format \n{text_resp}\n")
         await msg.reply(text_resp, disable_web_page_preview=True)
         success = True
-    except Exception as e:
-        logger.error(f"{prefix} reply error: {e}")
-        await msg.reply(f"error: {e}")
 
-    if success:
-        await increase_user_count(rdb, user.id)
-        logger.info(f"{prefix} do chat command, send token {count_tokens(text)}, response token {count_tokens(text_resp)}")
+    except Exception as e:
+        logger.exception(f"{prefix} reply failed")
+        await msg.reply(
+            f"生成回复失败，请稍后再试。| Failed to generate response, please try again later.",
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+        )
+
+    if not success:
+        await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER))
+        return
+
+    await increase_user_count(rdb, user.id)
+    logger.info(f"{prefix} do chat command, send token {count_tokens(text)}, response token {count_tokens(text_resp)}")
