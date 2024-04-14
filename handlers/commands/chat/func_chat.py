@@ -59,6 +59,8 @@ async def chat(msg: types.Message):
 
     if not await check_user_permission(rdb, chat.id, user.id):
         logger.warning(f"{prefix} user {user.id} in chat {chat.id} has no permission")
+        await manager.reply(msg, "你还没有权限使用这个功能。| You don't have permission to use this feature.",
+                            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER))
         return
 
     try:
@@ -98,7 +100,7 @@ async def chat(msg: types.Message):
     success = False
 
     try:
-        text_resp = re.sub(r'[-.!]', lambda x: '\\' + x.group(), text_resp)
+        text_resp = re.sub(r"[-.!]", lambda x: "\\" + x.group(), text_resp)
 
         await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
         success = True
