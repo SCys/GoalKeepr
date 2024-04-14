@@ -59,8 +59,12 @@ async def chat(msg: types.Message):
 
     if not await check_user_permission(rdb, chat.id, user.id):
         logger.warning(f"{prefix} user {user.id} in chat {chat.id} has no permission")
-        await manager.reply(msg, "你还没有权限使用这个功能。| You don't have permission to use this feature.",
-                            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER))
+        await manager.reply(
+            msg,
+            "你还没有权限使用这个功能。| You don't have permission to use this feature.",
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+        )
+        await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER * 2))
         return
 
     try:
