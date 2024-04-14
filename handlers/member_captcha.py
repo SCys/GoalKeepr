@@ -92,13 +92,18 @@ async def member_captcha(event: types.ChatMemberUpdated):
     chat = event.chat
     member = event.new_chat_member
 
+    if not member:
+        logger.info(f"chat {chat.id} member is None")
+        return
+
     member_id = member.user.id
     member_name = member.user.full_name
 
     prefix = f"chat {chat.id}({chat.title}) chat member updated member {member_id}({member_name})"
 
-    if not member or member.status not in [ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED]:
-        logger.info(f"{prefix} is left or kicked")
+    if member.status not in [ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED]:
+        status_name = ChatMemberStatus(member.status).name
+        logger.info(f"{prefix} status is {status_name}({member.status})")
         return
 
     # 忽略太久之前的信息
@@ -145,11 +150,12 @@ async def member_captcha(event: types.ChatMemberUpdated):
     # 如果已经被剔除，则不做处理
     member = await manager.chat_member(chat, member_id)
     if not member or member.status in [ChatMemberStatus.LEFT, ChatMemberStatus.KICKED]:
-        logger.info(f"{prefix} is left or kicked")
+        status_name = ChatMemberStatus(member.status).name
+        logger.info(f"{prefix} member status is {status_name}({member.status})")
         return
 
     if member.can_send_messages:
-        logger.info(f"{prefix} rights is accepted")
+        logger.info(f"{prefix} member {member_id} can send messages")
         return
 
     # checkout message sent after join 10ms
