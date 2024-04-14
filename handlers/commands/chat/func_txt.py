@@ -6,6 +6,8 @@ from .utils import count_tokens
 
 logger = manager.logger
 
+output_format_contorl = "response output format as telegram markdown v2."
+
 
 async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str):
     config = manager.config
@@ -54,7 +56,11 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
         "temperature": 0.9,
         "top_p": 1,
         "top_k": 1,
-        "messages": [{"role": "system", "content": prompt_system}, *chat_history],
+        "messages": [
+            {"role": "system", "content": output_format_contorl},
+            {"role": "system", "content": prompt_system},
+            *chat_history,
+        ],
     }
 
     session = await manager.bot.session.create_session()
