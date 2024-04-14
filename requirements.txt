@@ -10,3 +10,4 @@ edge-tts
 aioredis
 markdown
 tiktoken
+md2tgmd

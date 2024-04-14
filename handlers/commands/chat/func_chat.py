@@ -3,7 +3,7 @@ from aiogram import exceptions, types
 from aiogram.filters import Command
 import re
 from manager import manager
-from orjson import loads, dumps
+from md2tgmd import escape
 
 from .utils import count_tokens
 from .func_adv import operations_admin, operations_person
@@ -104,7 +104,8 @@ async def chat(msg: types.Message):
     success = False
 
     try:
-        text_resp = re.sub(r"[-.!]", lambda x: "\\" + x.group(), text_resp)
+        #text_resp = re.sub(r"[-.!]", lambda x: "\\" + x.group(), text_resp)
+        text_resp = escape(text_resp)
 
         await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
         success = True
