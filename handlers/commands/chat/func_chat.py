@@ -97,14 +97,15 @@ async def chat(msg: types.Message):
             logger.warning(f"{prefix} generate text error, ignored")
             return
     except Exception as e:
-        logger.error(f"{prefix} text {text} error: {e}")
+        logger.exception(f"{prefix} with invalid format:\n{text}\n")
+
         await msg.reply(f"error: {e}")
 
     text_resp += "\n\n---\n\n *Powered by Google Gemini Pro*"
     success = False
 
     try:
-        #text_resp = re.sub(r"[-.!]", lambda x: "\\" + x.group(), text_resp)
+        # text_resp = re.sub(r"[-.!]", lambda x: "\\" + x.group(), text_resp)
         text_resp = escape(text_resp)
 
         await msg.reply(text_resp, parse_mode="MarkdownV2", disable_web_page_preview=True)
