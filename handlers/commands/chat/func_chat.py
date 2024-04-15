@@ -73,7 +73,7 @@ async def chat(msg: types.Message):
         subcommand = parts[0]
 
         if await operations_person(rdb, chat, msg, user, subcommand, parts):
-            await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER))
+            # await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER))
             return
 
         # administrator operations
@@ -101,7 +101,7 @@ async def chat(msg: types.Message):
     success = False
 
     try:
-        # text_resp = escape(text_resp)
+        text_resp = escape(text_resp)
         await msg.reply(text_resp, parse_mode="MarkdownV2")
         success = True
 
