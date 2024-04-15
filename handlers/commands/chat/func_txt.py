@@ -71,28 +71,27 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
     if rdb:
         # 获取全局设置
         settings_global = await rdb.get("chat:settings:global")
-        if settings_global:
-            settings_global = loads(settings_global)
+        settings_global = loads(settings_global) if settings_global else {}
 
-            # global model
-            model = settings_global.get("model", MODEL_NAME)
-            if model in SUPPORTED_MODELS:
-                MODEL_NAME = model
-
-            # check global disabled
-            if settings_global.get("disabled", False):
-                return "系统正在维护中...|System is under maintenance..."
+        # global disabled flag
+        if settings_global.get("disabled", False):
+            return "系统正在维护中...|System is under maintenance..."
 
         # 每个用户独立的对话设置
         settings_person = await rdb.get(f"chat:settings:{member.id}")
-        if settings_person:
-            prompt_system = settings_person.get("prompt_system", prompt_system)
-            model = settings_person.get("model")
-            if model in SUPPORTED_MODELS:
-                MODEL_NAME = model
+        settings_person = loads(settings_person) if settings_person else {}
 
-        MODEL_INPUT_LENGTH = SUPPORTED_MODELS[model]["input_length"]
-        limit_input_size = min(MODEL_INPUT_LENGTH * 0.99, MODEL_INPUT_LENGTH - 1024)
+        prompt_system = settings_person.get("prompt_system", prompt_system)
+
+        # global model
+        if model_global := settings_global.get("model") and model_global in SUPPORTED_MODELS:
+            MODEL_NAME = model_global
+        # person model
+        if model_person := settings_person.get("model") and model_person in SUPPORTED_MODELS:
+            MODEL_NAME = model_person
+
+        MODEL_INPUT_LENGTH = SUPPORTED_MODELS[model_person]["input_length"]
+        truncate_input = min(MODEL_INPUT_LENGTH * 0.99, MODEL_INPUT_LENGTH - 1024)
 
         # 从Redis获取之前的对话历史
         prev_chat_history = await rdb.get(f"chat:history:{member.id}")
@@ -105,7 +104,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
             tokens = 0
             for i, msg in enumerate(chat_history):
                 tokens += count_tokens(msg["content"])
-                if tokens > limit_input_size:
+                if tokens > truncate_input:
                     chat_history = chat_history[0 : i - 1]
                     break
 
@@ -124,7 +123,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
     }
 
     # show use model info
-    logger.info(f"chat {chat.id} user {member.id} generate txt use model {MODEL_NAME}({SUPPORTED_MODELS[MODEL_NAME]['name']})")
+    logger.debug(f"chat {chat.id} user {member.id} generate txt use model {MODEL_NAME}({SUPPORTED_MODELS[MODEL_NAME]['name']})")
 
     session = await manager.bot.session.create_session()
     async with session.post(
