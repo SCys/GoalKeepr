@@ -284,29 +284,28 @@ async def operations_admin(
 
     # admin:model
     elif subcommand == "admin:settings:model":
-        if len(arguments) < 2:
-            model = settings.get("model", "gemini-1.0-pro")
+        model = settings.get("model", "gemini-1.0-pro")
+        if len(arguments) > 1:
+            model = arguments[1]
+            if model not in SUPPORTED_MODELS:
+                await manager.reply(
+                    msg,
+                    f"不支持的模型\nUnsupported model",
+                    auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+                )
+                return True
+
+            settings["model"] = model
+            await rdb.set(f"chat:settings:global", dumps(settings))
             await manager.reply(
                 msg,
-                f"当前全局对话系统模型为|Current global chat system model is: {model}",
+                f"全局对话系统模型设置成功。\nGlobal chat system model has been set.",
                 auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
             )
-            return True
 
-        model = arguments[1]
-        if model not in SUPPORTED_MODELS:
-            await manager.reply(
-                msg,
-                f"不支持的模型\nUnsupported model",
-                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
-            )
-            return True
-
-        settings["model"] = model
-        await rdb.set(f"chat:settings:global", dumps(settings))
         await manager.reply(
             msg,
-            f"全局对话系统模型设置成功。\nGlobal chat system model has been set.",
+            f"当前全局对话系统模型为|Current global chat system model is: {model}",
             auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
         )
         return True
