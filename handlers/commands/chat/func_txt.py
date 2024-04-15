@@ -81,7 +81,9 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
         settings_person = await rdb.get(f"chat:settings:{member.id}")
         settings_person = loads(settings_person) if settings_person else {}
 
-        prompt_system = settings_person.get("prompt_system", prompt_system)
+        prompt_system_person = settings_person.get("prompt_system")
+        if prompt_system_person:
+            prompt_system = str(prompt_system_person).strip()
 
         # global model
         model_global = settings_global.get("model")
