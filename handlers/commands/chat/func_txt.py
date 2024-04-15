@@ -25,6 +25,11 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
         {"role": "user", "content": prompt},
     ]
 
+    MODEL_NAME = "gemini-1.5-pro"
+    MODEL_INPUT_LENGTH = 1048576
+    MODEL_OUTPUT_LENGTH = 8192
+    MODEL_INPUT_LIMIT = min(MODEL_INPUT_LENGTH * 0.99, MODEL_INPUT_LENGTH - 1024)
+
     rdb = await manager.get_redis()
     if rdb:
         # 每个用户独立的对话设置
@@ -43,16 +48,16 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
             tokens = 0
             for i, msg in enumerate(chat_history):
                 tokens += count_tokens(msg["content"])
-                if tokens > 1048000:  # 1k system prompt?
+                if tokens > MODEL_INPUT_LIMIT:
                     chat_history = chat_history[i:]
                     break
 
     # request openai v1 like api
     url = f"{host}/v1/chat/completions"
     data = {
-        "model": "gemini-1.5-pro",
-        "max_tokens": 1048576,  # 32k for gemini-pro
-        "temperature": 0.9,
+        "model": MODEL_NAME,
+        "max_tokens": MODEL_OUTPUT_LENGTH,
+        "temperature": 0.75,
         "top_p": 1,
         "top_k": 1,
         "messages": [
@@ -62,7 +67,6 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
     }
 
     session = await manager.bot.session.create_session()
-
     async with session.post(
         url,
         json=data,
