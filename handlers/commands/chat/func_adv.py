@@ -69,7 +69,7 @@ async def operations_person(
         # 一行行列出支持的模型，包括 key 和 name，还有 input_length 等介绍
         models_txt = "\n".join(
             [
-                f"Key:{key} - Name:{value['name']}\n\t(max input {value['input_length']} tokens)"
+                f"Key:{key}\n\t{value['name']}\n\tInput Length:{value['input_length']}tokens"
                 for key, value in SUPPORTED_MODELS.items()
             ]
         )
@@ -257,15 +257,20 @@ async def operations_admin(
         return True
 
     # admin:model
-    elif subcommand == "admin:settings:model" and len(arguments) > 1:
+    elif subcommand == "admin:settings:model":
+        if len(arguments) < 2:
+            model = settings.get("model", "gemini-1.0-pro")
+            await msg.reply(f"当前全局对话系统模型为|Current global chat system model is: {model}")
+            return True
+
         model = arguments[1]
         if model not in SUPPORTED_MODELS:
             await msg.reply(f"不支持的模型\nUnsupported model")
             return True
 
         settings["model"] = model
-        await msg.reply(f"全局对话系统模型设置成功。\nGlobal chat system model has been set.")
         await rdb.set(f"chat:settings:global", dumps(settings))
+        await msg.reply(f"全局对话系统模型设置成功。\nGlobal chat system model has been set.")
         return True
 
     return False
