@@ -51,7 +51,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
     # request openai v1 like api
     url = f"{host}/v1/chat/completions"
     data = {
-        "model": "gemini-1.0-pro",
+        "model": "gemini-1.5-pro",
         "max_tokens": 30720,  # 32k for gemini-pro
         "temperature": 0.9,
         "top_p": 1,
