@@ -84,13 +84,15 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
         prompt_system = settings_person.get("prompt_system", prompt_system)
 
         # global model
-        if model_global := settings_global.get("model") and model_global in SUPPORTED_MODELS:
-            MODEL_NAME = model_global
-        # person model
-        if model_person := settings_person.get("model") and model_person in SUPPORTED_MODELS:
-            MODEL_NAME = model_person
+        model_global = settings_global.get("model")
+        model_person = settings_person.get("model")
 
-        MODEL_INPUT_LENGTH = SUPPORTED_MODELS[model_person]["input_length"]
+        if model_person in SUPPORTED_MODELS:
+            MODEL_NAME = model_person
+        elif  model_global in SUPPORTED_MODELS:
+            MODEL_NAME = model_global
+
+        MODEL_INPUT_LENGTH = SUPPORTED_MODELS[MODEL_NAME]["input_length"]
         truncate_input = min(MODEL_INPUT_LENGTH * 0.99, MODEL_INPUT_LENGTH - 1024)
 
         # 从Redis获取之前的对话历史
