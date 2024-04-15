@@ -89,7 +89,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
 
         if model_person in SUPPORTED_MODELS:
             MODEL_NAME = model_person
-        elif  model_global in SUPPORTED_MODELS:
+        elif model_global in SUPPORTED_MODELS:
             MODEL_NAME = model_global
 
         MODEL_INPUT_LENGTH = SUPPORTED_MODELS[MODEL_NAME]["input_length"]
