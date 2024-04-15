@@ -63,8 +63,10 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
     session = await manager.bot.session.create_session()
     async with session.post(url, json=data, headers={"Authorization": f"Bearer {proxy_token}"}) as response:
         if response.status != 200:
-            logger.error(f"generate text error: {response.status} {await response.text()}")
-            return
+            error_message = await response.text()
+            error_code = response.status
+            logger.error(f"generate text error: {error_code} {error_message}")
+            return f"System error: {error_code} {error_message}"
 
         data = await response.json()
 
