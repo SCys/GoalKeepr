@@ -7,6 +7,45 @@ from .utils import count_tokens
 
 logger = manager.logger
 
+CONVERSATION_TTL = 3600
+SUPPORTED_MODELS = {
+    "gemini-1.0-pro": {
+        "name": "Gemini 1.0 Pro",
+        "input_length": 30720,
+        "output_length": 2048,
+        "rate_minute": 60,
+        "rate_daily": 0,
+    },
+    "gemini-1.5-pro": {
+        "name": "Gemini 1.5 Pro",
+        "input_length": 1048576,
+        "output_length": 8192,
+        "rate_minute": 0.5,
+        "rate_daily": 1000,
+    },
+    "mixtral-8x7b-32768": {
+        "name": "Mixtral 8x7b from Groq",
+        "input_length": 32768,
+        "output_length": 2048,
+        "rate_minute": 0,
+        "rate_daily": 0,
+    },
+    "llama2-70b-4096": {
+        "name": "Llama2 70b from Groq",
+        "input_length": 4096,
+        "output_length": 2048,
+        "rate_minute": 0,
+        "rate_daily": 0,
+    },
+    "gemma-7b-it": {
+        "name": "Gemma 7b IT from Groq",
+        "input_length": 4096,
+        "output_length": 2048,
+        "rate_minute": 0,
+        "rate_daily": 0,
+    },
+}
+
 
 async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str):
     config = manager.config
@@ -25,17 +64,35 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
         {"role": "user", "content": prompt},
     ]
 
-    MODEL_NAME = "gemini-1.5-pro"
-    MODEL_INPUT_LENGTH = 1048576
-    MODEL_OUTPUT_LENGTH = 8192
-    MODEL_INPUT_LIMIT = min(MODEL_INPUT_LENGTH * 0.99, MODEL_INPUT_LENGTH - 1024)
+    MODEL_NAME = "gemini-1.0-pro"
+    MODEL_INPUT_LENGTH = SUPPORTED_MODELS[MODEL_NAME]["input_length"]
 
     rdb = await manager.get_redis()
     if rdb:
+        # 获取全局设置
+        settings_global = await rdb.get("chat:settings:global")
+        if settings_global:
+            settings_global = loads(settings_global)
+
+            # global model
+            model = settings_global.get("model", MODEL_NAME)
+            if model in SUPPORTED_MODELS:
+                MODEL_NAME = model
+
+            # check global disabled
+            if settings_global.get("disabled", False):
+                return "系统正在维护中...|System is under maintenance..."
+
         # 每个用户独立的对话设置
-        settings = await rdb.get(f"chat:settings:{member.id}")
-        if settings:
-            prompt_system = settings.get("prompt_system", prompt_system)
+        settings_person = await rdb.get(f"chat:settings:{member.id}")
+        if settings_person:
+            prompt_system = settings_person.get("prompt_system", prompt_system)
+            model = settings_person.get("model")
+            if model in SUPPORTED_MODELS:
+                MODEL_NAME = model
+
+        MODEL_INPUT_LENGTH = SUPPORTED_MODELS[model]["input_length"]
+        limit_input_size = min(MODEL_INPUT_LENGTH * 0.99, MODEL_INPUT_LENGTH - 1024)
 
         # 从Redis获取之前的对话历史
         prev_chat_history = await rdb.get(f"chat:history:{member.id}")
@@ -48,15 +105,15 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
             tokens = 0
             for i, msg in enumerate(chat_history):
                 tokens += count_tokens(msg["content"])
-                if tokens > MODEL_INPUT_LIMIT:
-                    chat_history = chat_history[i:]
+                if tokens > limit_input_size:
+                    chat_history = chat_history[0 : i - 1]
                     break
 
     # request openai v1 like api
     url = f"{host}/v1/chat/completions"
     data = {
         "model": MODEL_NAME,
-        "max_tokens": MODEL_OUTPUT_LENGTH,
+        "max_tokens": MODEL_INPUT_LENGTH,
         "temperature": 0.75,
         "top_p": 1,
         "top_k": 1,
@@ -97,6 +154,6 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
         if rdb:
             # 保存到Redis，确保保存的TTL为10分钟
             chat_history.append({"role": "assistant", "content": text})
-            await rdb.set(f"chat:history:{member.id}", dumps(chat_history), ex=600)
+            await rdb.set(f"chat:history:{member.id}", dumps(chat_history), ex=CONVERSATION_TTL)
 
         return text

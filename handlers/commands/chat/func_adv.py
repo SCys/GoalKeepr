@@ -7,14 +7,18 @@ from orjson import dumps, loads
 
 from .utils import count_tokens
 from .func_user import ban_user, allow_user, update_user_quota, count_user, total_user_requested
+from .func_txt import SUPPORTED_MODELS, CONVERSATION_TTL
 
 DELETED_AFTER = 5
 logger = manager.logger
 
-HELPER_TEXT = """Usage:
+HELPER_TEXT = f"""每个会话超时时间|Conversation timeout: {CONVERSATION_TTL}s\n
+使用|Usage:
 /chat reset - 重置会话|Reset the conversation
 /chat detail - 查看会话详情|View conversation details
-/chat settings:system_prompt <text> - 设置对话系统的提示|Set the prompt for the conversation system
+/chat models - 查看支持的模型|View supported models
+/chat settings:system_prompt <text> - 设置对话系统的提示，限制1024个字符|Set the prompt for the conversation system, limit 1024 characters
+/chat settings:model <model_name> - 设置对话系统的模型|Set the model for the conversation system
 /chat settings:clear - 清除对话设置|Clear the conversation settings
 """
 
@@ -61,26 +65,53 @@ async def operations_person(
 
         return True
 
-    # settings
-    elif subcommand == "settings:system_prompt" and len(arguments) > 1:
-        # 设置对话系统的提示
-        prompt = " ".join(arguments[1:])
-        await rdb.set(f"chat:settings:{user.id}", dumps({"prompt_system": prompt}), ex=3600)
-        await msg.reply(f"你的对话中系统Prompt设置成功。\nYour chat system prompt has been set.")
+    elif subcommand == "models":
+        # 一行行列出支持的模型，包括 key 和 name，还有 input_length 等介绍
+        models_txt = "\n".join(
+            [
+                f"Key:{key} - Name:{value['name']}\n\t(max input {value['input_length']} tokens)"
+                for key, value in SUPPORTED_MODELS.items()
+            ]
+        )
+        await manager.reply(
+            msg,
+            f"支持的模型|Supported models:\n{models_txt}"
+            f"\n通过命令|Set the model for the conversation system\n/chat settings:model <model Key>",
+        )
         return True
 
-    elif subcommand == "settings:clear":
-        # 清除对话设置
-        await rdb.delete(f"chat:settings:{user.id}")
-        await msg.reply(f"你的对话设置已被清除。\nYour chat settings have been cleared.")
-        return True
+    elif subcommand.startswith("settings:"):
+        settings = await rdb.get(f"chat:settings:{user.id}")
+        settings = loads(settings) if settings else {}
 
-    # select models
-    elif subcommand == "settings:model" and len(arguments) > 1:
-        # 设置对话系统的模型
-        model = " ".join(arguments[1:])
-        await rdb.set(f"chat:settings:{user.id}", dumps({"model": model}), ex=3600)
-        await msg.reply(f"你的对话系统模型设置成功。\nYour chat system model has been set.")
+        # settings
+        if subcommand == "settings:system_prompt" and len(arguments) > 1:
+            # 设置对话系统的提示
+            prompt = " ".join(arguments[1:])
+            settings["prompt_system"] = prompt[:1024]  # limit 1024 characters
+            await msg.reply(f"你的系统提示设置成功。\nSystem prompt set successfully.")
+            return True
+
+        elif subcommand == "settings:clear":
+            # 清除对话设置
+            settings = {}
+            await msg.reply(f"你的对话设置已被清除。\nYour chat settings have been cleared.")
+
+        # select models
+        elif subcommand == "settings:model" and len(arguments) > 1:
+            # 设置对话系统的模型
+            model = " ".join(arguments[1:])
+            if model not in SUPPORTED_MODELS:
+                await msg.reply(f"不支持的模型\nUnsupported model")
+                return True
+
+            settings["model"] = model
+            await msg.reply(f"你的对话系统模型设置成功。\nYour chat system model has been set.")
+
+        else:
+            return False
+
+        await rdb.set(f"chat:settings:{user.id}", dumps(settings))
         return True
 
     return False
@@ -93,31 +124,52 @@ async def operations_admin(
     if not administrator or user.id != int(administrator):
         return False
 
-    target_user_id = None
-    pre_msg = msg.reply_to_message
-    if pre_msg and pre_msg.from_user:
-        target_user_id = pre_msg.from_user.id
-    elif len(arguments) > 1:
-        try:
-            target_user_id = int(arguments[1])
-        except ValueError:
+    # global settings
+    settings = await rdb.get(f"chat:settings:global")
+    settings = loads(settings) if settings else {}
+
+    if subcommand == "admin:ban":
+        target_user_id, arguments = get_user_id(msg, arguments)
+        if not target_user_id:
+            await manager.reply(
+                msg,
+                "请回复一个用户或者提供一个用户ID。\nPlease reply to a user or provide a user ID.",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
             return False
 
-        arguments.pop(1)
-
-    if subcommand == "admin:ban" and target_user_id:
         await ban_user(rdb, target_user_id)
         await msg.reply(
             f"用户{target_user_id}禁用chat命令。\nUser {target_user_id} has been disabled from using the chat command."
         )
         logger.info(f"admin:ban {target_user_id}")
         return True
-    elif subcommand == "admin:allow" and target_user_id:
+
+    elif subcommand == "admin:allow":
+        target_user_id, arguments = get_user_id(msg, arguments)
+        if not target_user_id:
+            await manager.reply(
+                msg,
+                "请回复一个用户或者提供一个用户ID。\nPlease reply to a user or provide a user ID.",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
+            return False
+
         await allow_user(rdb, target_user_id)
         await msg.reply(f"用户{target_user_id}可以使用chat命令了。\nUser {target_user_id} can use the chat command.")
         logger.info(f"admin:allow {target_user_id}")
         return True
-    elif subcommand == "admin:quota" and target_user_id:
+
+    elif subcommand == "admin:quota":
+        target_user_id, arguments = get_user_id(msg, arguments)
+        if not target_user_id:
+            await manager.reply(
+                msg,
+                "请回复一个用户或者提供一个用户ID。\nPlease reply to a user or provide a user ID.",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
+            return False
+
         quota = int(arguments[1])
         await update_user_quota(rdb, target_user_id, quota)
         await manager.reply(
@@ -127,19 +179,30 @@ async def operations_admin(
         )
         logger.info(f"admin:quota {target_user_id} {quota}")
         return True
+
+    # global stats
     elif subcommand == "admin:stats":
         total_used = await total_user_requested(rdb)
         total_user = await count_user(rdb)
         await manager.reply(
             msg,
-            f"请求量:{total_used} 用户:{total_user}\nTotal requests:{total_used} users:{total_user}",
+            f"请求量|Total Requests:{total_used}\n用户|Users:{total_user}",
             auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
         )
         logger.info(f"admin:stats {total_used} {total_user}")
         return True
 
     # get user stats from redis
-    elif subcommand == "admin:stats_user" and target_user_id:
+    elif subcommand == "admin:stats_user":
+        target_user_id, arguments = get_user_id(msg, arguments)
+        if not target_user_id:
+            await manager.reply(
+                msg,
+                "请回复一个用户或者提供一个用户ID。\nPlease reply to a user or provide a user ID.",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
+            return False
+
         user_key = f"chat:user:{target_user_id}"
 
         # check exists
@@ -193,4 +256,32 @@ async def operations_admin(
         logger.info(f"admin:stats_user {target_user_id}")
         return True
 
+    # admin:model
+    elif subcommand == "admin:settings:model" and len(arguments) > 1:
+        model = arguments[1]
+        if model not in SUPPORTED_MODELS:
+            await msg.reply(f"不支持的模型\nUnsupported model")
+            return True
+
+        settings["model"] = model
+        await msg.reply(f"全局对话系统模型设置成功。\nGlobal chat system model has been set.")
+        await rdb.set(f"chat:settings:global", dumps(settings))
+        return True
+
     return False
+
+
+def get_user_id(msg: types.Message, arguments: List[str]):
+    target_user_id = None
+    pre_msg = msg.reply_to_message
+    if pre_msg and pre_msg.from_user:
+        target_user_id = pre_msg.from_user.id
+    elif len(arguments) > 1:
+        try:
+            target_user_id = int(arguments[1])
+        except ValueError:
+            return False
+
+        arguments.pop(1)
+
+    return target_user_id
