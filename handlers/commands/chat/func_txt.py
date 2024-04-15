@@ -124,7 +124,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
         ],
     }
 
-    if MODEL_NAME in ['mixtral-8x7b-32768']:
+    if MODEL_NAME in ["mixtral-8x7b-32768"]:
         del data["top_k"]
 
     # show use model info
@@ -163,4 +163,4 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
             chat_history.append({"role": "assistant", "content": text})
             await rdb.set(f"chat:history:{member.id}", dumps(chat_history), ex=CONVERSATION_TTL)
 
-        return text
+        return text + f"\npower by {SUPPORTED_MODELS[MODEL_NAME]['name']}"
