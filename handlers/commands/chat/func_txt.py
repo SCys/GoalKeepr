@@ -1,6 +1,7 @@
 from aiogram import types
 from manager import manager
 from orjson import loads, dumps
+from aiohttp import ClientTimeout
 
 from .utils import count_tokens
 
@@ -42,7 +43,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
             tokens = 0
             for i, msg in enumerate(chat_history):
                 tokens += count_tokens(msg["content"])
-                if tokens > 31000:  # 1k system prompt?
+                if tokens > 1048000:  # 1k system prompt?
                     chat_history = chat_history[i:]
                     break
 
@@ -50,7 +51,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
     url = f"{host}/v1/chat/completions"
     data = {
         "model": "gemini-1.5-pro",
-        "max_tokens": 30720,  # 32k for gemini-pro
+        "max_tokens": 1048576,  # 32k for gemini-pro
         "temperature": 0.9,
         "top_p": 1,
         "top_k": 1,
@@ -61,7 +62,18 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
     }
 
     session = await manager.bot.session.create_session()
-    async with session.post(url, json=data, headers={"Authorization": f"Bearer {proxy_token}"}) as response:
+
+    async with session.post(
+        url,
+        json=data,
+        headers={"Authorization": f"Bearer {proxy_token}"},
+        timeout=ClientTimeout(
+            total=100,
+            connect=5,
+            sock_read=90,
+            sock_connect=10,
+        ),
+    ) as response:
         if response.status != 200:
             error_message = await response.text()
             error_code = response.status
