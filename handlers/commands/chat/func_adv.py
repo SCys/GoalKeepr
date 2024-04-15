@@ -9,7 +9,7 @@ from .utils import count_tokens
 from .func_user import ban_user, allow_user, update_user_quota, count_user, total_user_requested
 from .func_txt import SUPPORTED_MODELS, CONVERSATION_TTL
 
-DELETED_AFTER = 5
+DELETED_AFTER = 15
 logger = manager.logger
 
 HELPER_TEXT = f"""每个会话超时时间|Conversation timeout: {CONVERSATION_TTL}s\n
@@ -89,24 +89,40 @@ async def operations_person(
             # 设置对话系统的提示
             prompt = " ".join(arguments[1:])
             settings["prompt_system"] = prompt[:1024]  # limit 1024 characters
-            await msg.reply(f"你的系统提示设置成功。\nSystem prompt set successfully.")
+            await manager.reply(
+                msg,
+                f"你的系统提示设置成功。\nSystem prompt set successfully.",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
             return True
 
         elif subcommand == "settings:clear":
             # 清除对话设置
             settings = {}
-            await msg.reply(f"你的对话设置已被清除。\nYour chat settings have been cleared.")
+            await manager.reply(
+                msg,
+                f"你的对话设置已被清除。\nYour chat settings have been cleared.",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
 
         # select models
         elif subcommand == "settings:model" and len(arguments) > 1:
             # 设置对话系统的模型
             model = " ".join(arguments[1:])
             if model not in SUPPORTED_MODELS:
-                await msg.reply(f"不支持的模型\nUnsupported model")
+                await manager.reply(
+                    msg,
+                    f"不支持的模型\nUnsupported model",
+                    auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+                )
                 return True
 
             settings["model"] = model
-            await msg.reply(f"你的对话系统模型设置成功。\nYour chat system model has been set.")
+            await manager.reply(
+                msg,
+                f"你的对话系统模型设置成功。\nYour chat system model has been set.",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
 
         else:
             return False
@@ -139,8 +155,10 @@ async def operations_admin(
             return False
 
         await ban_user(rdb, target_user_id)
-        await msg.reply(
-            f"用户{target_user_id}禁用chat命令。\nUser {target_user_id} has been disabled from using the chat command."
+        await manager.reply(
+            msg,
+            f"用户{target_user_id}禁用chat命令。\nUser {target_user_id} has been disabled from using the chat command.",
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
         )
         logger.info(f"admin:ban {target_user_id}")
         return True
@@ -156,7 +174,11 @@ async def operations_admin(
             return False
 
         await allow_user(rdb, target_user_id)
-        await msg.reply(f"用户{target_user_id}可以使用chat命令了。\nUser {target_user_id} can use the chat command.")
+        await manager.reply(
+            msg,
+            f"用户{target_user_id}可以使用chat命令了。\nUser {target_user_id} can use the chat command.",
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+        )
         logger.info(f"admin:allow {target_user_id}")
         return True
 
@@ -207,7 +229,11 @@ async def operations_admin(
 
         # check exists
         if not await rdb.exists(user_key):
-            await msg.reply(f"用户{target_user_id}不存在\nUser {target_user_id} not exists")
+            await manager.reply(
+                msg,
+                f"用户{target_user_id}不存在\nUser {target_user_id} not exists",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
             return True
 
         # basic info
@@ -260,17 +286,29 @@ async def operations_admin(
     elif subcommand == "admin:settings:model":
         if len(arguments) < 2:
             model = settings.get("model", "gemini-1.0-pro")
-            await msg.reply(f"当前全局对话系统模型为|Current global chat system model is: {model}")
+            await manager.reply(
+                msg,
+                f"当前全局对话系统模型为|Current global chat system model is: {model}",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
             return True
 
         model = arguments[1]
         if model not in SUPPORTED_MODELS:
-            await msg.reply(f"不支持的模型\nUnsupported model")
+            await manager.reply(
+                msg,
+                f"不支持的模型\nUnsupported model",
+                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            )
             return True
 
         settings["model"] = model
         await rdb.set(f"chat:settings:global", dumps(settings))
-        await msg.reply(f"全局对话系统模型设置成功。\nGlobal chat system model has been set.")
+        await manager.reply(
+            msg,
+            f"全局对话系统模型设置成功。\nGlobal chat system model has been set.",
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+        )
         return True
 
     return False
