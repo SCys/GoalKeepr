@@ -69,7 +69,7 @@ async def operations_person(
         # 一行行列出支持的模型，包括 key 和 name，还有 input_length 等介绍
         models_txt = "\n".join(
             [
-                f"Key:{key}\n\t{value['name']}\n\tInput Length:{value['input_length']}tokens"
+                f"Key: {key}\n\t{value['name']}\n\tInput length: {value['input_length']}tokens"
                 for key, value in SUPPORTED_MODELS.items()
             ]
         )
