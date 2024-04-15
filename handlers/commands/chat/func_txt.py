@@ -118,16 +118,16 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
         "model": MODEL_NAME,
         "max_tokens": MODEL_INPUT_LENGTH,
         "temperature": 0.75,
-        "top_p": 1,
-        "top_k": 1,
+        # "top_p": 1,
+        # "top_k": 1,
         "messages": [
             {"role": "system", "content": prompt_system},
             *chat_history,
         ],
     }
 
-    if MODEL_NAME in ["mixtral-8x7b-32768", "llama2-70b-4096", "gemma-7b-it"]:
-        del data["top_k"]
+    # if MODEL_NAME in ["mixtral-8x7b-32768", "llama2-70b-4096", "gemma-7b-it"]:
+    #     del data["top_k"]
 
     # show use model info
     logger.info(f"chat {chat.id} user {member.id} generate txt use model {MODEL_NAME}({SUPPORTED_MODELS[MODEL_NAME]['name']})")

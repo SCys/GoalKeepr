@@ -161,7 +161,7 @@ class Manager:
 
         if "admin" in self.config["telegram"]:
             admin = self.config["telegram"]["admin"]
-        await self.bot.send_message(admin, "bot is started")
+            await self.bot.send_message(admin, "bot is started")
 
         await self.dp.start_polling(self.bot)
 
@@ -273,6 +273,11 @@ class Manager:
             await self.delete_message(msg.chat, resp, auto_deleted_at)
 
         return True
+
+    async def notification(self, content: str):
+        if "admin" in self.config["telegram"]:
+            admin = self.config["telegram"]["admin"]
+            await self.bot.send_message(admin, content)
 
     async def get_redis(self):
         """setup redis connections"""
