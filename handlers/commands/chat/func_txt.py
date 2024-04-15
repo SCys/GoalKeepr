@@ -126,7 +126,7 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
         ],
     }
 
-    if MODEL_NAME in ["mixtral-8x7b-32768"]:
+    if MODEL_NAME in ["mixtral-8x7b-32768", "llama2-70b-4096", "gemma-7b-it"]:
         del data["top_k"]
 
     # show use model info
