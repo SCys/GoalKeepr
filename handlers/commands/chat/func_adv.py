@@ -16,6 +16,7 @@ HELPER_TEXT = f"""每个会话超时时间|Conversation timeout: {CONVERSATION_T
 使用|Usage:
 /chat reset - 重置会话|Reset the conversation
 /chat detail - 查看会话详情|View conversation details
+/chat model - 查看当前会话的模型|View the current model of the conversation
 /chat models - 查看支持的模型|View supported models
 /chat settings:system_prompt <text> - 设置对话系统的提示，限制1024个字符|Set the prompt for the conversation system, limit 1024 characters
 /chat settings:model <model_name> - 设置对话系统的模型|Set the model for the conversation system
@@ -41,6 +42,8 @@ async def operations_person(
         return True
 
     elif subcommand == "detail":
+        txt = ""
+
         chat_history = await rdb.get(f"chat:history:{user.id}")
         if chat_history:
             chat_history = loads(chat_history)
@@ -51,17 +54,28 @@ async def operations_person(
             # expired at
             expired_at = await rdb.ttl(f"chat:history:{user.id}")
 
-            await manager.reply(
-                msg,
+            txt = (
                 f"会话历史中共有{len(chat_history)}条消息，总共{tokens}个Token，将会在{expired_at}秒后过期。\n"
                 f"There are {len(chat_history)} messages in the chat history, "
-                f"a total of {tokens} tokens, and it will expire in {expired_at} seconds.",
-                auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+                f"a total of {tokens} tokens, and it will expire in {expired_at} seconds.\n"
             )
-        else:
-            await manager.reply(
-                msg, f"没有会话历史\nNo chat history.", auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER)
-            )
+
+        # show current model
+        settings_global = await rdb.get(f"chat:settings:global")
+        settings_person = await rdb.get(f"chat:settings:{user.id}")
+        settings_global = loads(settings_global) if settings_global else {}
+        settings_person = loads(settings_person) if settings_person else {}
+
+        model = settings_person.get(
+            "model",
+            settings_global.get("model", "gemini-1.0-pro"),
+        )
+
+        await manager.reply(
+            msg,
+            txt + f"当前会话模型为|Current conversation model is: {model}",
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+        )
 
         return True
 
@@ -81,14 +95,14 @@ async def operations_person(
         return True
 
     elif subcommand.startswith("settings:"):
-        settings = await rdb.get(f"chat:settings:{user.id}")
-        settings = loads(settings) if settings else {}
+        settings_person = await rdb.get(f"chat:settings:{user.id}")
+        settings_person = loads(settings_person) if settings_person else {}
 
         # settings
         if subcommand == "settings:system_prompt" and len(arguments) > 1:
             # 设置对话系统的提示
             prompt = " ".join(arguments[1:])
-            settings["prompt_system"] = prompt[:1024]  # limit 1024 characters
+            settings_person["prompt_system"] = prompt[:1024]  # limit 1024 characters
             await manager.reply(
                 msg,
                 f"你的系统提示设置成功。\nSystem prompt set successfully.",
@@ -98,7 +112,7 @@ async def operations_person(
 
         elif subcommand == "settings:clear":
             # 清除对话设置
-            settings = {}
+            settings_person = {}
             await manager.reply(
                 msg,
                 f"你的对话设置已被清除。\nYour chat settings have been cleared.",
@@ -117,7 +131,7 @@ async def operations_person(
                 )
                 return True
 
-            settings["model"] = model
+            settings_person["model"] = model
             await manager.reply(
                 msg,
                 f"你的对话系统模型设置成功。\nYour chat system model has been set.",
@@ -127,7 +141,7 @@ async def operations_person(
         else:
             return False
 
-        await rdb.set(f"chat:settings:{user.id}", dumps(settings))
+        await rdb.set(f"chat:settings:{user.id}", dumps(settings_person))
         return True
 
     return False
