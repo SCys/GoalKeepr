@@ -124,6 +124,9 @@ async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str)
         ],
     }
 
+    if MODEL_NAME in ['mixtral-8x7b-32768']:
+        del data["top_k"]
+
     # show use model info
     logger.debug(f"chat {chat.id} user {member.id} generate txt use model {MODEL_NAME}({SUPPORTED_MODELS[MODEL_NAME]['name']})")
 
