@@ -76,7 +76,7 @@ async def operations_person(
         await manager.reply(
             msg,
             f"支持的模型|Supported models:\n{models_txt}"
-            f"\n通过命令|Set the model for the conversation system\n/chat settings:model <model Key>",
+            f"\n通过命令|Use command: /chat settings:model <Key> 来设置模型|to set the model.",
         )
         return True
 
