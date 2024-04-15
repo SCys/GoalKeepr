@@ -94,8 +94,7 @@ async def chat(msg: types.Message):
             return
     except Exception as e:
         logger.exception(f"{prefix} generate text failed")
-
-        await msg.reply(f"error: {e}")
+        text_resp = f"生成回复失败，请稍后再试。| Failed to generate response, please try again later.\n ```{e}```"
 
     # if success is False, the message will be deleted
     success = False
