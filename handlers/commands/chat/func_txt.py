@@ -30,9 +30,16 @@ SUPPORTED_MODELS = {
         "rate_minute": 0,
         "rate_daily": 0,
     },
-    "llama2-70b-4096": {
-        "name": "Llama2 70b from Groq",
-        "input_length": 4096,
+    "llama3-8b-8192": {
+        "name": "Llama3 8b from Groq",
+        "input_length": 8192,
+        "output_length": 2048,
+        "rate_minute": 0,
+        "rate_daily": 0,
+    },
+    "llama3-70b-8192": {
+        "name": "Llama3 70b from Groq",
+        "input_length": 8192,
         "output_length": 2048,
         "rate_minute": 0,
         "rate_daily": 0,
