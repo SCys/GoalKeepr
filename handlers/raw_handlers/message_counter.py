@@ -6,18 +6,14 @@ from manager import manager
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 
 
-@manager.register("message")
-async def message_counter(msg: types.Message):
+async def message_counter(chat: types.Chat, msg: types.Message, member: types.ChatMember, user: types.User):
     logger = manager.logger
 
-    chat = msg.chat
-    member = msg.from_user
     text = msg.text
 
-    prefix = f"[message_sent]chat {chat.id}({chat.title}) msg {msg.message_id}"
+    prefix = f"[message_counter]chat {chat.id}({chat.title}) msg {msg.message_id}"
 
     if not text:
-        # logger.debug(f"{prefix} message is not text")
         return
 
     # 忽略太久之前的信息
@@ -50,7 +46,7 @@ async def message_counter(msg: types.Message):
                 .execute()
             )
 
-        logger.info(f"{prefix} update redis record {key} {msg.message_id} {msg.date}")
+        logger.debug(f"{prefix} update redis record {key} {msg.message_id} {msg.date}")
         return
 
     async with rdb.pipeline(transaction=True) as pipe:

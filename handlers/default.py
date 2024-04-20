@@ -1,10 +1,9 @@
 from aiogram import types
 from manager import manager
 
-logger = manager.logger
+from .raw_handlers import message_counter
 
 
 @manager.register("message")
-async def default(msg: types.Message, *args, **kwargs):
-    # await bot.forward_message(from_chat_id=message.chat.id, chat_id=message.chat.id, message_id=message.message_id)
-    logger.debug(f"Message: {msg}")
+async def default_handler(msg: types.Message):
+    await message_counter(msg.chat, msg, msg.from_user, msg.from_user)
