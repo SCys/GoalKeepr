@@ -103,7 +103,7 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
         logger.warning(f"user {uid} is not in chat command")
         return False
 
-    if raw == 1:
+    if raw != b"0":
         logger.warning(f"user {uid} is disabled for chat command")
         return False
 
