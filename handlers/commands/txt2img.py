@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import io
 from datetime import datetime, timedelta
 
 from aiogram import types
@@ -13,7 +12,7 @@ from utils.tg import strip_text_prefix
 
 logger = manager.logger
 
-GLOBAL_FORCE_SLEEP = 10
+GLOBAL_FORCE_SLEEP = 3
 GLOBAL_TASK_LIMIT = 3
 QUEUE_NAME = "txt2img"
 DELETED_AFTER = 3  # 3s
@@ -99,10 +98,13 @@ async def worker():
         return
 
     while True:
+        await asyncio.sleep(0.1)
+
         rdb = await manager.get_redis()
         if not rdb:
             logger.warning(f"redis is not ready, ignored")
-            return
+            await asyncio.sleep(2)
+            continue
 
         raw = await rdb.rpop(QUEUE_NAME)
         if raw:
