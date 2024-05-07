@@ -95,25 +95,27 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
             logger.info(f"user {uid} is admin in group {chat_id}")
             return True
 
-        # logger.warning(f"user {uid} is not admin(creator) in group {chat_id}")
-        # return False
-
-    raw = await rdb.hget(f"chat:user:{uid}", "disabled")
-    if raw is None:
-        logger.warning(f"user {uid} is not in chat command")
-        return False
-
-    if raw != b"0":
-        logger.warning(f"user {uid} is disabled for chat command")
-        return False
-
-    # check qutoa
-    quota = await rdb.hget(f"chat:user:{uid}", "quota")
-    if quota and int(quota) > 0:
-        count = await rdb.hget(f"chat:user:{uid}", "count")
-        if count and int(count) >= int(quota):
-            logger.warning(f"user {uid} has reached the quota")
+    try:
+        raw = await rdb.hget(f"chat:user:{uid}", "disabled")
+        if raw is None:
+            logger.warning(f"user {uid} is not in chat command")
             return False
 
-    logger.info(f"user {uid} is allowed for chat command")
-    return True
+        if int(raw) != 0:
+            logger.warning(f"user {uid} is disabled for chat command")
+            return False
+
+        # check qutoa
+        quota = await rdb.hget(f"chat:user:{uid}", "quota")
+        if quota and int(quota) > 0:
+            count = await rdb.hget(f"chat:user:{uid}", "count")
+            if count and int(count) >= int(quota):
+                logger.warning(f"user {uid} has reached the quota")
+                return False
+
+        logger.info(f"user {uid} is allowed for chat command")
+        return True
+
+    except:
+        logger.exception("check_user_permission")
+        return False
