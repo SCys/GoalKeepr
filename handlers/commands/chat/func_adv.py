@@ -336,8 +336,8 @@ def get_user_id(msg: types.Message, arguments: List[str]):
         try:
             target_user_id = int(arguments[1])
         except ValueError:
-            return False
+            return None, arguments
 
         arguments.pop(1)
 
-    return target_user_id
+    return target_user_id, arguments
