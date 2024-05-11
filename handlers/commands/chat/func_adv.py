@@ -1,13 +1,15 @@
 from datetime import timedelta
-from aiogram import types
-from manager import manager
-import aioredis
 from typing import List
+
+import aioredis
+from aiogram import types
 from orjson import dumps, loads
 
+from manager import manager
+
+from .func_txt import CONVERSATION_TTL, SUPPORTED_MODELS
+from .func_user import allow_user, ban_user, count_user, total_user_requested, update_user_quota
 from .utils import count_tokens
-from .func_user import ban_user, allow_user, update_user_quota, count_user, total_user_requested
-from .func_txt import SUPPORTED_MODELS, CONVERSATION_TTL
 
 DELETED_AFTER = 15
 logger = manager.logger
@@ -159,7 +161,7 @@ async def operations_admin(
     settings = loads(settings) if settings else {}
 
     if subcommand == "admin:ban":
-        target_user_id, arguments = get_user_id(msg, arguments)
+        target_user_id = get_user_id(msg, arguments)
         if not target_user_id:
             await manager.reply(
                 msg,
@@ -178,7 +180,7 @@ async def operations_admin(
         return True
 
     elif subcommand == "admin:allow":
-        target_user_id, arguments = get_user_id(msg, arguments)
+        target_user_id = get_user_id(msg, arguments)
         if not target_user_id:
             await manager.reply(
                 msg,
@@ -197,7 +199,7 @@ async def operations_admin(
         return True
 
     elif subcommand == "admin:quota":
-        target_user_id, arguments = get_user_id(msg, arguments)
+        target_user_id = get_user_id(msg, arguments)
         if not target_user_id:
             await manager.reply(
                 msg,
@@ -230,7 +232,7 @@ async def operations_admin(
 
     # get user stats from redis
     elif subcommand == "admin:stats_user":
-        target_user_id, arguments = get_user_id(msg, arguments)
+        target_user_id = get_user_id(msg, arguments)
         if not target_user_id:
             await manager.reply(
                 msg,
@@ -332,12 +334,13 @@ def get_user_id(msg: types.Message, arguments: List[str]):
     pre_msg = msg.reply_to_message
     if pre_msg and pre_msg.from_user:
         target_user_id = pre_msg.from_user.id
+
     elif len(arguments) > 1:
         try:
             target_user_id = int(arguments[1])
         except ValueError:
-            return None, arguments
+            return
 
         arguments.pop(1)
 
-    return target_user_id, arguments
+    return target_user_id
