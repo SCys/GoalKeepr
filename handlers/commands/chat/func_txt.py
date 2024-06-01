@@ -1,13 +1,12 @@
-from os import name
-from types import ClassMethodDescriptorType
-from aiogram import types
 from dataclasses import dataclass
-from manager import manager
-from orjson import loads, dumps
+
+from aiogram import types
 from aiohttp import ClientTimeout
+from orjson import dumps, loads
+
+from manager import manager
 
 from .utils import count_tokens
-from dataclasses import dataclass
 
 logger = manager.logger
 
@@ -118,7 +117,7 @@ async def generate_text(chat: types.Chat, member: types.User, prompt: str):
             model_name = model_global
 
         # fallback to default model
-        if not model_name or  model_name not in SUPPORTED_MODELS:
+        if not model_name or model_name not in SUPPORTED_MODELS:
             model_name = DEFUALT_MODEL
 
         model_input_length = SUPPORTED_MODELS[model_name].input_length
