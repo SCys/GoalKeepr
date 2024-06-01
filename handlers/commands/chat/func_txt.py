@@ -54,7 +54,7 @@ SUPPORTED_MODELS = {
 }
 
 
-async def generate_text(chat: types.Chat, member: types.ChatMember, prompt: str):
+async def generate_text(chat: types.Chat, member: types.User, prompt: str):
     config = manager.config
 
     host = config["ai"]["proxy_host"]

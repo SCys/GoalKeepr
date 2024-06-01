@@ -44,8 +44,16 @@ async def chat(msg: types.Message):
         return
 
     text = msg.text
-    if text.startswith("/chat"):
+    if text and text.startswith("/chat"):
         text = RE_CLEAR.sub("", text, 1).strip()
+
+    if msg.reply_to_message:
+        replied_msg = msg.reply_to_message
+        text = f"{replied_msg.text}\n{text}"
+
+        if text.startswith("/chat"):
+            text = RE_CLEAR.sub("", text, 1).strip()
+
     if not text:
         logger.warning(f"{prefix} message without text, ignored")
         return
