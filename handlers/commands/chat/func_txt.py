@@ -118,7 +118,7 @@ async def generate_text(chat: types.Chat, member: types.User, prompt: str):
             model_name = model_global
 
         # fallback to default model
-        if model_name not in SUPPORTED_MODELS:
+        if not model_name or  model_name not in SUPPORTED_MODELS:
             model_name = DEFUALT_MODEL
 
         model_input_length = SUPPORTED_MODELS[model_name].input_length
