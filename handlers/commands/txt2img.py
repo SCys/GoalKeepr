@@ -6,6 +6,7 @@ from aiogram import types
 from aiogram.filters import Command
 from orjson import dumps, loads
 
+from handlers.commands import chat
 from manager import manager
 from utils import sd_api
 from utils.tg import strip_text_prefix
@@ -85,7 +86,7 @@ async def txt2img(msg: types.Message):
 
         logger.info(f"{prefix} task is queued, size is {task_size}")
     except:
-        msg_err = await manager.bot.edit_message_text(f"task is failed: put task to queue failed.", chat.id, reply.message_id)
+        msg_err = await manager.bot.edit_message_text(f"task is failed: put task to queue failed.", chat_id=chat.id, message_id=reply.message_id)
         await manager.delete_message(chat, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
 
         logger.exception(f"{prefix} sd txt2img error")
@@ -152,12 +153,18 @@ async def process_task(task):
         endpoint = config["sd_api"]["endpoint"]
     except:
         logger.exception("sd api endpoint is invalid")
-        msg_err = await manager.bot.edit_message_text(f"task is failed: sd api endpoint is invalid.", chat_id, msg_reply)
+        msg_err = await manager.bot.edit_message_text(
+            f"task is failed: sd api endpoint is invalid.", chat_id=chat_id, message_id=msg_reply
+        )
         await manager.delete_message(chat_id, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
     if not endpoint:
         logger.warning("sd api endpoint is empty")
-        msg_err = await manager.bot.edit_message_text(f"task is failed: sd api endpoint is empty.", chat_id, msg_reply)
+        msg_err = await manager.bot.edit_message_text(
+            f"task is failed: sd api endpoint is empty.",
+            chat_id=chat_id,
+            message_id=msg_reply,
+        )
         await manager.delete_message(chat_id, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
         return
 
@@ -168,8 +175,8 @@ async def process_task(task):
     cost = datetime.now() - created_at
     await manager.bot.edit_message_text(
         f"task is started(cost {str(cost)[:-7]}), please wait(~45s).",
-        chat_id,
-        msg_reply,
+        chat_id=chat_id,
+        message_id=msg_reply,
     )
 
     logger.info(f"{prefix} is processing task")
@@ -192,7 +199,7 @@ async def process_task(task):
             chat_id,
             input_file,
             reply_to_message_id=msg_from,
-            caption=f"cost {str(cost)[:-7]}"
+            caption=f"cost {str(cost)[:-7]}",
             # , has_spoiler=True no support
         )
 
@@ -200,8 +207,7 @@ async def process_task(task):
     except:
         msg_err = await manager.bot.edit_message_text(
             f"task is failed(create before {str(cost)[:-7]}), please try again later",
-            chat_id,
-            msg_reply,
+            chat_id=chat_id, message_id=msg_reply
         )
         await manager.delete_message(chat_id, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
 
