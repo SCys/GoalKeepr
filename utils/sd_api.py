@@ -25,7 +25,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
     height = int(height)
 
     cfg_scale = 2
-    step = 4
+    step = 8
     sampler_name = "DPM++ SDE Karras"
     # step = 9
     # sampler_name = "Restart"
