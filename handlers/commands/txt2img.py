@@ -12,7 +12,7 @@ from utils.tg import strip_text_prefix
 
 logger = manager.logger
 
-GLOBAL_FORCE_SLEEP = 1
+GLOBAL_FORCE_SLEEP = 3
 GLOBAL_TASK_LIMIT = 3
 QUEUE_NAME = "txt2img"
 DELETED_AFTER = 3  # 3s
@@ -65,8 +65,8 @@ async def txt2img(msg: types.Message):
     task = {
         "chat": msg.chat.id,
         "chat_name": msg.chat.full_name,
-        "user": user.id,
-        "user_name": user.full_name,
+        "user": msg.from_user.id,
+        "user_name": msg.from_user.full_name,
         "raw": strip_text_prefix(msg.text),
         "from": msg.message_id,
         "to": -1,
