@@ -1,4 +1,5 @@
 import asyncio
+
 from manager import manager
 
 # PROMPT_PREFIX = """modelshoot style, photo realistic game cg, 8k, epic, symetrical features, Intricate, High Detail, Sharp focus, photorealistic, epic volumetric lighting, fine details, illustration, (masterpiece, best quality, highres),\n"""
@@ -6,6 +7,10 @@ from manager import manager
 
 PROMPT_PREFIX = ""
 NEGATIVE_PROMPT_PREFIX = ""
+
+CFG_SCALE = 2
+STEP = 8
+SAMPLER_NAME = "DPM++ 2M Karras"
 
 
 async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") -> str:
@@ -20,15 +25,13 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
         prompt = raw
         negative_prompt = ""
 
-    width, height = size.split("x")
-    width = int(width)
-    height = int(height)
-
-    cfg_scale = 2
-    step = 8
-    sampler_name = "DPM++ SDE Karras"
-    # step = 9
-    # sampler_name = "Restart"
+    try:
+        width, height = size.split("x")
+        width = int(width)
+        height = int(height)
+    except:
+        width = 512
+        height = 512
 
     session = await manager.bot.session.create_session()
     async with session.post(
@@ -37,11 +40,11 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
             "prompt": PROMPT_PREFIX + prompt,
             "negative_prompt": NEGATIVE_PROMPT_PREFIX + negative_prompt,
             "seed": -1,
-            "sampler_name": sampler_name,
+            "sampler_name": SAMPLER_NAME,
             "batch_size": 1,
             "n_iter": n,
-            "steps": step,
-            "cfg_scale": cfg_scale,
+            "steps": STEP,
+            "cfg_scale": CFG_SCALE,
             "width": width,
             "height": height,
             "restore_faces": False,
