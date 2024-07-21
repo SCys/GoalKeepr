@@ -9,11 +9,11 @@ PROMPT_PREFIX = ""
 NEGATIVE_PROMPT_PREFIX = ""
 
 CFG_SCALE = 2
-STEP = 8
+STEP = 24
 SAMPLER_NAME = "DPM++ 2M Karras"
 
 
-async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") -> str:
+async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "1024x1024") -> str:
     """return is base64 str png"""
     # split the raw by ===, upside is prompt, downside is negative prompt
     if "===" in raw:

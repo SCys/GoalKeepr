@@ -183,7 +183,7 @@ async def process_task(task):
 
     try:
         checkpoint = datetime.now()
-        img_raw = await sd_api.txt2img(endpoint, raw, 1, "512x512")
+        img_raw = await sd_api.txt2img(endpoint, raw, 1)
         cost = datetime.now() - checkpoint
         logger.info(f"{prefix} task is processed, cost {str(cost)[:-7]}")
 
