@@ -9,8 +9,8 @@ PROMPT_PREFIX = ""
 NEGATIVE_PROMPT_PREFIX = ""
 
 CFG_SCALE = 2
-STEP = 24
-SAMPLER_NAME = "DPM++ 2M Karras"
+STEP = 8
+SAMPLER_NAME = "DPM++ 2M Turbo"
 
 
 async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") -> str:
