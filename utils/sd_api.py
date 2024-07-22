@@ -55,7 +55,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
             "send_images": True,
             "save_images": False,
         },
-        timeout=200, # 3m20s
+        timeout=240, # 4m
     ) as response:
         if response.status != 200:
             raise Exception(await response.text())
