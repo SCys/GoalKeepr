@@ -189,7 +189,7 @@ async def process_task(task):
 
         input_file = types.BufferedInputFile(
             base64.b64decode(img_raw.split(",", 1)[0]),
-            filename="sd_txt2img.webp",
+            filename="sd_txt2img.png",
         )
         cost = datetime.now() - created_at
 
