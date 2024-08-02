@@ -1,14 +1,16 @@
+import re
 from datetime import timedelta
+
 from aiogram import exceptions, types
 from aiogram.filters import Command
-import re
-from manager import manager
 from md2tgmd import escape
 
-from .utils import count_tokens
+from manager import manager
+
 from .func_adv import operations_admin, operations_person
 from .func_txt import generate_text
 from .func_user import check_user_permission, increase_user_count
+from .utils import count_tokens
 
 """
 user info as hash in redis, key prefix is chat:user:{{ user_id }}. 

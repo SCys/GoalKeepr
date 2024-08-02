@@ -21,21 +21,21 @@ class ModelDescription:
 
 
 CONVERSATION_TTL = 3600
-DEFUALT_MODEL = "gemini-1.0-pro"
+DEFUALT_MODEL = "gemini-1.5-flash"
 SUPPORTED_MODELS = {
-    "gemini-1.0-pro": ModelDescription(
-        name="Gemini 1.0 Pro",
-        input_length=30720,
-        output_length=2048,
-        rate_minute=60,
-        rate_daily=0,
+    "gemini-1.5-flash": ModelDescription(
+        name="Gemini 1.5 Flash",
+        input_length=1048576,
+        output_length=8192,
+        rate_minute=15,
+        rate_daily=1500,
     ),
     "gemini-1.5-pro": ModelDescription(
         name="Gemini 1.5 Pro",
-        input_length=1048576,
+        input_length=2097152,
         output_length=8192,
-        rate_minute=0.5,
-        rate_daily=1000,
+        rate_minute=2,
+        rate_daily=50,
     ),
     "mixtral-8x7b-32768": ModelDescription(
         name="Mixtral 8x7b from Groq",
@@ -44,22 +44,8 @@ SUPPORTED_MODELS = {
         rate_minute=0,
         rate_daily=0,
     ),
-    "llama3-8b-8192": ModelDescription(
-        name="Llama3 8b from Groq",
-        input_length=8192,
-        output_length=2048,
-        rate_minute=0,
-        rate_daily=0,
-    ),
-    "llama3-70b-8192": ModelDescription(
-        name="Llama3 70b from Groq",
-        input_length=8192,
-        output_length=2048,
-        rate_minute=0,
-        rate_daily=0,
-    ),
-    "gemma-7b-it": ModelDescription(
-        name="Gemma 7b IT from Groq",
+    "gemma2-9b-it": ModelDescription(
+        name="Gemma2 9b IT from Groq",
         input_length=4096,
         output_length=2048,
         rate_minute=0,
