@@ -8,9 +8,9 @@ from manager import manager
 PROMPT_PREFIX = ""
 NEGATIVE_PROMPT_PREFIX = ""
 
-CFG_SCALE = 2
-STEP = 8
-SAMPLER_NAME = "DPM++ 2M Turbo"
+CFG_SCALE = 1
+STEP = 4
+SAMPLER_NAME = "DPM++ 2M Simple"
 
 
 async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") -> str:
@@ -55,7 +55,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
             "send_images": True,
             "save_images": False,
         },
-        timeout=240, # 4m
+        timeout=240,  # 4m
     ) as response:
         if response.status != 200:
             raise Exception(await response.text())
