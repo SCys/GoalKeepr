@@ -86,7 +86,9 @@ async def txt2img(msg: types.Message):
 
         logger.info(f"{prefix} task is queued, size is {task_size}")
     except:
-        msg_err = await manager.bot.edit_message_text(f"task is failed: put task to queue failed.", chat_id=chat.id, message_id=reply.message_id)
+        msg_err = await manager.bot.edit_message_text(
+            f"task is failed: put task to queue failed.", chat_id=chat.id, message_id=reply.message_id
+        )
         await manager.delete_message(chat, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
 
         logger.exception(f"{prefix} sd txt2img error")
@@ -156,7 +158,7 @@ async def process_task(task):
         msg_err = await manager.bot.edit_message_text(
             f"task is failed: sd api endpoint is invalid.", chat_id=chat_id, message_id=msg_reply
         )
-        await manager.delete_message(chat_id, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat_id, msg_err, datetime.now() + timedelta(seconds=DELETED_AFTER))
         return
     if not endpoint:
         logger.warning("sd api endpoint is empty")
@@ -165,7 +167,7 @@ async def process_task(task):
             chat_id=chat_id,
             message_id=msg_reply,
         )
-        await manager.delete_message(chat_id, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat_id, msg_err, datetime.now() + timedelta(seconds=DELETED_AFTER))
         return
 
     created_at = datetime.fromtimestamp(task["created_at"])
@@ -206,9 +208,8 @@ async def process_task(task):
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
     except:
         msg_err = await manager.bot.edit_message_text(
-            f"task is failed(create before {str(cost)[:-7]}), please try again later",
-            chat_id=chat_id, message_id=msg_reply
+            f"task is failed(create before {str(cost)[:-7]}), please try again later", chat_id=chat_id, message_id=msg_reply
         )
-        await manager.delete_message(chat_id, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(chat_id, msg_err, datetime.now() + timedelta(seconds=DELETED_AFTER))
 
         logger.exception(f"{prefix} sd txt2img error")
