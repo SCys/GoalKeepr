@@ -1,5 +1,7 @@
 import asyncio
 
+from aiohttp import ClientTimeout
+
 from manager import manager
 
 # PROMPT_PREFIX = """modelshoot style, photo realistic game cg, 8k, epic, symetrical features, Intricate, High Detail, Sharp focus, photorealistic, epic volumetric lighting, fine details, illustration, (masterpiece, best quality, highres),\n"""
@@ -55,7 +57,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
             "send_images": True,
             "save_images": False,
         },
-        timeout=240,  # 4m
+        timeout=ClientTimeout(total=300, connect=15, sock_read=240),
     ) as response:
         if response.status != 200:
             raise Exception(await response.text())
