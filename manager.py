@@ -290,5 +290,8 @@ class Manager:
 
         return self.rdb
 
+    async def create_session(self):
+        return await self.bot.session.create_session()  # type: ignore
+
 
 manager = Manager()
