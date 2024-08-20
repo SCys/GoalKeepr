@@ -31,7 +31,7 @@ async def asr(msg: types.Message):
         return
 
     # download file from telegram server
-    raw = await manager.bot.download_file(voice.file_id)
+    raw = await manager.bot.download(voice)
     if not raw:
         return
 
