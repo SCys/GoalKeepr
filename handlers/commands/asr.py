@@ -26,12 +26,12 @@ async def asr(msg: types.Message):
     if not target:
         return
 
-    audio = target.audio
-    if not audio:
+    voice = target.voice
+    if not voice:
         return
 
     # download file from telegram server
-    raw = await manager.bot.download_file(audio.file_id)
+    raw = await manager.bot.download_file(voice.file_id)
     if not raw:
         return
 
