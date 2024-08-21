@@ -3,9 +3,9 @@ import asyncio
 from aiogram import Bot
 
 import database
+from handlers.commands.txt2img import worker as txt2img_worker  # NOQA: 引入处理器
 from handlers.member_captcha.events import new_member_check, unban_member  # NOQA: 引入处理器
 from manager import manager
-from handlers.commands.txt2img import worker as txt2img_worker  # NOQA: 引入处理器
 
 is_running = False
 
@@ -36,7 +36,7 @@ SQL_FETCH_LAZY_DELETE_MESSAGES = (
 SQL_FETCH_SESSIONS = "select id,chat,msg,member,type from lazy_sessions where checkout_at < datetime('now','localtime') order by checkout_at limit 500"
 
 logger = manager.logger
-logger.level = "DEBUG"
+# logger.level('DEBUG')
 
 
 async def lazy_messages(bot: Bot):

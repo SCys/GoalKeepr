@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta
+from typing import Union
 
 from aiogram import types
 from aiogram.filters import Command
+
 from manager import manager
 
 DELETED_AFTER = 5
@@ -52,10 +54,13 @@ async def k(msg: types.Message):
         await manager.delete_message(chat, i, msg.date + timedelta(seconds=DELETED_AFTER))
 
 
-async def kick_member(chat: types.Chat, msg: types.Message, administrator: types.User, member: types.User):
+async def kick_member(chat: types.Chat, msg: types.Message, administrator: types.User, member: Union[types.User, None]):
     """
     从 chat 踢掉对应的成员
     """
+    if member is None:
+        return
+
     id = member.id
 
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"

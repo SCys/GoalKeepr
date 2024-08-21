@@ -1,7 +1,9 @@
 from datetime import timedelta
+from typing import Union
 
 from aiogram import types
 from aiogram.filters import Command
+
 from manager import manager
 
 DELETED_AFTER = 3
@@ -50,10 +52,13 @@ async def sb(msg: types.Message):
     await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER))
 
 
-async def ban_member(chat: types.Chat, msg: types.Message, administrator: types.User, member: types.User):
+async def ban_member(chat: types.Chat, msg: types.Message, administrator: types.User, member: Union[types.User, None]):
     """
     将用户放入黑名单
     """
+    if member is None:
+        return
+
     id = member.id
 
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"

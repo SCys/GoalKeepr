@@ -8,6 +8,7 @@ from typing import Optional, Union
 import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, types
+from aiogram.exceptions import TelegramNotFound
 
 import database
 
@@ -174,7 +175,7 @@ class Manager:
         """获取用户名"""
 
         if isinstance(_user, types.ChatMember):
-            return _user.user.full_name
+            return _user.user.full_name # type: ignore
 
         return _user.full_name
 
@@ -195,7 +196,7 @@ class Manager:
             logger.exception(f"chat {chat.id} member {member_id} check exception")
 
     async def delete_message(
-        self, chat: Union[int, types.Chat], msg: Union[int, types.Message], deleted_at: Union[datetime, None] = None
+        self, chat: Union[int, types.Chat], msg: Union[int, types.Message, None], deleted_at: Union[datetime, None] = None
     ):
         """
         延缓删除消息
@@ -203,24 +204,26 @@ class Manager:
         msg: msg will be deleted
         deleted_at: message deleted after the timestamp
         """
-        if isinstance(chat, types.Chat):
-            chat = chat.id
+        if msg is None:
+            return True
 
-        if isinstance(msg, types.Message):
-            msg = msg.message_id
+        id_chat: int = chat.id if isinstance(chat, types.Chat) else chat
+        id_message: int = msg.message_id if isinstance(msg, types.Message) else msg
 
         if deleted_at is not None:
             await database.execute(
                 "insert into lazy_delete_messages(chat,msg,deleted_at) values($1,$2,$3)",
-                (chat, msg, deleted_at),
+                (id_chat, id_message, deleted_at),
             )
-            logger.debug(f"chat {chat} message {msg} delete at {deleted_at}")
+            logger.debug(f"chat {id_chat} message {id_message} delete at {deleted_at}")
         else:
             try:
-                await self.bot.delete_message(chat, msg)
-                logger.info(f"chat {chat} message {msg} deleted")
+                await self.bot.delete_message(id_chat, id_message)
+                logger.info(f"chat {id_chat} message {id_message} deleted")
+            except TelegramNotFound:
+                logger.warning(f"chat {id_chat} message {id_message} not found")
             except Exception as e:
-                logger.exception(f"chat {chat} message {msg} delete failed")
+                logger.exception(f"chat {id_chat} message {id_message} delete failed")
 
         return True
 
@@ -255,13 +258,16 @@ class Manager:
 
         return True
 
-    async def reply(self, msg: types.Message, content: str, auto_deleted_at: datetime = None, *args, **kwargs):
+    async def reply(self, msg: types.Message, content: str, *args, **kwargs):
         """
         回复消息
         msg: reply to message
         content: reply content
         auto_deleted_at: message deleted after the timestamp
         """
+        # auto_deleted_at: datetime = None, 
+        auto_deleted_at = kwargs.pop("auto_deleted_at", None)
+
         try:
             resp = await msg.reply(content, *args, **kwargs)
             logger.info(f"chat {msg.chat.id} message {msg.message_id} replied")
