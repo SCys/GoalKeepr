@@ -35,7 +35,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
         width = 512
         height = 512
 
-    session = await manager.bot.session.create_session()
+    session = await manager.create_session()
     async with session.post(
         url=f"{endpoint}/sdapi/v1/txt2img",
         json={
