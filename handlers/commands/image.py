@@ -83,7 +83,7 @@ async def image(msg: types.Message):
         prompt = strip_text_prefix(msg.reply_to_message.text) + "\n"
     prompt += strip_text_prefix(msg.text)
 
-    if not prompt:
+    if not prompt or len(prompt) < 7:
         # display help message
         await manager.reply(
             msg,
@@ -129,38 +129,6 @@ async def image(msg: types.Message):
     except:
         await reply.edit_text(f"Task is failed: put task to queue failed.")
         logger.exception(f"{prefix} sd txt2img error")
-
-
-async def worker():
-    rdb = await manager.get_redis()
-    if not rdb:
-        logger.warning(f"redis is not ready, ignored")
-        return
-
-    while True:
-        await asyncio.sleep(0.1)
-
-        rdb = await manager.get_redis()
-        if not rdb:
-            logger.warning(f"redis is not ready, ignored")
-            await asyncio.sleep(2)
-            continue
-
-        raw = await rdb.rpop(QUEUE_NAME)
-        if raw:
-            try:
-                task = Task(**loads(raw))
-                await process_task(task)
-            except:
-                logger.exception("process task error")
-
-        # sleep 1s
-        await asyncio.sleep(1)
-
-        # tasks detail
-        tasks_size = await rdb.llen(QUEUE_NAME)
-        if tasks_size > 1:
-            logger.debug(f"task queue size: {tasks_size}")
 
 
 async def process_task(task: Task):
@@ -241,3 +209,35 @@ async def process_task(task: Task):
             f"Task is failed(create before {str(cost)[:-7]}), please try again later.\n\n{str(e)}",
             datetime.now() + timedelta(seconds=DELETED_AFTER),
         )
+
+
+async def worker():
+    rdb = await manager.get_redis()
+    if not rdb:
+        logger.warning(f"redis is not ready, ignored")
+        return
+
+    while True:
+        await asyncio.sleep(0.1)
+
+        rdb = await manager.get_redis()
+        if not rdb:
+            logger.warning(f"redis is not ready, ignored")
+            await asyncio.sleep(2)
+            continue
+
+        raw = await rdb.rpop(QUEUE_NAME)
+        if raw:
+            try:
+                task = Task(**loads(raw))
+                await process_task(task)
+            except:
+                logger.exception("process task error")
+
+        # sleep 1s
+        await asyncio.sleep(1)
+
+        # tasks detail
+        tasks_size = await rdb.llen(QUEUE_NAME)
+        if tasks_size > 1:
+            logger.debug(f"task queue size: {tasks_size}")
