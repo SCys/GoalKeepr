@@ -9,7 +9,6 @@ from .asr import asr
 from .whoami import whoami
 
 # image generation
-from .txt2img import txt2img
 from .sdxl import sdxl
 from .image import image
 
