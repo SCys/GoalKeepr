@@ -1,4 +1,7 @@
-def strip_text_prefix(raw: str) -> str:
+from typing import Optional
+
+
+def strip_text_prefix(raw: Optional[str]) -> str:
     """
     remove the text prefix
 
@@ -9,6 +12,9 @@ def strip_text_prefix(raw: str) -> str:
 
     output: girl beautiful girl no face long leg
     """
+    if not raw:
+        return ""
+
     try:
         if not raw.startswith("/"):
             return raw

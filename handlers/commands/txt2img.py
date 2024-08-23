@@ -25,25 +25,23 @@ async def txt2img(msg: types.Message):
     chat = msg.chat
     user = msg.from_user
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+    now = datetime.now()
 
     if not user:
         logger.warning(f"{prefix} message without user, ignored")
         return
 
-    # load users and groups from configure
+    # check user/group permission
     config = manager.config
-    # setup image config
     try:
         users = [int(i) for i in config["image"]["users"].split(",") if i]
         groups = [int(i) for i in config["image"]["groups"].split(",") if i]
     except:
         logger.exception("image users or groups is invalid")
         return
-
     if user.id not in users and chat.id not in groups:
         logger.warning(f"{prefix} user {user.full_name} or group {chat.id} is not allowed, ignored")
-        msg_err = await msg.reply(f"task is failed: no permission.")
-        await manager.delete_message(chat, msg_err)
+        await manager.reply(msg, f"task is failed: no permission.", now + timedelta(seconds=DELETED_AFTER))
         return
 
     prefix += f" user {user.full_name}"
@@ -59,38 +57,39 @@ async def txt2img(msg: types.Message):
     task_size = await rdb.llen(QUEUE_NAME) + 1
     if task_size > GLOBAL_TASK_LIMIT:
         logger.warning(f"task queue is full, ignored")
-        msg_err = await msg.reply(f"task is failed: task queue is full.")
-        await manager.delete_message(chat, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
+        await manager.reply(msg, f"task is failed: task queue is full.", now + timedelta(seconds=DELETED_AFTER))
+        return
+
+    prompt = strip_text_prefix(msg.text)
+
+    if not prompt:
+        logger.warning(f"{prefix} prompt is empty, ignored")
+        await manager.reply(msg, f"task is failed: prompt is empty.", now + timedelta(seconds=DELETED_AFTER))
         return
 
     task = {
         "chat": msg.chat.id,
         "chat_name": msg.chat.full_name,
-        "user": msg.from_user.id,
-        "user_name": msg.from_user.full_name,
-        "raw": strip_text_prefix(msg.text),
+        "user": user.id,
+        "user_name": user.full_name,
+        "raw": prompt,
         "from": msg.message_id,
         "to": -1,
-        "created_at": datetime.now().timestamp(),
+        "created_at": now.timestamp(),
     }
 
     if task_size > 0:
-        reply = await msg.reply(f"task is queued, please wait(~{task_size * 45}s).")
+        reply = await msg.reply(f"task is queued, please wait(~{task_size * 120}s).")
     else:
-        reply = await msg.reply("task is queued, please wait(~45s).")
+        reply = await msg.reply("task is queued, please wait(~120s).")
     task["to"] = reply.message_id
 
+    # put task to queue
     try:
-        # put task to queue
         await rdb.lpush(QUEUE_NAME, dumps(task))
-
         logger.info(f"{prefix} task is queued, size is {task_size}")
     except:
-        msg_err = await manager.bot.edit_message_text(
-            f"task is failed: put task to queue failed.", chat_id=chat.id, message_id=reply.message_id
-        )
-        await manager.delete_message(chat, msg_err, msg_err.date + timedelta(seconds=DELETED_AFTER))
-
+        await reply.edit_text(f"Task is failed: put task to queue failed.")
         logger.exception(f"{prefix} sd txt2img error")
 
 
@@ -124,7 +123,7 @@ async def worker():
 
         # tasks detail
         tasks_size = await rdb.llen(QUEUE_NAME)
-        if tasks_size > 0:
+        if tasks_size > 1:
             logger.debug(f"task queue size: {tasks_size}")
 
 
