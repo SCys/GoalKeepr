@@ -3,7 +3,7 @@ from aiogram import types
 from aiogram.filters import Command
 
 from manager import manager
-from utils.tg import strip_text_prefix
+from ..utils import strip_text_prefix
 
 logger = manager.logger
 
@@ -43,7 +43,7 @@ async def sdxl(msg: types.Message):
 
     # use remote cloudflare worker
     # API URL: https://iscys.com/api/cf/ai/txt2img
-    session = await manager.bot.session.create_session()
+    session = await manager.create_session()
     async with session.post(
         "https://iscys.com/api/cf/ai/txt2img",
         json={

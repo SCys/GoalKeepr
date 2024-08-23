@@ -6,7 +6,7 @@ from orjson import dumps, loads
 
 from manager import manager
 
-from .utils import count_tokens
+from ...utils import count_tokens
 
 logger = manager.logger
 

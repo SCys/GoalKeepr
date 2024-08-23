@@ -175,7 +175,7 @@ class Manager:
         """获取用户名"""
 
         if isinstance(_user, types.ChatMember):
-            return _user.user.full_name # type: ignore
+            return _user.user.full_name  # type: ignore
 
         return _user.full_name
 
@@ -265,8 +265,12 @@ class Manager:
         content: reply content
         auto_deleted_at: message deleted after the timestamp
         """
-        # auto_deleted_at: datetime = None, 
         auto_deleted_at = kwargs.pop("auto_deleted_at", None)
+        if auto_deleted_at is None:
+            # first arg is datetime, set it as auto_deleted_at
+            if len(args) > 0 and isinstance(args[0], datetime):
+                auto_deleted_at = args[0]
+                args = args[1:]
 
         try:
             resp = await msg.reply(content, *args, **kwargs)
@@ -277,6 +281,32 @@ class Manager:
 
         if auto_deleted_at is not None:
             await self.delete_message(msg.chat, resp, auto_deleted_at)
+
+        return True
+
+    async def edit_text(self, chat: int, msg: int, content: str, *args, **kwargs):
+        """
+        编辑消息
+        chat: chat with msg
+        msg: msg will be edited
+        content: new content
+        """
+        auto_deleted_at = kwargs.pop("auto_deleted_at", None)
+        if auto_deleted_at is None:
+            # first arg is datetime, set it as auto_deleted_at
+            if len(args) > 0 and isinstance(args[0], datetime):
+                auto_deleted_at = args[0]
+                args = args[1:]
+
+        try:
+            await self.bot.edit_message_text(content, chat_id=chat, message_id=msg, *args, **kwargs)
+            logger.info(f"chat {chat} message {msg} edited")
+        except:
+            logger.exception(f"chat {chat} message {msg} edit error")
+            return False
+
+        if auto_deleted_at is not None:
+            await self.delete_message(chat, msg, auto_deleted_at)
 
         return True
 

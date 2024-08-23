@@ -7,9 +7,9 @@ from orjson import dumps, loads
 
 from manager import manager
 
+from ...utils import count_tokens
 from .func_txt import CONVERSATION_TTL, SUPPORTED_MODELS
 from .func_user import allow_user, ban_user, count_user, total_user_requested, update_user_quota
-from .utils import count_tokens
 
 DELETED_AFTER = 15
 logger = manager.logger
@@ -85,7 +85,7 @@ async def operations_person(
         # 一行行列出支持的模型，包括 key 和 name，还有 input_length 等介绍
         models_txt = "\n".join(
             [
-                f"Key: {key}\n\t{value['name']}\n\tInput length: {value['input_length']}tokens"
+                f"Key: {key}\n\t{value.name}\n\tInput length: {value.input_length}tokens"
                 for key, value in SUPPORTED_MODELS.items()
             ]
         )

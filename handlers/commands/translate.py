@@ -4,18 +4,26 @@ from datetime import timedelta
 import translators as ts
 from aiogram import types
 from aiogram.filters import Command
+
 from manager import manager
 from utils.tts import reply_tts
 
+from ..utils import strip_text_prefix
+
 logger = manager.logger
 
-RE_CLEAR = re.compile(r"/tr(@[a-zA-Z0-9]+)?\s?")
 DELETED_AFTER = 5
+
+ts.preaccelerate_and_speedtest()
 
 
 @manager.register("message", Command("tr", ignore_case=True, ignore_mention=True))
 async def translate(msg: types.Message):
     user = msg.from_user
+
+    if not user:
+        logger.warning("message without user, ignored")
+        return
 
     target = msg
     content = msg.text
@@ -23,8 +31,7 @@ async def translate(msg: types.Message):
         content = msg.reply_to_message.text
         target = msg.reply_to_message
 
-    content = RE_CLEAR.sub("", content, 1)
-
+    content = strip_text_prefix(content)
     if not content:
         await msg.answer("Please send me a text to translate")
         return
@@ -38,7 +45,8 @@ async def translate(msg: types.Message):
 
     try:
         result = ts.translate_text(content, to_language=to_language, translator="google")
-        await reply_tts(target, result, show_original=True)
+        if result is str:
+            await reply_tts(target, result, show_original=True)
     except Exception as e:
         logger.exception("translate failed")
 

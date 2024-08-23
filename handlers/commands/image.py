@@ -2,6 +2,7 @@ import asyncio
 import base64
 from datetime import datetime, timedelta
 
+import translators as ts
 from aiogram import types
 from aiogram.filters import Command
 from orjson import dumps, loads
@@ -9,7 +10,7 @@ from orjson import dumps, loads
 from manager import manager
 from utils import sd_api
 
-from ..utils import strip_text_prefix
+from ..utils import contains_chinese, strip_text_prefix
 
 logger = manager.logger
 
@@ -19,9 +20,8 @@ QUEUE_NAME = "txt2img"
 DELETED_AFTER = 3  # 3s
 
 
-@manager.register("message", Command("txt2img", ignore_case=True, ignore_mention=True))
-async def txt2img(msg: types.Message):
-    """sd txt2img"""
+@manager.register("message", Command("image", ignore_case=True, ignore_mention=True))
+async def image(msg: types.Message):
     chat = msg.chat
     user = msg.from_user
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
@@ -63,9 +63,23 @@ async def txt2img(msg: types.Message):
     prompt = strip_text_prefix(msg.text)
 
     if not prompt:
-        logger.warning(f"{prefix} prompt is empty, ignored")
-        await manager.reply(msg, f"task is failed: prompt is empty.", now + timedelta(seconds=DELETED_AFTER))
+        # display help message
+        await manager.reply(
+            msg,
+            "Usage: /image <text>\n <text> is the text you want to convert to image.",
+            now + timedelta(seconds=DELETED_AFTER),
+        )
         return
+
+    if contains_chinese(prompt):
+        try:
+            result = ts.translate_text(prompt, from_language="zh", to_language="en", translator="google")
+            if result is str:
+                prompt = result
+                logger.info(f"{prefix} translate chinese to english: {prompt}")
+        except Exception:
+            logger.exception("translate failed")
+            # ignore exception
 
     task = {
         "chat": msg.chat.id,
@@ -144,7 +158,7 @@ async def process_task(task):
     chat_fullname = task["chat_name"]
     user_id = task["user"]
     user_fullname = task["user_name"]
-    msg_reply = task["to"]
+    msg_id = task["to"]
     msg_from = task["from"]
 
     # load users and groups from configure
@@ -155,18 +169,17 @@ async def process_task(task):
     except:
         logger.exception("sd api endpoint is invalid")
         msg_err = await manager.bot.edit_message_text(
-            f"task is failed: sd api endpoint is invalid.", chat_id=chat_id, message_id=msg_reply
+            f"task is failed: sd api endpoint is invalid.", chat_id=chat_id, message_id=msg_id
         )
         await manager.delete_message(chat_id, msg_err, datetime.now() + timedelta(seconds=DELETED_AFTER))
         return
     if not endpoint:
         logger.warning("sd api endpoint is empty")
-        msg_err = await manager.bot.edit_message_text(
-            f"task is failed: sd api endpoint is empty.",
-            chat_id=chat_id,
-            message_id=msg_reply,
+        await manager.edit_text(
+            chat_id,
+            msg_id,
+            f"task is failed: remote service is down, please try again later.",
         )
-        await manager.delete_message(chat_id, msg_err, datetime.now() + timedelta(seconds=DELETED_AFTER))
         return
 
     created_at = datetime.fromtimestamp(task["created_at"])
@@ -177,7 +190,7 @@ async def process_task(task):
     await manager.bot.edit_message_text(
         f"task is started(cost {str(cost)[:-7]}), please wait(~45s).",
         chat_id=chat_id,
-        message_id=msg_reply,
+        message_id=msg_id,
     )
 
     logger.info(f"{prefix} is processing task")
@@ -195,7 +208,7 @@ async def process_task(task):
         cost = datetime.now() - created_at
 
         # delete reply and create new reply
-        await manager.bot.delete_message(chat_id, msg_reply)
+        await manager.bot.delete_message(chat_id, msg_id)
         await manager.bot.send_photo(
             chat_id,
             input_file,
@@ -207,7 +220,7 @@ async def process_task(task):
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
     except:
         msg_err = await manager.bot.edit_message_text(
-            f"task is failed(create before {str(cost)[:-7]}), please try again later", chat_id=chat_id, message_id=msg_reply
+            f"task is failed(create before {str(cost)[:-7]}), please try again later", chat_id=chat_id, message_id=msg_id
         )
         await manager.delete_message(chat_id, msg_err, datetime.now() + timedelta(seconds=DELETED_AFTER))
 
