@@ -49,6 +49,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512", st
             "seed": -1,
             "sampler_name": SAMPLER_NAME,
             "scheduler": SCHEDULER,
+            "hr_scheduler": SCHEDULER,
             "batch_size": 1,
             "n_iter": n,
             "steps": step,
