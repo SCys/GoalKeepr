@@ -8,7 +8,7 @@ from typing import Optional, Union
 import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, types
-from aiogram.exceptions import TelegramNotFound
+from aiogram.exceptions import TelegramBadRequest
 
 import database
 
@@ -220,7 +220,7 @@ class Manager:
             try:
                 await self.bot.delete_message(id_chat, id_message)
                 logger.info(f"chat {id_chat} message {id_message} deleted")
-            except TelegramNotFound:
+            except TelegramBadRequest:
                 logger.warning(f"chat {id_chat} message {id_message} not found")
             except Exception as e:
                 logger.exception(f"chat {id_chat} message {id_message} delete failed")
