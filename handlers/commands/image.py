@@ -78,7 +78,10 @@ async def image(msg: types.Message):
         await manager.reply(msg, f"task is failed: task queue is full.", now + timedelta(seconds=DELETED_AFTER))
         return
 
-    prompt = strip_text_prefix(msg.text)
+    prompt = ""
+    if msg.reply_to_message and msg.reply_to_message.text:
+        prompt = strip_text_prefix(msg.reply_to_message.text) + "\n"
+    prompt += strip_text_prefix(msg.text)
 
     if not prompt:
         # display help message
@@ -93,7 +96,7 @@ async def image(msg: types.Message):
         try:
             result = ts.translate_text(prompt, to_language="en", translator="google")
             reply_content = f"Prompt:\n{prompt}\n\nTranslated:\n{result}"
-            prompt = result
+            prompt = str(result)
             logger.info(f"{prefix} translate chinese to english: {prompt}")
         except Exception:
             logger.exception("translate failed")
