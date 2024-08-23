@@ -19,16 +19,15 @@ https://github.com/SCys/GoalKeepr
 包括命令:
 
 <pre>
-k - 踢掉发信息的人 kicks off the person who sent the message
-sb - 将发送信息的人放入黑名单，会清理此人之前发出的所有信息 ban the message sender, will cleanup the user sent messages
-id - 获取用户信息，reply 信息则会返回发信人的详细信息 gets the user information, reply message returns the sender details
-asr - 识别音频内文本 recognizes text within audio
-tts - 转换文本为音频 convert text to audio
-shorturl - 压缩 URL,支持多条 URL 同时压缩，每条之间换行即可 compress URLs, support multiple URLs at the same time, just line break between each one
+k - 踢掉发信息的人 Kick the person who sent the message.
+sb - 将发送信息的人放入黑名单，会清理此人之前发出的所有信息 Put the person who sent the message into the blacklist, and clean up all the information sent by this person before.
+id - 获取用户信息，信息则会返回发信人的详细信息 Get user information, information will return the detailed information of the sender
+asr - 识别音频内文本 Recognizes text within audio. Powerby openai whisper-small(multi languages).
+tts - 转换文本为音频 Convert text to audio
 tr - 将输入的文本翻译为中文 translate the input text into Chinese
-txt2img - 通过文本生成图像 generate images through text(on mini machine, only support English)
-sdxl - 通过文本生成图像 generate images through text(power by cloudflare)
-chat - 支持上下文的聊天功能，允许配置相关参数，详情请输入 /chat help chat function with context, allow to configure related parameters, please enter /chat help for details
+image - 通过文本生成图像 Generate images through text.Support English. Chinese will translate to English.
+sdxl - 通过文本生成图像 Generate images through text(Power by cloudflare, use SDXL)
+chat - 支持上下文的聊天功能，允许配置相关参数，详情请输入 Chat function that supports context, allows configuration of related parameters, please enter for details
 </pre>
 
 配置文件 main.ini
