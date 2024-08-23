@@ -167,13 +167,13 @@ async def process_task(task: Task):
     prompt = task.prompt
     size = "512x512"
     step = 4
-    if prompt.startswith("large"):
+    if prompt.startswith("large "):
         size = "768x1024"
         step = 8
-        prompt = prompt[5:]
-    elif prompt.startswith("icon"):
+        prompt = prompt[6:]
+    elif prompt.startswith("icon "):
         size = "128x128"
-        prompt = prompt[4:]
+        prompt = prompt[5:]
 
     try:
         checkpoint = datetime.now()
