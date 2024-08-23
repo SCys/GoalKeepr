@@ -92,14 +92,14 @@ async def image(msg: types.Message):
     if contains_chinese(prompt):
         try:
             result = ts.translate_text(prompt, to_language="en", translator="google")
-            reply_content = f"Prompt:\n\n{prompt}\n\nTranslated:\n\n{result}"
+            reply_content = f"Prompt:\n{prompt}\n\nTranslated:\n{result}"
             prompt = result
             logger.info(f"{prefix} translate chinese to english: {prompt}")
         except Exception:
             logger.exception("translate failed")
-            reply_content = f"Prompt:\n\n{prompt}\n\ntraslate failed"
+            reply_content = f"Prompt:\n{prompt}\n\nTraslate failed"
     else:
-        reply_content = f"Prompt:\n\n{prompt}"
+        reply_content = f"Prompt:\n{prompt}"
 
     # task = {
     #     "chat": msg.chat.id,
