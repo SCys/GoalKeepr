@@ -227,6 +227,7 @@ async def process_task(task: Task):
             caption=f"{task.reply_content}\n\ncost {cost.total_seconds()}s",
             disable_notification=True,
             has_spoiler=True,
+            parse_mode="MarkdownV2",
         )
 
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
