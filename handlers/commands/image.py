@@ -1,6 +1,8 @@
 import asyncio
 import base64
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Optional
 
 import translators as ts
 from aiogram import types
@@ -14,10 +16,25 @@ from ..utils import contains_chinese, strip_text_prefix
 
 logger = manager.logger
 
-GLOBAL_FORCE_SLEEP = 3
 GLOBAL_TASK_LIMIT = 3
 QUEUE_NAME = "txt2img"
 DELETED_AFTER = 3  # 3s
+
+
+@dataclass
+class Task:
+    chat_id: int
+    chat_name: Optional[str]
+
+    user_id: int
+    user_name: Optional[str]
+
+    message_id: int
+    reply_message_id: int
+
+    reply_content: Optional[str]
+    prompt: str
+    created_at: float
 
 
 @manager.register("message", Command("image", ignore_case=True, ignore_mention=True))
@@ -26,6 +43,7 @@ async def image(msg: types.Message):
     user = msg.from_user
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
     now = datetime.now()
+    reply_content = ""
 
     if not user:
         logger.warning(f"{prefix} message without user, ignored")
@@ -75,28 +93,44 @@ async def image(msg: types.Message):
         try:
             result = ts.translate_text(prompt, from_language="zh", to_language="en", translator="google")
             if result is str:
+                reply_content = f"Prompt: ```{prompt}```\n\nTranslated: ```{result}```"
                 prompt = result
                 logger.info(f"{prefix} translate chinese to english: {prompt}")
+            else:
+                reply_content = f"Prompt: {prompt}"
         except Exception:
             logger.exception("translate failed")
-            # ignore exception
+    else:
+        reply_content = "Prompt: " + prompt
 
-    task = {
-        "chat": msg.chat.id,
-        "chat_name": msg.chat.full_name,
-        "user": user.id,
-        "user_name": user.full_name,
-        "raw": prompt,
-        "from": msg.message_id,
-        "to": -1,
-        "created_at": now.timestamp(),
-    }
+    # task = {
+    #     "chat": msg.chat.id,
+    #     "chat_name": msg.chat.full_name,
+    #     "user": user.id,
+    #     "user_name": user.full_name,
+    #     "raw": prompt,
+    #     "from": msg.message_id,
+    #     "to": -1,
+    #     "created_at": now.timestamp(),
+    # }
+
+    task = Task(
+        chat_id=chat.id,
+        chat_name=chat.full_name,
+        user_id=user.id,
+        user_name=user.full_name,
+        prompt=prompt,
+        message_id=msg.message_id,
+        reply_message_id=-1,
+        reply_content=reply_content,
+        created_at=now.timestamp(),
+    )
 
     if task_size > 0:
         reply = await msg.reply(f"task is queued, please wait(~{task_size * 120}s).")
     else:
         reply = await msg.reply("task is queued, please wait(~120s).")
-    task["to"] = reply.message_id
+    task.reply_message_id = reply.message_id
 
     # put task to queue
     try:
@@ -125,12 +159,10 @@ async def worker():
         raw = await rdb.rpop(QUEUE_NAME)
         if raw:
             try:
-                task = loads(raw)
+                task = Task(**loads(raw))
                 await process_task(task)
             except:
                 logger.exception("process task error")
-
-            await asyncio.sleep(GLOBAL_FORCE_SLEEP)
 
         # sleep 1s
         await asyncio.sleep(1)
@@ -141,87 +173,69 @@ async def worker():
             logger.debug(f"task queue size: {tasks_size}")
 
 
-async def process_task(task):
-    """
-    task = {
-        "chat": msg.chat,
-        "user": msg.from_user,
-        "raw": msg.text,
-        "from": msg.message_id,
-        "to": -1,
-        "created_at": datetime.now(),
-        "updated_at": datetime.now(),
-    }
-    """
-    raw = task["raw"]
-    chat_id = task["chat"]
-    chat_fullname = task["chat_name"]
-    user_id = task["user"]
-    user_fullname = task["user_name"]
-    msg_id = task["to"]
-    msg_from = task["from"]
+async def process_task(task: Task):
+    prefix = f"chat {task.chat_id}({task.chat_name}) msg {task.message_id} user {task.user_name}"
 
-    # load users and groups from configure
     config = manager.config
     endpoint = None
     try:
         endpoint = config["sd_api"]["endpoint"]
     except:
-        logger.exception("sd api endpoint is invalid")
-        msg_err = await manager.bot.edit_message_text(
-            f"task is failed: sd api endpoint is invalid.", chat_id=chat_id, message_id=msg_id
-        )
-        await manager.delete_message(chat_id, msg_err, datetime.now() + timedelta(seconds=DELETED_AFTER))
+        logger.warning(f"{prefix} sd api config is invalid")
+        await manager.edit_text(task.chat_id, task.reply_message_id, f"Task is failed: remote service is closed.")
         return
     if not endpoint:
-        logger.warning("sd api endpoint is empty")
-        await manager.edit_text(
-            chat_id,
-            msg_id,
-            f"task is failed: remote service is down, please try again later.",
-        )
+        logger.warning(f"{prefix} sd api endpoint is empty")
+        await manager.edit_text(task.chat_id, task.reply_message_id, f"Task is failed: remote service is closed")
         return
 
-    created_at = datetime.fromtimestamp(task["created_at"])
-    prefix = f"chat {chat_id}({chat_fullname}) msg {task['from']} user {user_id}({user_fullname})"
+    created_at = datetime.fromtimestamp(task.created_at)
 
-    # task is started, reply to user
     cost = datetime.now() - created_at
-    await manager.bot.edit_message_text(
-        f"task is started(cost {str(cost)[:-7]}), please wait(~45s).",
-        chat_id=chat_id,
-        message_id=msg_id,
+    if cost > timedelta(minutes=10):
+        logger.warning(f"{prefix} task is expired, ignored")
+        await manager.edit_text(task.chat_id, task.reply_message_id, f"Task is expired.")
+        return
+
+    # task started
+    await manager.edit_text(
+        task.chat_id,
+        task.reply_message_id,
+        f"Task is started(cost {cost.total_seconds()}s/120s)",
     )
 
-    logger.info(f"{prefix} is processing task")
+    logger.info(f"{prefix} is processing task(cost {cost.total_seconds()}s/120s)")
 
     try:
         checkpoint = datetime.now()
-        img_raw = await sd_api.txt2img(endpoint, raw, 1)
+        img_raw = await sd_api.txt2img(endpoint, task.prompt, 1)
         cost = datetime.now() - checkpoint
-        logger.info(f"{prefix} task is processed, cost {str(cost)[:-7]}")
+        logger.info(f"{prefix} task is processed(cost {cost.total_seconds()}s/120s).")
 
         input_file = types.BufferedInputFile(
             base64.b64decode(img_raw.split(",", 1)[0]),
-            filename="sd_txt2img.png",
+            filename=f"txt2img_{task.chat_id}_{task.user_id}_{task.created_at}.png",
         )
         cost = datetime.now() - created_at
 
-        # delete reply and create new reply
-        await manager.bot.delete_message(chat_id, msg_id)
+        # delete
+        await manager.delete_message(task.chat_id, task.reply_message_id)
         await manager.bot.send_photo(
-            chat_id,
+            task.chat_id,
             input_file,
-            reply_to_message_id=msg_from,
-            caption=f"cost {str(cost)[:-7]}",
-            # , has_spoiler=True no support
+            reply_to_message_id=task.message_id,
+            caption=f"{task.reply_content}\n\ncost {cost.total_seconds()}s",
+            disable_notification=True,
+            has_spoiler=True,
         )
 
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
-    except:
-        msg_err = await manager.bot.edit_message_text(
-            f"task is failed(create before {str(cost)[:-7]}), please try again later", chat_id=chat_id, message_id=msg_id
-        )
-        await manager.delete_message(chat_id, msg_err, datetime.now() + timedelta(seconds=DELETED_AFTER))
-
+    except Exception as e:
         logger.exception(f"{prefix} sd txt2img error")
+
+        await manager.edit_text(
+            task.chat_id,
+            task.reply_message_id,
+            f"Task is failed(create before {str(cost)[:-7]}), please try again later.\n\n{str(e)}",
+            datetime.now() + timedelta(seconds=DELETED_AFTER),
+        )
