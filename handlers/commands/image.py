@@ -206,8 +206,20 @@ async def process_task(task: Task):
 
     try:
         checkpoint = datetime.now()
-        img_raw = await sd_api.txt2img(endpoint, task.prompt, 1)
+        resp = await sd_api.txt2img(endpoint, task.prompt, 1)
         cost = datetime.now() - checkpoint
+        if "error" in resp:
+            logger.warning(f"{prefix} sd txt2img error: {resp['error']['code']} {resp['error']['message']}")
+            await manager.edit_text(
+                task.chat_id,
+                task.reply_message_id,
+                f"Task is failed(create before {str(cost)[:-7]}), please try again later.\n\n"
+                f"{resp['error']['code']} {resp['error']['message']}",
+                datetime.now() + timedelta(seconds=DELETED_AFTER),
+            )
+            return
+
+        img_raw = resp["image"]
         logger.info(f"{prefix} task is processed(cost {cost.total_seconds()}s/120s).")
 
         input_file = types.BufferedInputFile(

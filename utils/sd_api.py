@@ -15,7 +15,7 @@ STEP = 4
 SAMPLER_NAME = "DPM++ 2M Simple"
 
 
-async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") -> str:
+async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") -> dict:
     """return is base64 str png"""
     # split the raw by ===, upside is prompt, downside is negative prompt
     if "===" in raw:
@@ -64,7 +64,12 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
             raise Exception(await response.text())
 
         resp = await response.json()
-        return resp["images"][0]
+        # return resp["images"][0]
+        if "error" in resp:
+            # {'error': {'code': 400, 'message': 'client error'}}
+            return resp
+
+        return {"image": resp["images"][0]}
 
 
 if __name__ == "__main__":
