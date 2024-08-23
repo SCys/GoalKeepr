@@ -83,7 +83,9 @@ async def image(msg: types.Message):
         prompt = strip_text_prefix(msg.reply_to_message.text) + "\n"
     prompt += strip_text_prefix(msg.text)
 
-    if not prompt or len(prompt) < 7:
+    prompt = prompt.strip()
+
+    if not prompt:
         # display help message
         await manager.reply(
             msg,
@@ -183,7 +185,7 @@ async def process_task(task: Task):
 
     try:
         checkpoint = datetime.now()
-        resp = await sd_api.txt2img(endpoint, task.prompt, 1, size=size, step=step)
+        resp = await sd_api.txt2img(endpoint, prompt, 1, size=size, step=step)
         cost = datetime.now() - checkpoint
         if "error" in resp:
             logger.warning(f"{prefix} sd txt2img error: {resp['error']['code']} {resp['error']['message']}")
