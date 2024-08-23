@@ -3,7 +3,7 @@ import asyncio
 from aiogram import Bot
 
 import database
-from handlers.commands.txt2img import worker as txt2img_worker  # NOQA: 引入处理器
+from handlers.commands.image import worker as txt2img_worker  # NOQA: 引入处理器
 from handlers.member_captcha.events import new_member_check, unban_member  # NOQA: 引入处理器
 from manager import manager
 

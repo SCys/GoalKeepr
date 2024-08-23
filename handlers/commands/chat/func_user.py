@@ -54,7 +54,7 @@ async def count_user(rdb: "aioredis.Redis") -> int:
     cursor = b"0"
     total = 0
     while cursor:
-        cursor, keys = await rdb.scan(cursor, match="chat:user:*", count=100)
+        cursor, keys = await rdb.scan(cursor, match="chat:user:*", count=100) # type: ignore
         total += len(keys)
 
     return total
@@ -68,7 +68,7 @@ async def total_user_requested(rdb: "aioredis.Redis") -> int:
     cursor = b"0"
     total = 0
     while cursor:
-        cursor, keys = await rdb.scan(cursor, match="chat:user:*", count=100)
+        cursor, keys = await rdb.scan(cursor, match="chat:user:*", count=100) # type: ignore
         for key in keys:
             count = await rdb.hget(key, "count")
             if count:
