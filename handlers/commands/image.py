@@ -123,7 +123,7 @@ async def image(msg: types.Message):
         message_id=msg.message_id,
         reply_message_id=-1,
         reply_content=reply_content,
-        created_at=now.timestamp(),
+        created_at=msg.date.timestamp(),
     )
 
     if task_size > 0:
