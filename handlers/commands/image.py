@@ -188,13 +188,12 @@ async def process_task(task: Task):
         )
         cost = datetime.now() - created_at
 
-        # delete
         await manager.delete_message(task.chat_id, task.reply_message_id)
         await manager.bot.send_photo(
             task.chat_id,
             input_file,
             reply_to_message_id=task.message_id,
-            caption=f"{task.reply_content}\n\ncost {cost.total_seconds()}s",
+            caption=f"{task.reply_content}\n\nWrite by {task.user_name} in {task.chat_name}.\nCost: {str(cost)[:-7]}s",
             disable_notification=True,
             has_spoiler=True,
         )
