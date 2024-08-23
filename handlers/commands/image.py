@@ -184,9 +184,8 @@ async def process_task(task: Task):
         logger.exception(f"{prefix} parse prompt error")
 
     try:
-        checkpoint = datetime.now()
         resp = await sd_api.txt2img(endpoint, prompt, 1, size=size, step=step)
-        cost = datetime.now() - checkpoint
+        cost = datetime.now() - created_at
         if "error" in resp:
             logger.warning(f"{prefix} sd txt2img error: {resp['error']['code']} {resp['error']['message']}")
             await manager.edit_text(
