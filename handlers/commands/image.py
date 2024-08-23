@@ -104,17 +104,6 @@ async def image(msg: types.Message):
     else:
         reply_content = f"Prompt:\n{prompt}"
 
-    # task = {
-    #     "chat": msg.chat.id,
-    #     "chat_name": msg.chat.full_name,
-    #     "user": user.id,
-    #     "user_name": user.full_name,
-    #     "raw": prompt,
-    #     "from": msg.message_id,
-    #     "to": -1,
-    #     "created_at": now.timestamp(),
-    # }
-
     task = Task(
         chat_id=chat.id,
         chat_name=chat.full_name,

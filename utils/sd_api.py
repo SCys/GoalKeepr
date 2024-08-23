@@ -13,10 +13,10 @@ NEGATIVE_PROMPT_PREFIX = ""
 CFG_SCALE = 1
 STEP = 4
 SAMPLER_NAME = "DPM++ 2M"
-scheduler = "Simple"
+SCHEDULER = "Simple"
 
 
-async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") -> dict:
+async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512", step=STEP) -> dict:
     """return is base64 str png"""
     # split the raw by ===, upside is prompt, downside is negative prompt
     if "===" in raw:
@@ -44,9 +44,10 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
             "negative_prompt": NEGATIVE_PROMPT_PREFIX + negative_prompt,
             "seed": -1,
             "sampler_name": SAMPLER_NAME,
+            "scheduler": SCHEDULER,
             "batch_size": 1,
             "n_iter": n,
-            "steps": STEP,
+            "steps": step,
             "cfg_scale": CFG_SCALE,
             "width": width,
             "height": height,
@@ -57,7 +58,6 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
             "eta": 0,
             "send_images": True,
             "save_images": False,
-            "scheduler": scheduler,
         },
         # timeout 5m, connect 15s, read 240s
         timeout=ClientTimeout(total=300, connect=15, sock_read=240),
