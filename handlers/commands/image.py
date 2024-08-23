@@ -93,15 +93,15 @@ async def image(msg: types.Message):
         try:
             result = ts.translate_text(prompt, to_language="en", translator="google")
             if result is str:
-                reply_content = f"Prompt: ```{prompt}```\n\nTranslated: ```{result}```"
+                reply_content = f"Prompt:\n\n{prompt}\n\nTranslated:\n\n{result}"
                 prompt = result
                 logger.info(f"{prefix} translate chinese to english: {prompt}")
             else:
-                reply_content = f"Prompt: ```{prompt}```\n\ntraslate failed"
+                reply_content = f"Prompt:\n\n{prompt}\n\ntraslate failed"
         except Exception:
             logger.exception("translate failed")
     else:
-        reply_content = f"Prompt: ```{prompt}```"
+        reply_content = f"Prompt:\n\n{prompt}"
 
     # task = {
     #     "chat": msg.chat.id,
@@ -227,7 +227,6 @@ async def process_task(task: Task):
             caption=f"{task.reply_content}\n\ncost {cost.total_seconds()}s",
             disable_notification=True,
             has_spoiler=True,
-            parse_mode="MarkdownV2",
         )
 
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
