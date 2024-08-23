@@ -164,9 +164,20 @@ async def process_task(task: Task):
 
     logger.info(f"{prefix} is processing task(cost {cost.total_seconds()}s/120s)")
 
+    prompt = task.prompt
+    size = "512x512"
+    step = 4
+    if prompt.startswith("large"):
+        size = "768x1024"
+        step = 8
+        prompt = prompt[5:]
+    elif prompt.startswith("icon"):
+        size = "128x128"
+        prompt = prompt[4:]
+
     try:
         checkpoint = datetime.now()
-        resp = await sd_api.txt2img(endpoint, task.prompt, 1)
+        resp = await sd_api.txt2img(endpoint, task.prompt, 1, size=size, step=step)
         cost = datetime.now() - checkpoint
         if "error" in resp:
             logger.warning(f"{prefix} sd txt2img error: {resp['error']['code']} {resp['error']['message']}")
