@@ -12,7 +12,8 @@ NEGATIVE_PROMPT_PREFIX = ""
 
 CFG_SCALE = 1
 STEP = 4
-SAMPLER_NAME = "DPM++ 2M Simple"
+SAMPLER_NAME = "DPM++ 2M"
+scheduler = "Simple"
 
 
 async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") -> dict:
@@ -56,6 +57,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512") ->
             "eta": 0,
             "send_images": True,
             "save_images": False,
+            "scheduler": scheduler,
         },
         # timeout 5m, connect 15s, read 240s
         timeout=ClientTimeout(total=300, connect=15, sock_read=240),
