@@ -14,9 +14,9 @@ logger = manager.logger
 
 DELETED_AFTER = 5
 
-ts.preaccelerate_and_speedtest(
-    timeout=0.200,
-)
+# ts.preaccelerate_and_speedtest(
+#     timeout=0.200,
+# )
 
 
 @manager.register("message", Command("tr", ignore_case=True, ignore_mention=True))
