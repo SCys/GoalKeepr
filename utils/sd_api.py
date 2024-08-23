@@ -36,6 +36,10 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512", st
         width = 512
         height = 512
 
+    timeout = ClientTimeout(total=300, connect=15, sock_read=240)
+    if width * height > 513 * 513:
+        timeout = ClientTimeout(total=600, connect=15, sock_read=480)
+
     session = await manager.create_session()
     async with session.post(
         url=f"{endpoint}/sdapi/v1/txt2img",
@@ -60,7 +64,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512", st
             "save_images": False,
         },
         # timeout 5m, connect 15s, read 240s
-        timeout=ClientTimeout(total=300, connect=15, sock_read=240),
+        timeout=timeout,
     ) as response:
         if response.status != 200:
             raise Exception(await response.text())
