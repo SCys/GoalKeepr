@@ -178,6 +178,8 @@ async def process_task(task: Task):
             options = prompt[1:end]
             prompt = prompt[end + 1 :]
             for opt in options.split():
+                logger.info(f"{prefix} option: {opt}")
+                
                 if opt.startswith("size:"):
                     size = opt[5:]
                 elif opt.startswith("step:"):
@@ -199,10 +201,13 @@ async def process_task(task: Task):
             elif size == "horizontal":
                 size = "1024x512"
 
-            logger.info(f"{prefix} more options: size={size} step={step}")
+            prompt = prompt.strip()
 
+            logger.info(f"{prefix} more options: size={size} step={step} prompt={prompt}")
         except:
             logger.exception(f"{prefix} parse prompt error")
+
+    return
 
     try:
         resp = await sd_api.txt2img(endpoint, prompt, 1, size=size, step=step)
