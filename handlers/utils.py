@@ -45,11 +45,9 @@ def strip_text_prefix(raw: Optional[str]) -> str:
     if not raw:
         return ""
 
-    try:
-        if not raw.startswith("/"):
-            return raw
+    raw = raw.strip()
 
-        # remove the command prefix
-        return raw.split(" ", 1)[1]
-    except IndexError:
-        return raw
+    if raw.startswith("/"):
+        raw = raw.split(maxsplit=1)[-1]
+
+    return raw
