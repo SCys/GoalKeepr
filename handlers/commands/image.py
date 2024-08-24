@@ -184,7 +184,7 @@ async def process_task(task: Task):
                     step = int(opt[5:])
                 elif opt == "more_detail":
                     # add Lora to start
-                    prompt = "<lora:FluxMythP0rtr4itStyle:0.8> MythAn1m3 <lora:FluxDFaeTasticDetails:0.8> " + prompt
+                    prompt = "<lora:FluxMythP0rtr4itStyle:0.8>, <lora:FluxDFaeTasticDetails:0.8>\n" + prompt
 
             # convert size
             if size == "icon":
