@@ -85,11 +85,12 @@ async def image(msg: types.Message):
 
     prompt = prompt.strip()
 
+    # prompt as : [size:icon/large/horizontal step:4/8/16 more_detail] <raw prompt text>
     if not prompt:
         # display help message
         await manager.reply(
             msg,
-            "Usage: /image <text>\n <text> is the text you want to convert to image.",
+            "Usage: /image [size:icon/large/horizontal step:4/8/16 more_detail] <text>\n\n",
             now + timedelta(seconds=DELETED_AFTER),
         )
         return
@@ -166,9 +167,37 @@ async def process_task(task: Task):
 
     logger.info(f"{prefix} is processing task(cost {cost.total_seconds()}s/120s)")
 
-    prompt = task.prompt
+    prompt = task.prompt.strip()
     size = "512x512"
     step = 4
+
+    # advanced options
+
+    # get options
+    if prompt.startswith("["):
+        try:
+            end = prompt.index("]")
+            options = prompt[1:end]
+            prompt = prompt[end + 1 :]
+            for opt in options.split():
+                if opt.startswith("size:"):
+                    size = opt[5:]
+                elif opt.startswith("step:"):
+                    step = int(opt[5:])
+                elif opt == "more_detail":
+                    # add Lora to start
+                    prompt = "<> " + prompt
+
+            # convert size
+            if size == "icon":
+                size = "128x128"
+            elif size == "large":
+                size = "768x1024"
+            elif size == "horizontal":
+                size = "1024x512"
+
+        except:
+            logger.exception(f"{prefix} parse prompt error")
 
     # try:
     #     if prompt.startswith("large "):
