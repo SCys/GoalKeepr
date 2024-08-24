@@ -170,18 +170,18 @@ async def process_task(task: Task):
     size = "512x512"
     step = 4
 
-    try:
-        if prompt.startswith("large "):
-            size = "768x1024"
-            step = 8
-            prompt = prompt[6:]
-            logger.info(f"{prefix} generate large image")
-        elif prompt.startswith("icon "):
-            size = "128x128"
-            prompt = prompt[5:]
-            logger.info(f"{prefix} generate icon")
-    except:
-        logger.exception(f"{prefix} parse prompt error")
+    # try:
+    #     if prompt.startswith("large "):
+    #         size = "768x1024"
+    #         step = 8
+    #         prompt = prompt[6:]
+    #         logger.info(f"{prefix} generate large image")
+    #     elif prompt.startswith("icon "):
+    #         size = "128x128"
+    #         prompt = prompt[5:]
+    #         logger.info(f"{prefix} generate icon")
+    # except:
+    #     logger.exception(f"{prefix} parse prompt error")
 
     try:
         resp = await sd_api.txt2img(endpoint, prompt, 1, size=size, step=step)
