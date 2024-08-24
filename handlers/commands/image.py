@@ -131,7 +131,7 @@ async def image(msg: types.Message):
 
             prompt = prompt.strip()
 
-            logger.info(f"{prefix} more options: size={size} step={step} prompt={prompt}")
+            # logger.info(f"{prefix} more options: size={size} step={step} prompt={prompt}")
         except:
             logger.exception(f"{prefix} parse prompt error")
 
