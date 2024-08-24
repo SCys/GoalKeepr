@@ -182,6 +182,11 @@ async def process_task(task: Task):
                     size = opt[5:]
                 elif opt.startswith("step:"):
                     step = int(opt[5:])
+
+                    if step > 12:
+                        step = 12
+                    if step < 4:
+                        step = 4
                 elif opt == "more_detail":
                     # add Lora to start
                     prompt = "<lora:FluxMythP0rtr4itStyle:0.8>, <lora:FluxDFaeTasticDetails:0.8>\n" + prompt
@@ -196,19 +201,6 @@ async def process_task(task: Task):
 
         except:
             logger.exception(f"{prefix} parse prompt error")
-
-    # try:
-    #     if prompt.startswith("large "):
-    #         size = "768x1024"
-    #         step = 8
-    #         prompt = prompt[6:]
-    #         logger.info(f"{prefix} generate large image")
-    #     elif prompt.startswith("icon "):
-    #         size = "128x128"
-    #         prompt = prompt[5:]
-    #         logger.info(f"{prefix} generate icon")
-    # except:
-    #     logger.exception(f"{prefix} parse prompt error")
 
     try:
         resp = await sd_api.txt2img(endpoint, prompt, 1, size=size, step=step)
