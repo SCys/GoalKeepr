@@ -35,6 +35,7 @@ class Task:
     reply_content: Optional[str]
     prompt: str
     created_at: float
+    options: dict
 
 
 @manager.register("message", Command("image", ignore_case=True, ignore_mention=True))
@@ -93,6 +94,47 @@ async def image(msg: types.Message):
         )
         return
 
+    # advanced options
+
+    # get options
+    size = "512x512"
+    step = 4
+    more_detail = False
+    if prompt.startswith("["):
+        try:
+            end = prompt.index("]")
+            options = prompt[1:end]
+            prompt = prompt[end + 1 :]
+            for opt in options.split():
+                opt = opt.lower()
+
+                if opt.startswith("size:"):
+                    size = opt[5:]
+                elif opt.startswith("step:"):
+                    step = int(opt[5:])
+
+                    if step > 12:
+                        step = 12
+                    if step < 4:
+                        step = 4
+                elif opt == "more_detail":
+                    # add Lora to start
+                    more_detail = True
+
+            # convert size
+            if size == "icon":
+                size = "128x128"
+            elif size == "large":
+                size = "768x1024"
+            elif size == "horizontal":
+                size = "1024x512"
+
+            prompt = prompt.strip()
+
+            logger.info(f"{prefix} more options: size={size} step={step} prompt={prompt}")
+        except:
+            logger.exception(f"{prefix} parse prompt error")
+
     if contains_chinese(prompt):
         try:
             result = ts.translate_text(prompt, to_language="en", translator="google")
@@ -115,6 +157,11 @@ async def image(msg: types.Message):
         reply_message_id=-1,
         reply_content=reply_content,
         created_at=msg.date.timestamp(),
+        options={
+            "size": size,
+            "step": step,
+            "more_detail": more_detail,
+        },
     )
 
     if task_size > 0:
@@ -166,48 +213,12 @@ async def process_task(task: Task):
     logger.info(f"{prefix} is processing task(cost {cost.total_seconds()}s/120s)")
 
     prompt = task.prompt.strip()
-    size = "512x512"
-    step = 4
+    size = task.options.get("size", "512x512")
+    step = task.options.get("step", 4)
+    more_detail = task.options.get("more_detail", False)
 
-    # advanced options
-
-    # get options
-    if prompt.startswith("["):
-        try:
-            end = prompt.index("]")
-            options = prompt[1:end]
-            prompt = prompt[end + 1 :]
-            for opt in options.split():
-                logger.info(f"{prefix} option: {opt}")
-                
-                if opt.startswith("size:"):
-                    size = opt[5:]
-                elif opt.startswith("step:"):
-                    step = int(opt[5:])
-
-                    if step > 12:
-                        step = 12
-                    if step < 4:
-                        step = 4
-                elif opt == "more_detail":
-                    # add Lora to start
-                    prompt = "<lora:FluxMythP0rtr4itStyle:0.8>, <lora:FluxDFaeTasticDetails:0.8>\n" + prompt
-
-            # convert size
-            if size == "icon":
-                size = "128x128"
-            elif size == "large":
-                size = "768x1024"
-            elif size == "horizontal":
-                size = "1024x512"
-
-            prompt = prompt.strip()
-
-            logger.info(f"{prefix} more options: size={size} step={step} prompt={prompt}")
-        except:
-            logger.exception(f"{prefix} parse prompt error")
-
-    return
+    if more_detail:
+        prompt = "<lora:FluxMythP0rtr4itStyle:0.8>, <lora:FluxDFaeTasticDetails:0.8>\n" + prompt
 
     try:
         resp = await sd_api.txt2img(endpoint, prompt, 1, size=size, step=step)
