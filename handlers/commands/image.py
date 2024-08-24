@@ -83,11 +83,6 @@ async def image(msg: types.Message):
         prompt = strip_text_prefix(msg.reply_to_message.text) + "\n"
     prompt += strip_text_prefix(msg.text)
 
-    prompt = prompt.strip()
-
-    # DEBUG
-    logger.info(f"{prefix} prompt: '{prompt}'")
-
     # prompt as : [size:icon/large/horizontal step:4/8/16 more_detail] <raw prompt text>
     if not prompt:
         # display help message
@@ -97,8 +92,6 @@ async def image(msg: types.Message):
             now + timedelta(seconds=DELETED_AFTER),
         )
         return
-    
-    return
 
     if contains_chinese(prompt):
         try:
