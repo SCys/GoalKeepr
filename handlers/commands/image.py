@@ -199,6 +199,8 @@ async def process_task(task: Task):
             elif size == "horizontal":
                 size = "1024x512"
 
+            logger.info(f"{prefix} more options: size={size} step={step}")
+
         except:
             logger.exception(f"{prefix} parse prompt error")
 
