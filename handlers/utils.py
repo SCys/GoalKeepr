@@ -33,14 +33,13 @@ def contains_chinese(text: str) -> bool:
 
 def strip_text_prefix(raw: Optional[str]) -> str:
     """
-    remove the text prefix
+    清理函数
 
-    input 1: /something_command_prefix0 girl beautiful girl no face long leg
-    input 2: /something_command_prefix1@bot_name girl beautiful girl no face long leg
-    input 3: /something_command_prefix2@bot_name girl beautiful girl no face long leg
-    input 4: girl beautiful girl no face long leg
-
-    output: girl beautiful girl no face long leg
+    1. /something_command_prefix0 a bc => a bc
+    2. /something_command_prefix1@bot_name a bc => a bc
+    3. /something_command_prefix2@bot_name a bc => a bc
+    4. a bc => a bc
+    5. /something_command_prefix3 => '' (EMPTY TEXT)
     """
     if not raw:
         return ""
@@ -48,6 +47,10 @@ def strip_text_prefix(raw: Optional[str]) -> str:
     raw = raw.strip()
 
     if raw.startswith("/"):
-        raw = raw.split(maxsplit=1)[-1]
+        outptus = raw.split(maxsplit=1)
+        if len(outptus) > 1:
+            return outptus[1]
+
+        return ""
 
     return raw
