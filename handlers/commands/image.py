@@ -90,7 +90,6 @@ async def image(msg: types.Message):
         await manager.reply(
             msg,
             "Usage: /image [size:icon/large/horizontal step:4/8/16 more_detail] <text>\n\n",
-            now + timedelta(seconds=DELETED_AFTER),
         )
         return
 
@@ -243,11 +242,7 @@ async def process_task(task: Task):
         )
         cost = datetime.now() - created_at
 
-        caption = (
-            f"{task.reply_content}\n\n"
-            f"Size: {size} Step: {step}\n"
-            f"Cost: {str(cost)[:-7]}s"
-        )
+        caption = f"{task.reply_content}\n\n" f"Size: {size} Step: {step}\n" f"Cost: {str(cost)[:-7]}s"
 
         await manager.delete_message(task.chat_id, task.reply_message_id)
         await manager.bot.send_photo(
