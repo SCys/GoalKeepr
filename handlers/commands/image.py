@@ -1,11 +1,13 @@
 import asyncio
 import base64
+from ast import expr_context
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
 import translators as ts
 from aiogram import types
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from orjson import dumps, loads
 
@@ -245,25 +247,28 @@ async def process_task(task: Task):
         caption = f"{task.reply_content}\n\n" f"Size: {size} Step: {step}\n" f"Cost: {str(cost)[:-7]}s"
 
         await manager.delete_message(task.chat_id, task.reply_message_id)
-        await manager.bot.send_photo(
-            task.chat_id,
-            input_file,
-            reply_to_message_id=task.message_id,
-            caption=caption,
-            disable_notification=True,
-            has_spoiler=True,
-        )
-
-        logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
     except Exception as e:
         logger.exception(f"{prefix} sd txt2img error")
-
         await manager.edit_text(
             task.chat_id,
             task.reply_message_id,
             f"Task is failed(create before {str(cost)[:-7]}), please try again later.\n\n{str(e)}",
             datetime.now() + timedelta(seconds=DELETED_AFTER),
         )
+        return
+
+    try:
+        await manager.bot.send_photo(
+            task.chat_id,
+            input_file,
+            reply_to_message_id=task.message_id,
+            caption=caption[:1023],
+            disable_notification=True,
+            has_spoiler=True,
+        )
+        logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
+    except TelegramBadRequest as e:
+        logger.exception(f"{prefix} send photo error")
 
 
 async def worker():
