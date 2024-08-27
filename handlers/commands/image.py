@@ -107,15 +107,15 @@ async def image(msg: types.Message):
             options = prompt[1:end]
             prompt = prompt[end + 1 :]
             for opt in options.split():
-                opt = opt.lower()
+                opt = opt.lower().strip()
 
                 if opt.startswith("size:"):
                     size = opt[5:]
                 elif opt.startswith("step:"):
                     step = int(opt[5:])
 
-                    if step > 12:
-                        step = 12
+                    if step > 24:
+                        step = 24
                     if step < 4:
                         step = 4
                 elif opt == "more_detail":
