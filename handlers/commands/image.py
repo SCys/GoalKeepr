@@ -231,7 +231,6 @@ async def process_task(task: Task):
                 task.reply_message_id,
                 f"Task is failed(create before {str(cost)[:-7]}), please try again later.\n\n"
                 f"{resp['error']['code']} {resp['error']['message']}",
-                datetime.now() + timedelta(seconds=DELETED_AFTER),
             )
             return
 
@@ -253,7 +252,6 @@ async def process_task(task: Task):
             task.chat_id,
             task.reply_message_id,
             f"Task is failed(create before {str(cost)[:-7]}), please try again later.\n\n{str(e)}",
-            datetime.now() + timedelta(seconds=DELETED_AFTER),
         )
         return
 
