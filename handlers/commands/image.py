@@ -99,7 +99,7 @@ async def image(msg: types.Message):
 
     # get options
     size = "512x512"
-    step = 4
+    step = 8
     more_detail = False
     if prompt.startswith("["):
         try:
@@ -218,8 +218,8 @@ async def process_task(task: Task):
     step = task.options.get("step", 4)
     more_detail = task.options.get("more_detail", False)
 
-    if more_detail:
-        prompt = "<lora:FluxMythP0rtr4itStyle:0.8>, <lora:FluxDFaeTasticDetails:0.8>\n" + prompt
+    # if more_detail:
+    #     prompt = "<lora:FluxMythP0rtr4itStyle:0.8>, <lora:FluxDFaeTasticDetails:0.8>\n" + prompt
 
     try:
         resp = await sd_api.txt2img(endpoint, prompt, 1, size=size, step=step)
