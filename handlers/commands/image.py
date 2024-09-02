@@ -99,7 +99,7 @@ async def image(msg: types.Message):
 
     # get options
     size = "512x512"
-    step = 8
+    step = 4
     more_detail = False
     if prompt.startswith("["):
         try:
