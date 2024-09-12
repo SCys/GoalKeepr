@@ -6,10 +6,16 @@ import edge_tts
 
 logger = manager.logger
 
+LANGUAGES = {
+    'zh-CN': "zh-CN-XiaoxiaoNeural",
+    "en": "en-US-AriaNeural",
+    "ja": "ja-JP-NanamiNeural"
+}
 
-async def reply_tts(msg: types.Message, content: str, show_original=False):
+
+async def reply_tts(msg: types.Message, content: str, show_original=False, lang='zh-CN'):
     try:
-        voice_data = await edge_ext(content)
+        voice_data = await edge_ext(content, lang)
     except Exception:
         logger.exception(f"edge ext convert content to voice failed")
         return False
@@ -30,8 +36,8 @@ async def reply_tts(msg: types.Message, content: str, show_original=False):
     return True
 
 
-async def edge_ext(source: str):
-    communicate = edge_tts.Communicate(source, "zh-CN-XiaoxiaoNeural")
+async def edge_ext(source: str, lang='zh-CN'):
+    communicate = edge_tts.Communicate(source, LANGUAGES.get(lang, 'zh-CN'))
 
     data = b""
     async for chunk in communicate.stream():
