@@ -6,14 +6,10 @@ import edge_tts
 
 logger = manager.logger
 
-LANGUAGES = {
-    'zh-CN': "zh-CN-XiaoxiaoNeural",
-    "en": "en-US-AriaNeural",
-    "ja": "ja-JP-NanamiNeural"
-}
+SUPPORT_LANGUAGES = {"zh-CN": "zh-CN-XiaoxiaoNeural", "en": "en-US-AriaNeural", "ja": "ja-JP-NanamiNeural"}
 
 
-async def reply_tts(msg: types.Message, content: str, show_original=False, lang='zh-CN'):
+async def reply_tts(msg: types.Message, content: str, show_original=False, lang="zh-CN"):
     try:
         voice_data = await edge_ext(content, lang)
     except Exception:
@@ -36,8 +32,8 @@ async def reply_tts(msg: types.Message, content: str, show_original=False, lang=
     return True
 
 
-async def edge_ext(source: str, lang='zh-CN'):
-    communicate = edge_tts.Communicate(source, LANGUAGES.get(lang, 'zh-CN'))
+async def edge_ext(source: str, lang="zh-CN"):
+    communicate = edge_tts.Communicate(source, SUPPORT_LANGUAGES.get(lang, "zh-CN-XiaoxiaoNeural"))
 
     data = b""
     async for chunk in communicate.stream():
