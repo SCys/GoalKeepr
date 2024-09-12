@@ -1,4 +1,3 @@
-import re
 from datetime import timedelta
 
 import translators as ts
@@ -13,10 +12,6 @@ from ..utils import strip_text_prefix
 logger = manager.logger
 
 DELETED_AFTER = 5
-
-# ts.preaccelerate_and_speedtest(
-#     timeout=0.200,
-# )
 
 
 @manager.register("message", Command("tr", ignore_case=True, ignore_mention=True))
@@ -41,8 +36,13 @@ async def translate(msg: types.Message):
     # split content with space, if first argument in en, zh, convert it to en
     to_language = "zh-CN"
     parts = content.split(" ", 1)
-    if len(parts) > 1 and parts[0] in ["en", "zh"]:
-        to_language = "en" if parts[0] == "en" else "zh-CN"
+    if len(parts) > 1 and parts[0] in ["en", "zh", "jp"]:
+        if parts[0] == "en":
+            to_language = "en"
+        elif parts[0] == "jp":
+            to_language = "ja"
+        else:
+            to_language = "zh-CN"
         content = parts[1]
 
     try:
