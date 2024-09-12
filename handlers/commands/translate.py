@@ -57,4 +57,4 @@ async def translate(msg: types.Message):
             auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
         )
 
-    logger.info(f"user ({user.full_name} / {user.id}) start a translate task")
+    logger.info(f"user ({user.full_name} / {user.id}) start a translate task to language {to_language}")
