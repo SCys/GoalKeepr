@@ -215,8 +215,8 @@ async def process_task(task: Task):
 
     prompt = task.prompt.strip()
     size = task.options.get("size", "512x512")
-    step = task.options.get("step", 4)
-    more_detail = task.options.get("more_detail", False)
+    step = task.options.get("step", 2)
+    # more_detail = task.options.get("more_detail", False)
 
     # if more_detail:
     #     prompt = "<lora:FluxMythP0rtr4itStyle:0.8>, <lora:FluxDFaeTasticDetails:0.8>\n" + prompt
