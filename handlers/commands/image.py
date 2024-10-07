@@ -100,7 +100,7 @@ async def image(msg: types.Message):
     # get options
     size = "512x512"
     step = 4
-    more_detail = False
+    model = 'prefect_pony'
     if prompt.startswith("["):
         try:
             end = prompt.index("]")
@@ -116,11 +116,10 @@ async def image(msg: types.Message):
 
                     if step > 24:
                         step = 24
-                    if step < 4:
-                        step = 4
-                elif opt == "more_detail":
-                    # add Lora to start
-                    more_detail = True
+                    if step < 2:
+                        step = 2
+                elif opt == "model:":
+                    model = opt[6:]
 
             # convert size
             if size == "icon":
@@ -161,7 +160,7 @@ async def image(msg: types.Message):
         options={
             "size": size,
             "step": step,
-            "more_detail": more_detail,
+            "model": model,
         },
     )
 
@@ -216,13 +215,10 @@ async def process_task(task: Task):
     prompt = task.prompt.strip()
     size = task.options.get("size", "512x512")
     step = task.options.get("step", 2)
-    # more_detail = task.options.get("more_detail", False)
-
-    # if more_detail:
-    #     prompt = "<lora:FluxMythP0rtr4itStyle:0.8>, <lora:FluxDFaeTasticDetails:0.8>\n" + prompt
+    model = task.options.get("model", "prefect_pony")
 
     try:
-        resp = await sd_api.txt2img(endpoint, prompt, 1, size=size, step=step)
+        resp = await sd_api.txt2img(endpoint, prompt, model, 1, size=size, step=step)
         cost = datetime.now() - created_at
         if "error" in resp:
             logger.warning(f"{prefix} sd txt2img error: {resp['error']['code']} {resp['error']['message']}")

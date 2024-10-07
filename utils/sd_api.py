@@ -16,7 +16,7 @@ SAMPLER_NAME = "Euler a"
 SCHEDULER = "Simple"
 
 
-async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512", step=STEP) -> dict:
+async def txt2img(endpoint: str, raw: str, model: str = "prefect_pony", n: int = 1, size: str = "512x512", step=STEP) -> dict:
     """return is base64 str png"""
     # split the raw by ===, upside is prompt, downside is negative prompt
     if "===" in raw:
@@ -44,6 +44,7 @@ async def txt2img(endpoint: str, raw: str, n: int = 1, size: str = "512x512", st
     async with session.post(
         url=f"{endpoint}/sdapi/v1/txt2img",
         json={
+            "model": model,
             "prompt": PROMPT_PREFIX + prompt,
             "negative_prompt": NEGATIVE_PROMPT_PREFIX + negative_prompt,
             "seed": -1,
