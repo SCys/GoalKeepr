@@ -99,14 +99,14 @@ async def image(msg: types.Message):
 
     # get options
     size = "512x512"
-    step = 4
-    model = 'prefect_pony'
+    step = 9
+    model = "prefect_pony"
     if prompt.startswith("["):
         try:
             end = prompt.index("]")
             options = prompt[1:end]
             prompt = prompt[end + 1 :]
-            for opt in options.split():
+            for opt in options.split(" "):
                 opt = opt.lower().strip()
 
                 if opt.startswith("size:"):
@@ -131,7 +131,7 @@ async def image(msg: types.Message):
 
             prompt = prompt.strip()
 
-            # logger.info(f"{prefix} more options: size={size} step={step} prompt={prompt}")
+            logger.info(f"{prefix} more options: size={size} step={step} prompt={prompt} model={model}")
         except:
             logger.exception(f"{prefix} parse prompt error")
 
