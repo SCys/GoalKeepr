@@ -118,7 +118,7 @@ async def image(msg: types.Message):
                         step = 24
                     if step < 2:
                         step = 2
-                elif opt == "model:":
+                elif opt.startswith("model:"):
                     model = opt[6:]
 
             # convert size
