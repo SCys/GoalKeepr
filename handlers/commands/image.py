@@ -101,6 +101,7 @@ async def image(msg: types.Message):
     size = "512x512"
     step = 9
     model = "prefect_pony"
+    cfg = 1
     if prompt.startswith("["):
         try:
             end = prompt.index("]")
@@ -120,13 +121,15 @@ async def image(msg: types.Message):
                         step = 2
                 elif opt.startswith("model:"):
                     model = opt[6:]
+                elif opt.startswith("cfg:"):
+                    cfg = int(opt[4:])
 
             # convert size
             if size == "icon":
                 size = "128x128"
-            elif size == "large":
+            elif size == "lg":
                 size = "768x1024"
-            elif size == "horizontal":
+            elif size == "hor":
                 size = "1024x512"
 
             prompt = prompt.strip()
@@ -161,6 +164,7 @@ async def image(msg: types.Message):
             "size": size,
             "step": step,
             "model": model,
+            "cfg": cfg,
         },
     )
 
@@ -216,9 +220,10 @@ async def process_task(task: Task):
     size = task.options.get("size", "512x512")
     step = task.options.get("step", 2)
     model = task.options.get("model", "prefect_pony")
+    cfg = task.options.get("cfg", 1)
 
     try:
-        resp = await sd_api.txt2img(endpoint, prompt, model, 1, size=size, step=step)
+        resp = await sd_api.txt2img(endpoint, prompt, model, 1, size=size, step=step, cfg=cfg)
         cost = datetime.now() - created_at
         if "error" in resp:
             logger.warning(f"{prefix} sd txt2img error: {resp['error']['code']} {resp['error']['message']}")

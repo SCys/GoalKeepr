@@ -16,7 +16,9 @@ SAMPLER_NAME = "DPM++ 2M"
 SCHEDULER = "Simple"
 
 
-async def txt2img(endpoint: str, raw: str, model: str = "prefect_pony", n: int = 1, size: str = "512x512", step=STEP) -> dict:
+async def txt2img(
+    endpoint: str, raw: str, model: str = "prefect_pony", n: int = 1, size: str = "512x512", step=STEP, cfg=CFG_SCALE
+) -> dict:
     """return is base64 str png"""
     # split the raw by ===, upside is prompt, downside is negative prompt
     if "===" in raw:
@@ -54,7 +56,7 @@ async def txt2img(endpoint: str, raw: str, model: str = "prefect_pony", n: int =
             "batch_size": 1,
             "n_iter": n,
             "steps": step,
-            "cfg_scale": CFG_SCALE,
+            "cfg_scale": cfg,
             "width": width,
             "height": height,
             "restore_faces": False,
