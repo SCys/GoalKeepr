@@ -129,10 +129,10 @@ async def image(msg: types.Message):
                 size = "128x128"
             elif size == "small":
                 size = "512x512"
-            elif size == "normal":
-                size = "768x768"
             elif size == "large":
                 size = "768x1024"
+            else:
+                size = "768x768"
 
             prompt = prompt.strip()
 
