@@ -98,7 +98,7 @@ async def image(msg: types.Message):
     # advanced options
 
     # get options
-    size = "normal"
+    size = "768x768"
     step = 9
     model = "default"
     cfg = 1
