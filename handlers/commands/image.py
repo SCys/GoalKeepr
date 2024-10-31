@@ -133,11 +133,6 @@ async def image(msg: types.Message):
                 size = "768x768"
             elif size == "large":
                 size = "768x1024"
-            else:
-                await manager.reply(
-                    msg, "Invalid size. support: mini/small/normal/large", now + timedelta(seconds=DELETED_AFTER)
-                )
-                return
 
             prompt = prompt.strip()
 
