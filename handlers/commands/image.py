@@ -98,9 +98,9 @@ async def image(msg: types.Message):
     # advanced options
 
     # get options
-    size = "512x512"
+    size = "normal"
     step = 9
-    model = "prefect_pony"
+    model = "default"
     cfg = 1
     if prompt.startswith("["):
         try:
@@ -125,16 +125,23 @@ async def image(msg: types.Message):
                     cfg = int(opt[4:])
 
             # convert size
-            if size == "icon":
+            if size == "mini":
                 size = "128x128"
-            elif size == "lg":
+            elif size == "small":
+                size = "512x512"
+            elif size == "normal":
+                size = "768x768"
+            elif size == "large":
                 size = "768x1024"
-            elif size == "hor":
-                size = "1024x512"
+            else:
+                await manager.reply(
+                    msg, "Invalid size. support: mini/small/normal/large", now + timedelta(seconds=DELETED_AFTER)
+                )
+                return
 
             prompt = prompt.strip()
 
-            logger.info(f"{prefix} more options: size={size} step={step} prompt={prompt} model={model}")
+            logger.info(f"{prefix} more options: size={size} step={step} prompt={prompt} model={model} cfg={cfg}")
         except:
             logger.exception(f"{prefix} parse prompt error")
 
