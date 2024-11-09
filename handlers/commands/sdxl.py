@@ -65,9 +65,10 @@ async def sdxl(msg: types.Message):
         # error response
         if response.content_type == "application/json":
             resp = await response.json()
-            error = resp.error
-            logger.error(f"{prefix} cloudflare worker return error: {error}")
-            msg_err = await msg.reply(f"task is failed: cloudflare worker return error: {error.code} {error.message}.")
+            code = resp['error']['code']
+            message = resp['error']['message']
+            logger.error(f"{prefix} cloudflare worker return error: {code} {message}")
+            msg_err = await msg.reply(f"task is failed: cloudflare worker return error: {code} {message}.")
             return
 
         try:
@@ -75,7 +76,6 @@ async def sdxl(msg: types.Message):
         except:
             logger.exception(f"{prefix} cloudflare worker return invalid json")
             msg_err = await msg.reply(f"task is failed: cloudflare worker return invalid json.")
-            await manager.delete_message(chat, msg_err, msg.date + timedelta(seconds=DELETED_AFTER))
             return
 
     # send image
@@ -87,8 +87,7 @@ async def sdxl(msg: types.Message):
         await manager.bot.send_photo(chat.id, input_file, caption="---\n\rPower by Cloudflare AI")
     except:
         logger.exception(f"{prefix} send image failed")
-        msg_err = await msg.reply(f"task is failed: send image failed.")
-        await manager.delete_message(chat, msg_err, msg.date + timedelta(seconds=DELETED_AFTER))
+        await msg.reply(f"task is failed: send image failed.")
         return
 
     logger.info(f"{prefix} task is done")
