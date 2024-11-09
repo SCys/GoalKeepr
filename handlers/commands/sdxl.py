@@ -58,7 +58,7 @@ async def sdxl(msg: types.Message):
     ) as response:
         if response.status != 200:
             logger.error(f"{prefix} cloudflare worker return {response.status}")
-            msg_err = await msg.reply(f"task is failed: cloudflare worker return {response.status}.")
+            msg_err = await msg.reply(f"task is failed: cloudflare worker return {response.status} {await response.text()}.")
             await manager.delete_message(chat, msg_err, msg.date + timedelta(seconds=DELETED_AFTER))
             return
 
