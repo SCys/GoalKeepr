@@ -64,10 +64,10 @@ async def sdxl(msg: types.Message):
         # error response
         if response.content_type == "application/json":
             resp = await response.json()
-            code = resp['error']['code']
-            message = resp['error']['message']
+            code = resp["error"]["code"]
+            message = resp["error"]["message"]
             logger.error(f"{prefix} cloudflare worker return error: {code} {message}")
-            msg_err = await msg.reply(f"task is failed: cloudflare worker return error: {code} {message}.")
+            await msg.reply(f"task is failed: {code} {message}.")
             return
 
         try:
