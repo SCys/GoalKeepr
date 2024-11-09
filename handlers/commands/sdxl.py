@@ -1,8 +1,10 @@
 from datetime import timedelta
+
 from aiogram import types
 from aiogram.filters import Command
 
 from manager import manager
+
 from ..utils import strip_text_prefix
 
 logger = manager.logger
@@ -48,8 +50,9 @@ async def sdxl(msg: types.Message):
         "https://iscys.com/api/cf/ai/txt2img",
         json={
             "params": {
+                "model": "flux",
                 "prompt": strip_text_prefix(msg.text),
-                "step": 20,  # default is max step
+                "num_steps": 8,  # 4~8 steps
             },
         },
     ) as response:
