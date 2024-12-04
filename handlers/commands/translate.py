@@ -47,7 +47,9 @@ async def translate(msg: types.Message):
 
     try:
         result = ts.translate_text(content, to_language=to_language, translator="google")
-        await reply_tts(target, result, show_original=True, lang=to_language)
+        if isinstance(result, str):
+            await reply_tts(target, result, show_original=True, lang=to_language)
+
     except Exception as e:
         logger.exception("translate failed")
 

@@ -4,6 +4,7 @@ from datetime import datetime
 import edge_tts
 from aiogram import types
 from aiogram.filters import Command
+
 from manager import manager
 from utils.tts import reply_tts
 
@@ -28,6 +29,9 @@ async def tts(msg: types.Message):
     txt = msg.text
     if msg.reply_to_message:
         txt = msg.reply_to_message.text
+
+    if not txt:
+        return
 
     if txt.startswith("/tts"):
         txt = RE_CLEAR.sub("", txt, 1)
