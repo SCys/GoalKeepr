@@ -1,66 +1,50 @@
-from manager import manager
 from datetime import datetime
+
 import aioredis
+
+from manager import manager
 
 logger = manager.logger
 
 
-async def init_user(rdb: "aioredis.Redis", uid: int):
-    await rdb.hset(f"chat:user:{uid}", "disabled", 0)
-    await rdb.hset(f"chat:user:{uid}", "count", 0)
-    await rdb.hset(f"chat:user:{uid}", "quota", -1)
-    await rdb.hset(f"chat:user:{uid}", "last", "1970-01-01T00:00:00Z")
-
-
-async def ban_user(rdb: "aioredis.Redis", uid: int):
+async def ban_user(rdb: aioredis.Redis, uid: int):
     # check & set
-    if not await rdb.hexists(f"chat:user:{uid}", "disabled"):
-        await init_user(rdb, uid)
-        return
+    await _check_and_create_user(rdb, uid)
 
     await rdb.hset(f"chat:user:{uid}", "disabled", 1)
 
 
-async def allow_user(rdb: "aioredis.Redis", uid: int):
-    # check & set, use hexists
-    if not await rdb.hexists(f"chat:user:{uid}", "disabled"):
-        await init_user(rdb, uid)
-        return
+async def allow_user(rdb: aioredis.Redis, uid: int):
+    await _check_and_create_user(rdb, uid)
 
     await rdb.hset(f"chat:user:{uid}", "disabled", 0)
 
 
-async def increase_user_count(rdb: "aioredis.Redis", uid: int):
-    # check & set
-    if not await rdb.hexists(f"chat:user:{uid}", "count"):
-        await init_user(rdb, uid)
-        return
+async def increase_user_count(rdb: aioredis.Redis, uid: int):
+    await _check_and_create_user(rdb, uid)
 
     await rdb.hincrby(f"chat:user:{uid}", "count", 1)
     await rdb.hset(f"chat:user:{uid}", "last", datetime.now().isoformat())
 
 
-async def update_user_quota(rdb: "aioredis.Redis", uid: int, quota: int):
-    # check & set
-    if not await rdb.hexists(f"chat:user:{uid}", "quota"):
-        await init_user(rdb, uid)
-        return
+async def update_user_quota(rdb: aioredis.Redis, uid: int, quota: int):
+    await _check_and_create_user(rdb, uid)
 
     await rdb.hset(f"chat:user:{uid}", "quota", quota)
 
 
-async def count_user(rdb: "aioredis.Redis") -> int:
+async def count_user(rdb: aioredis.Redis) -> int:
     # use scan
     cursor = b"0"
     total = 0
     while cursor:
-        cursor, keys = await rdb.scan(cursor, match="chat:user:*", count=100) # type: ignore
+        cursor, keys = await rdb.scan(cursor, match="chat:user:*", count=100)  # type: ignore
         total += len(keys)
 
     return total
 
 
-async def total_user_requested(rdb: "aioredis.Redis") -> int:
+async def total_user_requested(rdb: aioredis.Redis) -> int:
     """
     计算所有的 chat:user:{uid}:count 总量
     """
@@ -68,7 +52,7 @@ async def total_user_requested(rdb: "aioredis.Redis") -> int:
     cursor = b"0"
     total = 0
     while cursor:
-        cursor, keys = await rdb.scan(cursor, match="chat:user:*", count=100) # type: ignore
+        cursor, keys = await rdb.scan(cursor, match="chat:user:*", count=100)  # type: ignore
         for key in keys:
             count = await rdb.hget(key, "count")
             if count:
@@ -77,7 +61,7 @@ async def total_user_requested(rdb: "aioredis.Redis") -> int:
     return total
 
 
-async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -> bool:
+async def check_user_permission(rdb: aioredis.Redis, chat_id: int, uid: int) -> bool:
     administrator = manager.config["ai"]["administrator"]
 
     # miss administator
@@ -119,3 +103,15 @@ async def check_user_permission(rdb: "aioredis.Redis", chat_id: int, uid: int) -
     except:
         logger.exception("check_user_permission")
         return False
+
+
+async def _check_and_create_user(rdb: aioredis.Redis, uid: int):
+    """初始化用户基础信息"""
+
+    if await rdb.hexists(f"chat:user:{uid}", "disabled"):
+        return
+
+    await rdb.hmset(
+        f"chat:user:{uid}",
+        {"disabled": 0, "count": 0, "quota": -1, "last": "1970-01-01T00:00:00Z"},
+    )
