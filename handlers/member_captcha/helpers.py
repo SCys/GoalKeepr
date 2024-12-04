@@ -4,7 +4,7 @@ from aiogram import types
 from aiogram.types.chat import Chat
 from aiogram.types.message import Message
 from aiogram.types.user import User
-from typing import Union
+from typing import Tuple, Union
 from manager import manager
 
 WELCOME_TEXT = (
@@ -70,7 +70,9 @@ ICONS = {
 logger = manager.logger
 
 
-def build_new_member_message(member: Union[types.ChatMemberRestricted, types.User], msg_timestamp):
+def build_new_member_message(
+    member: Union[types.ChatMemberRestricted, types.User], msg_timestamp
+) -> Tuple[str, types.InlineKeyboardMarkup]:
     """
     构建新用户验证信息的按钮和文字内容
     """
