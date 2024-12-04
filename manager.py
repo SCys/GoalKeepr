@@ -107,7 +107,10 @@ class Manager:
         logger.add(sys.stderr, level=20)
         logger.info("logger is setup")
 
-    def load_handlers(self):
+    def setup_handlers(self):
+        """
+        设置事件处理
+        """
         dp = self.dp
         handlers = self.handlers
 

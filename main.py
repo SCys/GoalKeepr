@@ -7,16 +7,16 @@ from manager import manager
 async def main():
     manager.load_config()
     manager.setup()
-    manager.load_handlers()
+    manager.setup_handlers()
 
     try:
         manager.is_running = True
 
         await manager.start()
     except KeyboardInterrupt:
-        manager.stop()
+        await manager.stop()
     except InterruptedError:
-        manager.stop()
+        await manager.stop()
 
 
 if __name__ == "__main__":
