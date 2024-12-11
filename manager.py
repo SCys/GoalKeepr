@@ -11,6 +11,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.exceptions import TelegramBadRequest
 
 import database
+from bs4 import BeautifulSoup, Tag
 
 logger = loguru.logger
 
@@ -197,6 +198,42 @@ class Manager:
             return await self.bot.get_chat_member(chat.id, member_id)
         except:
             logger.exception(f"chat {chat.id} member {member_id} check exception")
+
+    async def get_user_extra_info(self, username: str):
+        """
+        通过解析 Telegram 用户页面的 HTML，获取头像 URL 和 bio 信息
+        :param username: Telegram 用户名（不带@）
+        :return: 用户的头像 URL 和 bio 信息
+        """
+        url = f"https://t.me/{username}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        }
+
+        try:
+            session = await self.create_session()
+            async with session.get(url, headers=headers) as response:
+                if response.status != 200:
+                    return {"error": f"Failed to fetch page for {username}, status: {response.status}"}
+
+                page_content = await response.text()
+                soup = BeautifulSoup(page_content, "html.parser")
+
+                # 提取头像 URL
+                image_tag = soup.find("img", {"class": "tgme_page_photo_image"})
+                if isinstance(image_tag, Tag):
+                    image_url = image_tag.get("src")
+                else:
+                    image_url = None
+
+                # 提取 bio 信息
+                bio_tag = soup.find("div", {"class": "tgme_page_description"})
+                bio = bio_tag.text.strip() if bio_tag else None
+
+                return {"bio": bio, "image_url": image_url}
+        except Exception as e:
+            logger.error(f"Failed to fetch page for {username}: {e}")
+            return
 
     async def delete_message(
         self, chat: Union[int, types.Chat], msg: Union[int, types.Message, None], deleted_at: Union[datetime, None] = None
