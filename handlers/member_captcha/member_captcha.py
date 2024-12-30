@@ -5,9 +5,9 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 
-import loguru
 from aiogram import types
 from aiogram.enums import ChatMemberStatus
+from loguru import logger
 
 from manager import manager
 
@@ -16,10 +16,10 @@ from .helpers import accepted_member, build_captcha_message
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 DELETED_AFTER = 30
 
-# 使用 loguru 生成一个独立用于验证用户的日志记录器
-logger = loguru.Logger()
-logger.remove(0)
-logger.add("log/member_captcha.log", level="DEBUG", rotation="10 MB", compression="zip")
+# # 使用 loguru 生成一个独立用于验证用户的日志记录器
+# logger = loguru.add("log/member_captcha.log", level="DEBUG", rotation="10 MB", compression="zip")
+# logger.remove(0)
+# logger.add("log/member_captcha.log", level="DEBUG", rotation="10 MB", compression="zip")
 
 
 @manager.register("chat_member")
