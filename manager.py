@@ -112,11 +112,8 @@ class Manager:
         """
         设置事件处理
         """
-        dp = self.dp
-        handlers = self.handlers
-
-        for func, type_name, args, kwargs in handlers:
-            observer = dp.observers.get(type_name, None)
+        for func, type_name, args, kwargs in self.handlers:
+            observer = self.dp.observers.get(type_name, None)
             if not observer or not hasattr(observer, "register"):
                 logger.warning(f"dispatcher:unknown type {type_name}")
                 continue
@@ -125,13 +122,13 @@ class Manager:
             method(func, *args, **kwargs)
             logger.info(f"dispatcher {func.__name__}:{observer.event_name}.{method.__name__}({args}, {kwargs})")
 
-    def register(self, type_name, *router_args, **router_kwargs):
+    def register(self, type_name, *dispatcher_args, **dispatcher_kwargs):
         """
         延迟注册到 Dispatcher
         """
 
         def wrapper(func):
-            self.handlers.append((func, type_name, router_args, router_kwargs))
+            self.handlers.append((func, type_name, dispatcher_args, dispatcher_kwargs))
 
             @wraps(func)
             async def _wrapper(*args, **kwargs):

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from loguru import logger
 from aiogram import types
 from aiogram.enums import ChatMemberStatus
+from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER
 
 from manager import manager
 
@@ -22,7 +23,7 @@ DELETED_AFTER = 30
 # logger.add("log/member_captcha.log", level="DEBUG", rotation="10 MB", compression="zip")
 
 
-@manager.register("chat_member")
+@manager.register("chat_member", IS_NOT_MEMBER >> IS_MEMBER)
 async def member_captcha(event: types.ChatMemberUpdated):
     chat = event.chat
     member = event.new_chat_member
@@ -95,19 +96,19 @@ async def member_captcha(event: types.ChatMemberUpdated):
         logger.error(f"{log_prefix} get member failed")
 
     # 记录分数，分数越高，则加强更多检查
-    # score = 0
-    # username = member.user.username
-    # if username:
-    #     # 检查 bio, 如果内置了 telegram 的 https://t.me/+ 开头的链接，则默认静默超过5分钟
-    #     user_info = await manager.get_user_extra_info(username)
-    #     if user_info:
-    #         bio = user_info["bio"]
-    #         if bio and "https://t.me/+" in bio:
-    #             logger.info(f"{log_prefix} member bio found https://t.me/+, bad score +50")
-    #             score = score + 100
-    # else:
-    #     logger.info(f"{log_prefix} member has no username, bad score +10")
-    #     score = score + 30
+    score = 0
+    username = member.user.username
+    if username:
+        # 检查 bio, 如果内置了 telegram 的 https://t.me/+ 开头的链接，则默认静默超过5分钟
+        user_info = await manager.get_user_extra_info(username)
+        if user_info:
+            bio = user_info["bio"]
+            if bio and "https://t.me/+" in bio:
+                logger.info(f"{log_prefix} member bio found https://t.me/+, bad score +50")
+                score = score + 100
+    else:
+        logger.info(f"{log_prefix} member has no username, bad score +10")
+        score = score + 30
 
     # 频繁加入群，加倍检查？
     # try:
