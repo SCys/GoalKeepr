@@ -1,10 +1,10 @@
 import random
-from datetime import timedelta
-from aiogram import types
-from aiogram.types.chat import Chat
-from aiogram.types.message import Message
-from aiogram.types.user import User
+from datetime import datetime, timedelta
 from typing import Tuple, Union
+
+from aiogram import types
+from numpy import isin
+
 from manager import manager
 
 WELCOME_TEXT = (
@@ -70,18 +70,21 @@ ICONS = {
 logger = manager.logger
 
 
-def build_new_member_message(
-    member: Union[types.ChatMemberRestricted, types.User], msg_timestamp
+async def build_captcha_message(
+    member: Union[types.ChatMember, types.User],
+    msg_timestamp: datetime,
 ) -> Tuple[str, types.InlineKeyboardMarkup]:
     """
     构建新用户验证信息的按钮和文字内容
     """
-    if isinstance(member, types.ChatMemberRestricted):
+    if isinstance(member, (types.ChatMemberRestricted, types.ChatMemberMember)):
         member_id = member.user.id
-    else:  # User
+        member_name = member.user.full_name
+    elif isinstance(member, types.User):
         member_id = member.id
-
-    member_name = manager.username(member)
+        member_name = member.full_name
+    else:
+        raise ValueError(f"Unknown member type {type(member)}")
 
     # 用户组
     items = random.sample(list(ICONS.items()), k=5)
@@ -106,7 +109,7 @@ def build_new_member_message(
     return content, types.InlineKeyboardMarkup(inline_keyboard=[buttons_user, buttons_admin])
 
 
-async def accepted_member(chat: Chat, msg: Message, user: User):
+async def accepted_member(chat: types.Chat, msg: types.Message, user: types.User):
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
 
     try:

@@ -11,5 +11,7 @@ aioredis==2.0.1
 edge-tts==6.1.8
 aiosqlite==0.20.0
 
+beautifulsoup4==4.12.3
+
 # testing
 pytest
