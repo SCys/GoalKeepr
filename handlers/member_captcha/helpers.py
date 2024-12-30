@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from typing import Tuple, Union
 
 from aiogram import types
-from numpy import isin
 
 from manager import manager
 
