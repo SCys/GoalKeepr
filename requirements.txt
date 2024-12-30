@@ -5,6 +5,7 @@ pydub
 translators
 markdown
 tiktoken
+numpy
 md2tgmd==0.1.9
 aiogram==3.15.0
 aioredis==2.0.1
