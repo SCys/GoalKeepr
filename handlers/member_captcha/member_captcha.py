@@ -5,9 +5,9 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 
+from loguru import logger
 from aiogram import types
 from aiogram.enums import ChatMemberStatus
-from loguru import logger
 
 from manager import manager
 
@@ -40,8 +40,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     # 必须是普通成员或者被限制的成员
     if not isinstance(member, (types.ChatMemberRestricted, types.ChatMemberMember)):
-        status_name = ChatMemberStatus(member.status).name
-        logger.info(f"{log_prefix} status is {status_name}({member.status})")
+        logger.info(f"{log_prefix} status is {member.status}")
         return
 
     # 忽略太久之前的事件
@@ -49,10 +48,11 @@ async def member_captcha(event: types.ChatMemberUpdated):
         logger.warning(f"{log_prefix} too old: {event.date}")
         return
 
+    # FIXME 大量请求可能来自很久之前的邀请链接，所以暂时跳过此项检查
     # 忽略发自管理员的邀请
-    if event.from_user and await manager.is_admin(chat, event.from_user):
-        logger.info(f"{log_prefix} invite from admin")
-        return
+    # if event.from_user and await manager.is_admin(chat, event.from_user):
+    #     logger.info(f"{log_prefix} invite from admin")
+    #     return
 
     now = event.date
     logger.info(f"{log_prefix} found new member at {now} ttl is {now - event.date}")
