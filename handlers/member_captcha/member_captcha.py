@@ -35,9 +35,11 @@ async def member_captcha(event: types.ChatMemberUpdated):
         return
 
     member_id = member.user.id
-    member_name = member.user.full_name
+    member_name = member.user.username
 
-    log_prefix = f"chat {chat.id}({chat.title}) member {member_id}({member_name})"
+    log_prefix = f"chat {chat.id}({chat.title}) member {member_id}"
+    if member_name:
+        log_prefix += f"({member_name})"
 
     # 必须是普通成员或者被限制的成员
     if not isinstance(member, (types.ChatMemberRestricted, types.ChatMemberMember)):
@@ -97,18 +99,17 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     # 记录分数，分数越高，则加强更多检查
     score = 0
-    username = member.user.username
-    if username:
+    if member_name:
         # 检查 bio, 如果内置了 telegram 的 https://t.me/+ 开头的链接，则默认静默超过5分钟
-        user_info = await manager.get_user_extra_info(username)
+        user_info = await manager.get_user_extra_info(member_name)
         if user_info:
             bio = user_info["bio"]
             if bio and "https://t.me/+" in bio:
                 logger.info(f"{log_prefix} member bio found https://t.me/+, bad score +50")
-                score = score + 100
+                score = score + 50
     else:
         logger.info(f"{log_prefix} member has no username, bad score +10")
-        score = score + 30
+        score = score + 10
 
     # 频繁加入群，加倍检查？
     # try:
