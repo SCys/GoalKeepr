@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from loguru import logger
 from aiogram import types
 from aiogram.enums import ChatMemberStatus
-from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER
+from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter
 
 from manager import manager
 
@@ -23,7 +23,7 @@ DELETED_AFTER = 30
 # logger.add("log/member_captcha.log", level="DEBUG", rotation="10 MB", compression="zip")
 
 
-@manager.register("chat_member", IS_NOT_MEMBER >> IS_MEMBER)
+@manager.register("chat_member", ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
 async def member_captcha(event: types.ChatMemberUpdated):
     chat = event.chat
     member = event.new_chat_member
