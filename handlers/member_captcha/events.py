@@ -1,9 +1,6 @@
 from datetime import datetime, timedelta
 
 from aiogram import Bot, types
-from aiogram.enums import ChatMemberStatus
-from matplotlib.pyplot import isinteractive
-from numpy import isin
 
 from manager import manager
 
