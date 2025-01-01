@@ -3,7 +3,7 @@ import sys
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
-from typing import Dict, Optional, Union
+from typing import Optional, Union
 
 import aiohttp
 import aioredis
@@ -11,7 +11,6 @@ import loguru
 from aiogram import Bot, Dispatcher, types
 from aiogram.exceptions import TelegramBadRequest
 from bs4 import BeautifulSoup, Tag
-from fsspec import Callback
 
 import database
 
@@ -59,7 +58,7 @@ class Manager:
 
     # routes
     handlers = []
-    events: Dict[str, Callback] = {}
+    events = {}
 
     # running status
     is_running = False
