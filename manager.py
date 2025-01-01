@@ -3,15 +3,17 @@ import sys
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
+import aiohttp
 import aioredis
 import loguru
 from aiogram import Bot, Dispatcher, types
 from aiogram.exceptions import TelegramBadRequest
+from bs4 import BeautifulSoup, Tag
+from fsspec import Callback
 
 import database
-from bs4 import BeautifulSoup, Tag
 
 logger = loguru.logger
 
@@ -57,7 +59,7 @@ class Manager:
 
     # routes
     handlers = []
-    events = {}
+    events: Dict[str, Callback] = {}
 
     # running status
     is_running = False
@@ -209,7 +211,7 @@ class Manager:
 
         try:
             session = await self.create_session()
-            async with session.get(url, headers=headers) as response:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=7)) as response:
                 if response.status != 200:
                     return {"error": f"Failed to fetch page for {username}, status: {response.status}"}
 

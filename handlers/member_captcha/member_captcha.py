@@ -3,12 +3,13 @@
 """
 
 import asyncio
+import re
 from datetime import datetime, timedelta, timezone
 
-from loguru import logger
 from aiogram import types
 from aiogram.enums import ChatMemberStatus
 from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter
+from loguru import logger
 
 from manager import manager
 
@@ -16,11 +17,7 @@ from .helpers import accepted_member, build_captcha_message
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 DELETED_AFTER = 30
-
-# # 使用 loguru 生成一个独立用于验证用户的日志记录器
-# logger = loguru.add("log/member_captcha.log", level="DEBUG", rotation="10 MB", compression="zip")
-# logger.remove(0)
-# logger.add("log/member_captcha.log", level="DEBUG", rotation="10 MB", compression="zip")
+RE_TG_NAME = re.compile(r"^@[a-zA-Z0-9_]{5,32}$")
 
 
 @manager.register("chat_member", ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
@@ -99,14 +96,21 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     # 记录分数，分数越高，则加强更多检查
     score = 0
+    bio = None
     if member_name:
         # 检查 bio, 如果内置了 telegram 的 https://t.me/+ 开头的链接，则默认静默超过5分钟
         user_info = await manager.get_user_extra_info(member_name)
         if user_info:
             bio = user_info["bio"]
-            if bio and "https://t.me/+" in bio:
-                logger.info(f"{log_prefix} member bio found https://t.me/+, bad score +50")
-                score = score + 50
+            if bio:
+                if "https://t.me/+" in bio:
+                    logger.info(f"{log_prefix} member bio found https://t.me/+, bad score +50")
+                    score = score + 50
+                if RE_TG_NAME.search(bio):
+                    logger.info(f"{log_prefix} member bio found tg username, bad score +50")
+                    score = score + 50
+
+        logger.warning(f"{log_prefix} score more then zero, member {member_name}({member_id}) with bio:{bio}")
     else:
         logger.info(f"{log_prefix} member has no username, bad score +10")
         score = score + 10

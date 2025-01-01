@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta
-from aiogram import Bot
+
+from aiogram import Bot, types
 from aiogram.enums import ChatMemberStatus
+from matplotlib.pyplot import isinteractive
+from numpy import isin
+
 from manager import manager
 
 logger = manager.logger
@@ -21,28 +25,27 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
 
     prefix = f"chat {chat_id}({chat.title}) msg {message_id}"
 
-    status = member.status
-    if status == ChatMemberStatus.ADMINISTRATOR:
+    # status = member.status
+    if isinstance(member, types.ChatMemberAdministrator):
         logger.info(f"{prefix} member {member_id} is admin")
         return
-    elif status == ChatMemberStatus.CREATOR:
-        logger.info(f"{prefix} member {member_id} is creator")
+    elif isinstance(member, types.ChatMemberOwner):
+        logger.info(f"{prefix} member {member_id} is owner")
         return
-    elif status == ChatMemberStatus.LEFT:
+    elif isinstance(member, types.ChatMemberLeft):
         logger.info(f"{prefix} member {member_id} is left")
         return
-    elif status == ChatMemberStatus.KICKED:
+    elif isinstance(member, types.ChatMemberBanned):
         logger.info(f"{prefix} member {member_id} is kicked")
         return
-    elif status == ChatMemberStatus.MEMBER:
+    elif isinstance(member, types.ChatMemberMember):
         logger.info(f"{prefix} member {member_id} is member")
         return
-
-    if status == ChatMemberStatus.RESTRICTED and member.can_send_messages:
-        logger.info(f"{prefix} member {member_id} rights is accepted")
+    elif isinstance(member, types.ChatMemberRestricted) and member.can_send_messages:
+        logger.info(f"{prefix} member {member_id} can send messages")
         return
 
-    logger.info(f"{prefix} member {member_id} status is {status}")
+    logger.info(f"{prefix} member {member_id} status is {member.status}")
 
     try:
         await chat.ban(member_id, revoke_messages=True, until_date=timedelta(seconds=60))
