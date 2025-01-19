@@ -21,7 +21,7 @@ class ModelDescription:
 
 
 CONVERSATION_TTL = 3600
-DEFUALT_MODEL = "gemini-1.5-flash"
+DEFUALT_MODEL = "gemini-2.0-flash-exp"
 SUPPORTED_MODELS = {
     "gemini-1.5-flash": ModelDescription(
         name="Gemini 1.5 Flash",
@@ -30,13 +30,13 @@ SUPPORTED_MODELS = {
         rate_minute=15,
         rate_daily=1500,
     ),
-    # "gemini-1.5-pro": ModelDescription(
-    #     name="Gemini 1.5 Pro",
-    #     input_length=2097152,
-    #     output_length=8192,
-    #     rate_minute=2,
-    #     rate_daily=50,
-    # ),
+    "gemini-2.0-flash-exp": ModelDescription(
+        name="Gemini 1.5 Pro",
+        input_length=1048576,
+        output_length=8192,
+        rate_minute=10,
+        rate_daily=1500,
+    ),
     "mixtral-8x7b-32768": ModelDescription(
         name="Mixtral 8x7b from Groq",
         input_length=32768,
