@@ -8,7 +8,7 @@ from orjson import dumps, loads
 from manager import manager
 
 from ...utils import count_tokens
-from .func_txt import CONVERSATION_TTL, SUPPORTED_MODELS
+from .func_txt import CONVERSATION_TTL, SUPPORTED_MODELS, DEFUALT_MODEL
 from .func_user import allow_user, ban_user, count_user, total_user_requested, update_user_quota
 
 DELETED_AFTER = 15
@@ -300,7 +300,7 @@ async def operations_admin(
 
     # admin:model
     elif subcommand == "admin:settings:model":
-        model = settings.get("model", "gemini-1.0-pro")
+        model = settings.get("model", DEFUALT_MODEL)
         if len(arguments) > 1:
             model = arguments[1]
             if model not in SUPPORTED_MODELS:

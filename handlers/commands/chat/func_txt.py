@@ -31,8 +31,15 @@ SUPPORTED_MODELS = {
         rate_daily=1500,
     ),
     "gemini-2.0-flash-exp": ModelDescription(
-        name="Gemini 1.5 Pro",
+        name="Gemini 2.0 Flash Exp",
         input_length=1048576,
+        output_length=8192,
+        rate_minute=10,
+        rate_daily=1500,
+    ),
+    "gemini-2.0-flash-thinking-exp": ModelDescription(
+        name="Gemini 2.0 Flash Thinking Exp",
+        input_length=32768,
         output_length=8192,
         rate_minute=10,
         rate_daily=1500,
