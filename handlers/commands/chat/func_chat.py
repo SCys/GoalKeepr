@@ -25,10 +25,10 @@ include hash:
 
 DELETED_AFTER = 5
 BAN_MEMBER = 300  # 300s
+OUTPUT_MAX_LENGTH = 4096  # Telegram's max message length for text
+RE_CLEAR = re.compile(r"/chat(@[a-zA-Z0-9]+\s?)?")
 
 logger = manager.logger
-
-RE_CLEAR = re.compile(r"/chat(@[a-zA-Z0-9]+\s?)?")
 
 
 @manager.register("message", Command("chat", ignore_case=True, ignore_mention=True))
@@ -111,7 +111,16 @@ async def chat(msg: types.Message):
 
     try:
         text_resp = escape(text_resp)
-        await msg.reply(text_resp, parse_mode="MarkdownV2")
+        # Send the response in segments if it's too long
+
+        if len(text_resp) > OUTPUT_MAX_LENGTH:
+            parts = [text_resp[i : i + OUTPUT_MAX_LENGTH] for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH)]
+            for part in parts:
+                await msg.reply(part, parse_mode="MarkdownV2")
+
+        else:
+            await msg.reply(text_resp, parse_mode="MarkdownV2")
+
         success = True
 
     except exceptions.TelegramBadRequest as e:
