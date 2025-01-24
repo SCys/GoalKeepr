@@ -21,7 +21,7 @@ class ModelDescription:
     rate_daily: float
 
 
-PROMPT_SYSTEM = """You are a helpful and friendly chatbot."""
+PROMPT_SYSTEM = None
 CONVERSATION_TTL = 3600
 DEFUALT_MODEL = "gemini-2.0-flash-exp"
 SUPPORTED_MODELS = {
@@ -134,18 +134,16 @@ async def generate_text(chat: types.Chat, member: types.User, prompt: str):
                     chat_history = chat_history[0 : i - 1]
                     break
 
+    if prompt_system:
+        chat_history.insert(0, {"role": "system", "content": prompt_system})
+
     # request openai v1 like api
     url = f"{host}/v1/chat/completions"
     data = {
+        # "temperature": 1,
         "model": model_name,
         "max_tokens": model_input_length,
-        "temperature": 0.75,
-        # "top_p": 1,
-        # "top_k": 1,
-        "messages": [
-            {"role": "system", "content": prompt_system},
-            *chat_history,
-        ],
+        "messages": chat_history,
     }
 
     # show use model info
