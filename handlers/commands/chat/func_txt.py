@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import telegramify_markdown
 from aiogram import types
 from aiohttp import ClientTimeout
 from orjson import dumps, loads
@@ -20,6 +21,7 @@ class ModelDescription:
     rate_daily: float
 
 
+PROMPT_SYSTEM = """You are a helpful and friendly chatbot."""
 CONVERSATION_TTL = 3600
 DEFUALT_MODEL = "gemini-2.0-flash-exp"
 SUPPORTED_MODELS = {
@@ -72,7 +74,7 @@ async def generate_text(chat: types.Chat, member: types.User, prompt: str):
     proxy_token = config["ai"]["proxy_token"]
 
     # default prompts
-    prompt_system = "You are a chatbot. You are a helpful and friendly chatbot."
+    prompt_system = PROMPT_SYSTEM
     chat_history = [
         # last message
         {"role": "user", "content": prompt},
@@ -182,4 +184,4 @@ async def generate_text(chat: types.Chat, member: types.User, prompt: str):
             chat_history.append({"role": "assistant", "content": text})
             await rdb.set(f"chat:history:{member.id}", dumps(chat_history), ex=CONVERSATION_TTL)
 
-        return text + f"\n\nPower by *{SUPPORTED_MODELS[model_name].name}*"
+        return telegramify_markdown.markdownify(text + f"\n\nPower by *{SUPPORTED_MODELS[model_name].name}*")

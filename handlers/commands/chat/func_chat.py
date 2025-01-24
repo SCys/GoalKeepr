@@ -1,10 +1,8 @@
-from io import text_encoding
 import re
 from datetime import timedelta
 
 from aiogram import exceptions, types
 from aiogram.filters import Command
-from md2tgmd import escape
 
 from manager import manager
 
@@ -112,8 +110,6 @@ async def chat(msg: types.Message):
 
     try:
         # text_resp = escape(text_resp)
-
-        text_resp = re.sub(r"[_*[\]()~>#\+\-=|{}.!]", lambda x: "\\" + x.group(), text_resp)
 
         if len(text_resp) > OUTPUT_MAX_LENGTH:
             parts = [text_resp[i : i + OUTPUT_MAX_LENGTH] for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH)]
