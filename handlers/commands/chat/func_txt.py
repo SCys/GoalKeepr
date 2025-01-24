@@ -147,7 +147,7 @@ async def generate_text(chat: types.Chat, member: types.User, prompt: str):
     }
 
     # show use model info
-    logger.info(f"chat {chat.id} user {member.id} generate txt use model {model_name}({model_name})")
+    logger.info(f"chat {chat.id} user {member.id} generate txt use model {model_name}({SUPPORTED_MODELS[model_name].name})")
 
     session = await manager.bot.session.create_session()  # type: ignore
     async with session.post(
