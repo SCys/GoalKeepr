@@ -182,4 +182,4 @@ async def generate_text(chat: types.Chat, member: types.User, prompt: str):
             chat_history.append({"role": "assistant", "content": text})
             await rdb.set(f"chat:history:{member.id}", dumps(chat_history), ex=CONVERSATION_TTL)
 
-        return text + f"\n\nPower by *{SUPPORTED_MODELS[model_name]}*"
+        return text + f"\n\nPower by *{SUPPORTED_MODELS[model_name].name}*"

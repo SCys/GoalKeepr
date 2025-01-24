@@ -25,7 +25,7 @@ include hash:
 
 DELETED_AFTER = 5
 BAN_MEMBER = 300  # 300s
-OUTPUT_MAX_LENGTH = 4096  # Telegram's max message length for text
+OUTPUT_MAX_LENGTH = 3500  # Telegram's max message length for text
 RE_CLEAR = re.compile(r"/chat(@[a-zA-Z0-9]+\s?)?")
 
 logger = manager.logger
