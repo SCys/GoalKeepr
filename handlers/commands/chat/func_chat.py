@@ -110,8 +110,7 @@ async def chat(msg: types.Message):
     success = False
 
     try:
-        text_resp = escape(text_resp)
-        # Send the response in segments if it's too long
+        # text_resp = escape(text_resp)
 
         if len(text_resp) > OUTPUT_MAX_LENGTH:
             parts = [text_resp[i : i + OUTPUT_MAX_LENGTH] for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH)]
