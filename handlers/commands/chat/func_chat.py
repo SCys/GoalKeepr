@@ -123,7 +123,15 @@ async def chat(msg: types.Message):
 
     except exceptions.TelegramBadRequest as e:
         logger.exception(f"{prefix} invalid text format \n{text_resp}\n")
-        await msg.reply(text_resp, disable_web_page_preview=True)
+
+        if len(text_resp) > OUTPUT_MAX_LENGTH:
+            parts = [text_resp[i : i + OUTPUT_MAX_LENGTH] for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH)]
+            for part in parts:
+                await msg.reply(part, disable_web_page_preview=True)
+
+        else:
+            await msg.reply(text_resp, disable_web_page_preview=True)
+
         success = True
 
     except Exception as e:
