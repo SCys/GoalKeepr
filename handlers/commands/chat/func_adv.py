@@ -8,7 +8,7 @@ from orjson import dumps, loads
 from manager import manager
 
 from ...utils import count_tokens
-from .func_txt import CONVERSATION_TTL, SUPPORTED_MODELS, DEFUALT_MODEL
+from .func_txt import CONVERSATION_TTL, DEFUALT_MODEL, SUPPORTED_MODELS
 from .func_user import allow_user, ban_user, count_user, total_user_requested, update_user_quota
 
 DELETED_AFTER = 15
@@ -16,6 +16,7 @@ logger = manager.logger
 
 HELPER_TEXT = f"""每个会话超时时间|Conversation timeout: {CONVERSATION_TTL}s\n
 使用|Usage:
+
 /chat reset - 重置会话|Reset the conversation
 /chat detail - 查看会话详情|View conversation details
 /chat model - 查看当前会话的模型|View the current model of the conversation
@@ -26,9 +27,39 @@ HELPER_TEXT = f"""每个会话超时时间|Conversation timeout: {CONVERSATION_T
 """
 
 
+ADMIN_HELPER_TEXT = """
+管理员命令|Administrator commands:
+
+/chat admin:ban <user_id> - 禁用用户|Ban the user.
+/chat admin:allow <user_id> - 允许用户|Allow the user.
+/chat admin:quota <user_id> <quota> - 设置用户配额|Set the quota for the user.
+/chat admin:stats - 获取全局统计信息|Get global statistics.
+/chat admin:user <user_id> - 获取用户统计信息|Get user statistics.
+/chat admin:settings <key> <value> - 设置全局设置|Set global settings.
+"""
+
+
 async def operations_person(
     rdb: "aioredis.Redis", chat: types.Chat, msg: types.Message, user: types.User, subcommand: str, arguments: List[str]
 ):
+    """
+    Operations for normal users.
+
+    This function provides a variety of operations for normal users,
+    such as resetting the conversation, viewing the conversation details,
+    viewing the supported models, and setting the model for the conversation.
+
+    Parameters:
+        rdb (aioredis.Redis): The Redis client.
+        chat (types.Chat): The chat where the command is sent.
+        msg (types.Message): The message that contains the command.
+        user (types.User): The user who sent the command.
+        subcommand (str): The subcommand of the command.
+        arguments (List[str]): The arguments of the command.
+
+    Returns:
+        bool: Whether the command is handled successfully.
+    """
     if subcommand == "help":
         await msg.reply(HELPER_TEXT)
         return True
@@ -152,6 +183,25 @@ async def operations_person(
 async def operations_admin(
     rdb: "aioredis.Redis", chat: types.Chat, msg: types.Message, user: types.User, subcommand: str, arguments: List[str]
 ) -> bool:
+    """
+    Operations for administrators.
+
+    This function provides a variety of operations for administrators,
+    such as banning or allowing users, setting user quotas, and getting
+    user and global statistics.
+
+    Parameters:
+        rdb (aioredis.Redis): The Redis client.
+        chat (types.Chat): The chat where the command is sent.
+        msg (types.Message): The message that contains the command.
+        user (types.User): The user who sent the command.
+        subcommand (str): The subcommand of the command.
+        arguments (List[str]): The arguments of the command.
+
+    Returns:
+        bool: Whether the command is handled successfully.
+
+    """
     administrator = manager.config["ai"]["administrator"]
     if not administrator or user.id != int(administrator):
         return False
@@ -160,7 +210,16 @@ async def operations_admin(
     settings = await rdb.get(f"chat:settings:global")
     settings = loads(settings) if settings else {}
 
-    if subcommand == "admin:ban":
+    if subcommand == "admin:help":
+        # return ADMIN_HELPER_TEXT
+        await manager.reply(
+            msg,
+            ADMIN_HELPER_TEXT,
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER * 2),
+        )
+        return True
+
+    elif subcommand == "admin:ban":
         target_user_id = get_user_id(msg, arguments)
         if not target_user_id:
             await manager.reply(
