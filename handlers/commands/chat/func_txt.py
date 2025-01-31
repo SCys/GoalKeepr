@@ -60,6 +60,13 @@ SUPPORTED_MODELS = {
         rate_minute=0,
         rate_daily=0,
     ),
+    "deepseek-r1-distill-llama-70b": ModelDescription(
+        name="DeepSeek R1 Distill Llama 70B",
+        input_length=128000, # 128k
+        output_length=4096,
+        rate_minute=0,
+        rate_daily=0,
+    ),
 }
 
 
