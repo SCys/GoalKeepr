@@ -46,6 +46,13 @@ SUPPORTED_MODELS = {
         rate_minute=10,
         rate_daily=1500,
     ),
+    "gemini-2.0-pro-exp-02-05": ModelDescription(
+        name="Gemini 2.0 Pro Exp 02-05",
+        input_length=1048576,
+        output_length=8192,
+        rate_minute=10,
+        rate_daily=50,
+    ),
     "mixtral-8x7b-32768": ModelDescription(
         name="Mixtral 8x7b from Groq",
         input_length=32768,
