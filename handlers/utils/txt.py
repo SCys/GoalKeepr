@@ -207,7 +207,7 @@ async def generate_text(prompt: str, model_name: Optional[str] = None):
     if not host:
         logger.error("proxy host is empty")
         return
-    
+
     if not model_name:
         model_name = DEFUALT_MODEL
 
@@ -219,7 +219,7 @@ async def generate_text(prompt: str, model_name: Optional[str] = None):
         # "temperature": 1,
         "model": model_name,
         "max_tokens": 4096,
-        "messages": {"role": "user", "content": prompt},
+        "messages": [{"role": "user", "content": prompt}],
     }
 
     session = await manager.bot.session.create_session()  # type: ignore
@@ -248,7 +248,7 @@ async def generate_text(prompt: str, model_name: Optional[str] = None):
             message = data["error"]["message"]
             logger.error(f"generate text error: {code} {message}")
             return
-        
+
         logger.info(f"generate txt use model {model_name}({SUPPORTED_MODELS[model_name].name})")
 
         return data["choices"][0]["message"]["content"]
