@@ -8,7 +8,7 @@ from orjson import dumps, loads
 from manager import manager
 
 from ...utils import count_tokens
-from .func_txt import CONVERSATION_TTL, DEFUALT_MODEL, SUPPORTED_MODELS
+from ...utils.txt import CONVERSATION_TTL, DEFUALT_MODEL, SUPPORTED_MODELS
 from .func_user import allow_user, ban_user, count_user, total_user_requested, update_user_quota
 
 DELETED_AFTER = 15

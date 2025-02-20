@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import List, Optional
 
 import telegramify_markdown
 from aiogram import types
@@ -7,7 +8,7 @@ from orjson import dumps, loads
 
 from manager import manager
 
-from ...utils import count_tokens
+from .base import count_tokens
 
 logger = manager.logger
 
@@ -69,7 +70,7 @@ SUPPORTED_MODELS = {
     ),
     "deepseek-r1-distill-llama-70b": ModelDescription(
         name="DeepSeek R1 Distill Llama 70B",
-        input_length=128000, # 128k
+        input_length=128000,  # 128k
         output_length=4096,
         rate_minute=0,
         rate_daily=0,
@@ -77,7 +78,7 @@ SUPPORTED_MODELS = {
 }
 
 
-async def generate_text(chat: types.Chat, member: types.User, prompt: str):
+async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str):
     config = manager.config
 
     host = config["ai"]["proxy_host"]
@@ -197,3 +198,57 @@ async def generate_text(chat: types.Chat, member: types.User, prompt: str):
             await rdb.set(f"chat:history:{member.id}", dumps(chat_history), ex=CONVERSATION_TTL)
 
         return telegramify_markdown.markdownify(text + f"\n\nPower by *{SUPPORTED_MODELS[model_name].name}*")
+
+
+async def generate_text(prompt: str, model_name: Optional[str] = None):
+    config = manager.config
+
+    host = config["ai"]["proxy_host"]
+    if not host:
+        logger.error("proxy host is empty")
+        return
+    
+    if not model_name:
+        model_name = DEFUALT_MODEL
+
+    proxy_token = config["ai"]["proxy_token"]
+
+    # request openai v1 like api
+    url = f"{host}/v1/chat/completions"
+    data = {
+        # "temperature": 1,
+        "model": model_name,
+        "max_tokens": 4096,
+        "messages": {"role": "user", "content": prompt},
+    }
+
+    session = await manager.bot.session.create_session()  # type: ignore
+    async with session.post(
+        url,
+        json=data,
+        headers={"Authorization": f"Bearer {proxy_token}"},
+        timeout=ClientTimeout(
+            total=100,
+            connect=5,
+            sock_read=90,
+            sock_connect=10,
+        ),
+    ) as response:
+        if response.status != 200:
+            error_message = await response.text()
+            error_code = response.status
+            logger.error(f"generate text error: {error_code} {error_message}")
+            return f"System error: {error_code} {error_message}"
+
+        data = await response.json()
+
+        # check error
+        if "error" in data:
+            code = data["error"]["code"]
+            message = data["error"]["message"]
+            logger.error(f"generate text error: {code} {message}")
+            return
+        
+        logger.info(f"generate txt use model {model_name}({SUPPORTED_MODELS[model_name].name})")
+
+        return data["choices"][0]["message"]["content"]

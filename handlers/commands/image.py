@@ -1,16 +1,15 @@
 import asyncio
 import base64
-from ast import expr_context
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
-import translators as ts
 from aiogram import types
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from orjson import dumps, loads
 
+from ..utils.txt import generate_text
 from manager import manager
 from utils import sd_api
 
@@ -142,13 +141,25 @@ async def image(msg: types.Message):
 
     if contains_chinese(prompt):
         try:
-            result = ts.translate_text(prompt, to_language="en", translator="google")
-            reply_content = f"Prompt:\n{prompt}\n\nTranslated:\n{result}"
-            prompt = str(result)
-            logger.info(f"{prefix} translate chinese to english: {prompt}")
+            # result = ts.translate_text(prompt, to_language="en", translator="google")
+            # reply_content = f"Prompt:\n{prompt}\n\nTranslated:\n{result}"
+            # prompt = str(result)
+            # logger.info(f"{prefix} translate chinese to english: {prompt}")
+
+            reply_content = await generate_text("""Given a user prompt, generate an "Enhanced prompt" that provides detailed visual descriptions suitable for image generation. Evaluate the level of detail in the user prompt: 
+- If the prompt is simple, focus on adding specifics about colors, shapes, sizes, textures, and spatial relationships to create vivid and concrete scenes. 
+- If the prompt is already detailed, refine and enhance the existing details slightly without overcomplicating.  
+
+Here are examples of how to transform or refine prompts:
+ - User Prompt: A cat sleeping -> Enhanced: A small, fluffy white cat curled up in a round shape, sleeping peacefully on a warm sunny windowsill, surrounded by pots of blooming red flowers. 
+- User Prompt: A busy city street -> Enhanced: A bustling city street scene at dusk, featuring glowing street lamps, a diverse crowd of people in colorful clothing, and a double-decker bus passing by towering glass skyscrapers.  
+
+Please generate only the enhanced description for the prompt below and avoid including any additional commentary or evaluations: 
+User Prompt: """ + prompt)
+
         except Exception:
             logger.exception("translate failed")
-            reply_content = f"Prompt:\n{prompt}\n\nTraslate failed"
+            reply_content = f"Prompt:\n{prompt}"
     else:
         reply_content = f"Prompt:\n{prompt}"
 

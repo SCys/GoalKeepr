@@ -7,9 +7,8 @@ from aiogram.filters import Command
 from manager import manager
 
 from .func_adv import operations_admin, operations_person
-from .func_txt import generate_text
 from .func_user import check_user_permission, increase_user_count
-from ...utils import count_tokens
+from ...utils import count_tokens, tg_generate_text
 
 """
 user info as hash in redis, key prefix is chat:user:{{ user_id }}. 
@@ -97,7 +96,7 @@ async def chat(msg: types.Message):
         return
 
     try:
-        text_resp = await generate_text(chat, user, text)
+        text_resp = await tg_generate_text(chat, user, text)
         if not text_resp:
             logger.warning(f"{prefix} generate text error, ignored")
             return
