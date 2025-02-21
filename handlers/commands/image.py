@@ -161,7 +161,7 @@ async def image(msg: types.Message):
 
 **输出格式**：优化后的提示词 + 简短说明（技术适配原因）。  
 示例输入：*“一个女孩在森林里”*  
-示例输出：*“A young woman with silver braided hair, wearing a flowing emerald cloak, standing in a sunlit enchanted forest surrounded by bioluminescent mushrooms and ancient ruins, Studio Ghibli style, soft cinematic lighting, intricate details, 8K resolution --ar 3:4” （添加生物发光与建筑细节增强奇幻感，宽屏适配场景延展性）*
+示例输出：*“A young woman with silver braided hair, wearing a flowing emerald cloak, standing in a sunlit enchanted forest surrounded by bioluminescent mushrooms and ancient ruins, Studio Ghibli style, soft cinematic lighting, intricate details, 8K resolution --ar 3:4”*
 
 ---
 
