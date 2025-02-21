@@ -161,11 +161,6 @@ async def image(msg: types.Message):
 
 **输出格式**：仅输出优化后的提示词。
 
-示例：
-
-- 输入：*“一个女孩在森林里”*  
-- 输出：*“A young woman with silver braided hair, wearing a flowing emerald cloak, standing in a sunlit enchanted forest surrounded by bioluminescent mushrooms and ancient ruins, Studio Ghibli style, soft cinematic lighting, intricate details, 8K resolution --ar 3:4”*
-
 ---
 
 输入: """ + prompt
