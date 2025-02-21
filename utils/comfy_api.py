@@ -29,7 +29,7 @@ async def generate_image(
         width, height = map(int, size.lower().split("x"))
     except ValueError:
         raise ValueError("尺寸格式错误，应为 'widthxheight'，例如 '512x512'")
-    
+
     # random seed: The default value is 0, with a minimum of 0 and a maximum of 0xffffffffffffffff
     # seed = random.randint(0, 0xffffffffffffffff)
 
@@ -62,7 +62,10 @@ async def generate_image(
             "_meta": {"title": "Empty Latent Image"},
         },
         "6": {
-            "inputs": {"text": prompt, "clip": ["4", 1]},
+            "inputs": {
+                "text": prompt,
+                "clip": ["4", 1],
+            },
             "class_type": "CLIPTextEncode",
             "_meta": {"title": "CLIP Text Encode (Prompt)"},
         },
@@ -77,9 +80,14 @@ async def generate_image(
             "_meta": {"title": "VAE Decode"},
         },
         "9": {
-            "inputs": {"filename_prefix": "ComfyUI", "images": ["8", 0]},
+            "inputs": {"filename_prefix": "ComfyUI", "images": ["12", 0]},
             "class_type": "SaveImage",
             "_meta": {"title": "Save Image"},
+        },
+        "12": {
+            "inputs": {"value": ["8", 0]},
+            "class_type": "UnloadAllModels",
+            "_meta": {"title": "UnloadAllModels"},
         },
     }
 
