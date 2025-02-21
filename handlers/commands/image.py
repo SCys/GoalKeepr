@@ -153,7 +153,6 @@ async def image(msg: types.Message):
 
 3. **技术参数适配**  
    - 推荐添加质量关键词（*ultra-detailed, 8K resolution, Unreal Engine render*）与镜头类型（*wide-angle, macro*）。  
-   - 根据用户需求建议宽高比（*--ar 16:9*）及步骤数（*--steps 25*）以平衡速度与质量。  
 
 4. **逻辑与创意引导**  
    - 将抽象概念转化为具象元素（例：*"hope" → sunlight breaking through storm clouds*）。  
