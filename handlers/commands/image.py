@@ -159,7 +159,7 @@ async def image(msg: types.Message):
    - 将抽象概念转化为具象元素（例：*"hope" → sunlight breaking through storm clouds*）。  
    - 若描述模糊，提供多选项（例：*“奇幻场景”可细化为“龙与城堡”或“外星森林”*）。  
 
-**输出格式**：优化后的提示词 + 简短说明（技术适配原因）。  
+**输出格式**：仅输出优化后的提示词。
 
 示例：
 
