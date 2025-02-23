@@ -7,9 +7,12 @@ import random
 # ComfyUI API 端点
 API_URL = "http://10.1.3.10:7860"
 
+# CHECKPOINT_NAME = "flux1-schnell-fp8.safetensors"
+CHECKPOINT_NAME = "flux1-dev-fp8.safetensors"
+
 
 async def generate_image(
-    prompt: str, size: str = "512x512", steps: int = 20, cfg: float = 1.0
+    prompt: str, size: str = "512x512", steps: int = 12, cfg: float = 1.0
 ) -> str:
     """
     通过 ComfyUI API 异步生成图片
@@ -52,7 +55,7 @@ async def generate_image(
             "_meta": {"title": "KSampler"},
         },
         "4": {
-            "inputs": {"ckpt_name": "flux1-schnell-fp8.safetensors"},
+            "inputs": {"ckpt_name": CHECKPOINT_NAME},
             "class_type": "CheckpointLoaderSimple",
             "_meta": {"title": "Load Checkpoint"},
         },

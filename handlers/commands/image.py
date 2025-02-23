@@ -98,7 +98,7 @@ async def image(msg: types.Message):
 
     # get options
     size = "768x768"
-    step = 9
+    step = 12
     model = "default"
     cfg = 1
     if prompt.startswith("["):
@@ -249,7 +249,7 @@ async def process_task(task: Task):
 
     prompt = task.prompt.strip()
     size = task.options.get("size", "512x512")
-    step = task.options.get("step", 2)
+    step = task.options.get("step", 12)
     model = task.options.get("model", "prefect_pony")
     cfg = task.options.get("cfg", 1)
 
