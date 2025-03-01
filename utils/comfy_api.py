@@ -1,18 +1,11 @@
 import asyncio
 import base64
 
-import aiohttp
+from manager import manager
 
-# ComfyUI API 端点
-# API_URL = "http://10.1.3.10:7860"
-API_URL = "http://10.10.10.10:8188"
-
-# CHECKPOINT_NAME = "flux1-schnell-fp8.safetensors"
-# CHECKPOINT_NAME = "flux1-dev-fp8.safetensors"
-CHECKPOINT_NAME = "flux1-dev.safetensors"
 
 async def generate_image(
-    prompt: str, size: str = "512x512", steps: int = 12, cfg: float = 1.0
+    endpoint: str, checkpoint: str, prompt: str, size: str = "512x512", steps: int = 12, cfg: float = 1.0
 ) -> str:
     """
     通过 ComfyUI API 异步生成图片
@@ -55,7 +48,7 @@ async def generate_image(
             "_meta": {"title": "KSampler"},
         },
         "4": {
-            "inputs": {"ckpt_name": CHECKPOINT_NAME},
+            "inputs": {"ckpt_name": checkpoint},
             "class_type": "CheckpointLoaderSimple",
             "_meta": {"title": "Load Checkpoint"},
         },
@@ -95,46 +88,33 @@ async def generate_image(
     }
 
     try:
-        async with aiohttp.ClientSession() as session:
-            # 发送工作流请求
-            async with session.post(
-                f"{API_URL}/prompt", json={"prompt": workflow}
-            ) as prompt_response:
-                if prompt_response.status != 200:
-                    raise Exception(f"API请求失败: {prompt_response.status}")
+        session = await manager.create_session()
+        # 发送工作流请求
+        async with session.post(f"{endpoint}/prompt", json={"prompt": workflow}) as prompt_response:
+            if prompt_response.status != 200:
+                raise Exception(f"API请求失败: {prompt_response.status}")
 
-                prompt_data = await prompt_response.json()
-                prompt_id = prompt_data["prompt_id"]
+            prompt_data = await prompt_response.json()
+            prompt_id = prompt_data["prompt_id"]
 
-                # 等待图片生成完成
-                while True:
-                    async with session.get(f"{API_URL}/history") as history_response:
-                        if history_response.status == 200:
-                            history = await history_response.json()
-                            if (
-                                prompt_id in history
-                                and len(history[prompt_id]["outputs"]) > 0
-                            ):
-                                # 获取生成的图片文件名
-                                image_filename = history[prompt_id]["outputs"]["9"][
-                                    "images"
-                                ][0]["filename"]
+            # 等待图片生成完成
+            while True:
+                async with session.get(f"{endpoint}/history") as history_response:
+                    if history_response.status == 200:
+                        history = await history_response.json()
+                        if prompt_id in history and len(history[prompt_id]["outputs"]) > 0:
+                            # 获取生成的图片文件名
+                            image_filename = history[prompt_id]["outputs"]["9"]["images"][0]["filename"]
 
-                                # 通过 /view 接口获取图片数据
-                                async with session.get(
-                                    f"{API_URL}/view?filename={image_filename}"
-                                ) as image_response:
-                                    if image_response.status == 200:
-                                        image_data = await image_response.read()
-                                        base64_data = base64.b64encode(
-                                            image_data
-                                        ).decode("utf-8")
-                                        return base64_data
-                                    else:
-                                        raise Exception(
-                                            f"获取图片失败: {image_response.status}"
-                                        )
-                    await asyncio.sleep(1)
+                            # 通过 /view 接口获取图片数据
+                            async with session.get(f"{endpoint}/view?filename={image_filename}") as image_response:
+                                if image_response.status == 200:
+                                    image_data = await image_response.read()
+                                    base64_data = base64.b64encode(image_data).decode("utf-8")
+                                    return base64_data
+                                else:
+                                    raise Exception(f"获取图片失败: {image_response.status}")
+                await asyncio.sleep(1)
 
     except Exception as e:
         raise Exception(f"生成图片时发生错误: {str(e)}")

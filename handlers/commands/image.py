@@ -250,22 +250,12 @@ async def process_task(task: Task):
     prompt = task.prompt.strip()
     size = task.options.get("size", "512x512")
     step = task.options.get("step", 12)
-    model = task.options.get("model", "prefect_pony")
+    model = task.options.get("model", "flux1-dev-fp8.safetensors")
     cfg = task.options.get("cfg", 1)
 
     try:
-        # resp = await sd_api.txt2img(endpoint, prompt, model, 1, size=size, step=step, cfg=cfg)
-        img_raw = await comfy_api.generate_image(prompt, size, step, cfg)
+        img_raw = await comfy_api.generate_image(endpoint, model, prompt, size, step, cfg)
         cost = datetime.now() - created_at
-        # if "error" in resp:
-        #     logger.warning(f"{prefix} sd txt2img error: {resp['error']['code']} {resp['error']['message']}")
-        #     await manager.edit_text(
-        #         task.chat_id,
-        #         task.reply_message_id,
-        #         f"Task is failed(create before {str(cost)[:-7]}), please try again later.\n\n"
-        #         f"{resp['error']['code']} {resp['error']['message']}",
-        #     )
-        #     return
 
         # img_raw = resp["image"]
         logger.info(f"{prefix} task is processed(cost {cost.total_seconds()}s/120s).")
