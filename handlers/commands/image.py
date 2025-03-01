@@ -99,7 +99,7 @@ async def image(msg: types.Message):
     # get options
     size = "768x768"
     step = 12
-    model = "default"
+    model = "flux1-dev-fp8.safetensors"
     cfg = 1
     if prompt.startswith("["):
         try:
