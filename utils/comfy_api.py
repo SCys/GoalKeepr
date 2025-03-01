@@ -76,15 +76,15 @@ async def generate_image(
             "_meta": {"title": "VAE Decode"},
         },
         "9": {
-            "inputs": {"filename_prefix": "ComfyUI", "images": ["8", 0]},
+            "inputs": {"filename_prefix": "ComfyUI", "images": ["12", 0]},
             "class_type": "SaveImage",
             "_meta": {"title": "Save Image"},
         },
-        # "12": {
-        #     "inputs": {"value": ["8", 0]},
-        #     "class_type": "UnloadAllModels",
-        #     "_meta": {"title": "UnloadAllModels"},
-        # },
+        "12": {
+            "inputs": {"value": ["8", 0]},
+            "class_type": "UnloadAllModels",
+            "_meta": {"title": "UnloadAllModels"},
+        },
     }
 
     try:
