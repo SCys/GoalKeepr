@@ -1,15 +1,15 @@
-import aiohttp
 import asyncio
-from typing import Tuple
 import base64
-import random
+
+import aiohttp
 
 # ComfyUI API 端点
-API_URL = "http://10.1.3.10:7860"
+# API_URL = "http://10.1.3.10:7860"
+API_URL = "http://10.10.10.10:8188"
 
 # CHECKPOINT_NAME = "flux1-schnell-fp8.safetensors"
-CHECKPOINT_NAME = "flux1-dev-fp8.safetensors"
-
+# CHECKPOINT_NAME = "flux1-dev-fp8.safetensors"
+CHECKPOINT_NAME = "flux1-dev.safetensors"
 
 async def generate_image(
     prompt: str, size: str = "512x512", steps: int = 12, cfg: float = 1.0
