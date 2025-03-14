@@ -9,11 +9,12 @@ from datetime import datetime, timedelta, timezone
 from aiogram import types
 from aiogram.enums import ChatMemberStatus
 from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter
-from loguru import logger
+from loguru import Message, logger
 
 from manager import manager
 
 from .helpers import accepted_member, build_captcha_message
+from .session import Session
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 DELETED_AFTER = 30
@@ -75,6 +76,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     logger.info(f"{log_prefix} is restricted")
 
+    session = await Session.get(chat, member, event, now)
+
     # wait for other bot check
     await asyncio.sleep(3)
     if _member := await manager.chat_member(chat, member_id):
@@ -98,6 +101,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
     score = 0
     bio = None
     if member_name:
+        session.member_username 
+
         # 检查 bio, 如果内置了 telegram 的 https://t.me/+ 开头的链接，则默认静默超过5分钟
         user_info = await manager.get_user_extra_info(member_name)
         if user_info:
