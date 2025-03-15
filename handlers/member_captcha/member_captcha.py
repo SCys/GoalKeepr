@@ -15,6 +15,7 @@ from manager import manager
 
 from .helpers import accepted_member, build_captcha_message
 from .session import Session
+from utils.advertising import check_advertising
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 DELETED_AFTER = 30
@@ -34,6 +35,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     member_id = member.user.id
     member_name = member.user.username
+    member_fullname = member.user.full_name
 
     log_prefix = f"chat {chat.id}({chat.title}) member {member_id}"
     if member_name:
@@ -64,6 +66,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
             member_id,
             permissions=types.ChatPermissions(
                 can_send_messages=False,
+                can_send_media_messages=False,
                 can_send_other_messages=False,
                 can_add_web_page_previews=False,
             ),
@@ -102,52 +105,43 @@ async def member_captcha(event: types.ChatMemberUpdated):
     else:
         logger.error(f"{log_prefix} get member failed")
 
-    # 记录分数，分数越高，则加强更多检查
-    score = 0
-    bio = None
+    strings_will_be_check = [member_fullname]
+
     if member_name:
-        session.member_username
+        session.member_username = member_name
 
         # 检查 bio, 如果内置了 telegram 的 https://t.me/+ 开头的链接，则默认静默超过5分钟
         user_info = await manager.get_user_extra_info(member_name)
         if user_info:
             bio = user_info["bio"]
             if bio:
-                if "https://t.me/+" in bio:
-                    logger.info(
-                        f"{log_prefix} member bio found https://t.me/+, bad score +50"
-                    )
-                    score = score + 50
-                if RE_TG_NAME.search(bio):
-                    logger.info(
-                        f"{log_prefix} member bio found tg username, bad score +50"
-                    )
-                    score = score + 50
+                # if "https://t.me/+" in bio:
+                # if RE_TG_NAME.search(bio):
+                strings_will_be_check.append(bio)
+                session.member_bio = bio
 
-        logger.warning(
-            f"{log_prefix} score more then zero, member {member_name}({member_id}) with bio:{bio}"
-        )
-    else:
-        logger.info(f"{log_prefix} member has no username, bad score +10")
-        score = score + 10
+    # 检查广告和关键字
+    for txt in strings_will_be_check:
+        contains_adv, matched_word = check_advertising(txt)
 
-    # 频繁加入群，加倍检查？
-    # try:
-    #     if rdb := await manager.get_redis():
-    #         key = f"{chat.id}_{member_id}"
-    #         if await rdb.exists(key):
-    #             message_id: bytes = await rdb.hget(key, "message")
-    #             message_content: bytes = await rdb.hget(key, "message_content")
-    #             message_date: bytes = await rdb.hget(key, "message_date")
-    #             message_id = int(message_id.decode())
-    #             message_content = message_content.decode()
-    #             message_date = message_date.decode()
-    #             logger.warning(f"{log_prefix} found message {message_id}({message_content}) ")
-    #             await chat.ban(member_id, until_date=timedelta(seconds=60), revoke_messages=True)
-    #             await chat.delete_message(message_id)
-    #             return
-    # except Exception as e:
-    #     logger.error(f"{log_prefix} redis error:{e}")
+        if contains_adv:
+            try:
+                await manager.send(
+                    chat.id,
+                    f"用户 {member_id} 的名或者BIO明确包含广告内容，已经被剔除。\n"
+                    f"Message from {member_id} contains advertising content and has been removed.",
+                    auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
+                )
+                log_msg = f"{log_prefix}({member_fullname})"
+                if session.member_username:
+                    log_msg += f"({session.member_username})"
+                if session.member_bio:
+                    log_msg += f"(bio: {session.member_bio})"
+                logger.warning(log_msg + f" contains advertising content: {matched_word}")
+
+                return
+            except Exception as e:
+                logger.error(f"Failed to ban user {member_fullname}: {e}")
 
     message_content, reply_markup = await build_captcha_message(member, now)
 

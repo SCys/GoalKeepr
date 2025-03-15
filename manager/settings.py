@@ -1,4 +1,3 @@
-
 SETTINGS_TEMPLATE = {
     "default": {"debug": False},
     "telegram": {"token": ""},  # telegram robot token
@@ -22,5 +21,10 @@ SETTINGS_TEMPLATE = {
     },
     "sd_api": {
         "endpoint": "",
+    },
+    "advertising": {
+        "enabled": False,  # enable advertising words detection
+        "words": [],  # list of advertising words to detect
+        "regex_patterns": "",  # semicolon-separated regex patterns, format: "name:pattern;name2:pattern2"
     },
 }
