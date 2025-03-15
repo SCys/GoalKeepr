@@ -139,6 +139,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
                     log_msg += f"(bio: {session.member_bio})"
                 logger.warning(log_msg + f" contains advertising content: {matched_word}")
 
+                await chat.ban(member_id, until_date=timedelta(days=30), revoke_messages=True)
+
                 return
             except Exception as e:
                 logger.error(f"Failed to ban user {member_fullname}: {e}")
