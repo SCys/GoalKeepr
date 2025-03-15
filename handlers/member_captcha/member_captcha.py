@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from aiogram import types
 from aiogram.enums import ChatMemberStatus
 from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter
-from loguru import Message, logger
+from loguru import logger
 
 from manager import manager
 
