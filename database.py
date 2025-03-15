@@ -1,15 +1,8 @@
 import aiosqlite
 
-global_conn = None
-
 
 def connection():
-    global global_conn
-    
-    if global_conn is None:
-        global_conn = aiosqlite.connect("./data/main.db")
-
-    return global_conn
+    return aiosqlite.connect("./data/main.db", timeout=15.0)
 
 
 async def execute(query: str, *args, **kwargs):
