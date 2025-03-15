@@ -1,10 +1,8 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from json import dumps, loads
-from time import timezone
 from typing import Optional, Union
 
 from aiogram import types
-from sklearn.metrics import top_k_accuracy_score
 
 from manager import manager
 
