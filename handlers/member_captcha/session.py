@@ -1,5 +1,5 @@
 from datetime import datetime
-from json import dumps, loads
+from orjson import dumps, loads
 from typing import Optional, Union
 
 from aiogram import types
