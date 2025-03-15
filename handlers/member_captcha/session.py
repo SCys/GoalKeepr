@@ -51,7 +51,7 @@ class Session:
             return
         
         # 创建会话
-        data = {
+        session = Session(**{
             "id": f"member_captcha:{chat.id}:{member.user.id}",
             "chat": chat.title,
             "chat_id": chat.id,
@@ -66,8 +66,7 @@ class Session:
             "accepted": False,
             "timeout": False,
             "banned": False,
-        }
-        session = Session(**data)
+        })
 
         rdb = await manager.get_redis()
         if rdb:  # redis not ready

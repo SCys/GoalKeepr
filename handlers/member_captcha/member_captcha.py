@@ -77,6 +77,9 @@ async def member_captcha(event: types.ChatMemberUpdated):
     logger.info(f"{log_prefix} is restricted")
 
     session = await Session.get(chat, member, event, now)
+    if not session:
+        logger.error(f"{log_prefix} session not found")
+        return
 
     # wait for other bot check
     await asyncio.sleep(3)
