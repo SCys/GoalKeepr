@@ -33,7 +33,7 @@ def load_advertising_words() -> List[str]:
         # If words is a string, split it by comma
         words = [word.strip() for word in words.split(",") if word.strip()]
     
-    logger.info(f"Loaded {len(words)} advertising words from configuration")
+    logger.debug(f"Loaded {len(words)} advertising words from configuration")
     return words
 
 
@@ -88,7 +88,7 @@ def load_advertising_patterns() -> List[Dict[str, Any]]:
         except re.error as e:
             logger.error(f"Failed to compile regex pattern '{pattern}': {e}")
     
-    logger.info(f"Loaded {len(patterns)} advertising regex patterns from configuration")
+    logger.debug(f"Loaded {len(patterns)} advertising regex patterns from configuration")
     return patterns
 
 

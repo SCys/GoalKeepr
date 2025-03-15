@@ -263,12 +263,17 @@ class Manager:
         chat: chat with msg
         msg: msg will be sent
         """
+        auto_deleted_at = kwargs.pop("auto_deleted_at", None)
+
         try:
-            await self.bot.send_message(chat, msg, **kwargs)
+            resp = await self.bot.send_message(chat, msg, **kwargs)
             logger.info(f"chat {chat} message {msg} sent")
         except:
             logger.exception(f"chat {chat} message {msg} send error")
             return False
+        
+        if auto_deleted_at is not None:
+            await self.delete_message(chat, resp, auto_deleted_at)
 
         return True
 
