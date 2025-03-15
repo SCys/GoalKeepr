@@ -6,7 +6,7 @@ translators
 tiktoken
 telegramify_markdown
 
-aiogram==3.15.0
+aiogram==3.18.0
 aioredis==2.0.1
 edge-tts==6.1.8
 aiosqlite==0.20.0

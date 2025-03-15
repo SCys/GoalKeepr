@@ -88,7 +88,9 @@ async def member_captcha(event: types.ChatMemberUpdated):
         # if _member.status != ChatMemberStatus.RESTRICTED:
         if not isinstance(_member, types.ChatMemberRestricted):
             status_name = ChatMemberStatus(member.status).name
-            logger.info(f"{log_prefix} member is not restricted, current status is {status_name}")
+            logger.info(
+                f"{log_prefix} member is not restricted, current status is {status_name}"
+            )
             return
 
         # ignore member can send messages
@@ -104,7 +106,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
     score = 0
     bio = None
     if member_name:
-        session.member_username 
+        session.member_username
 
         # 检查 bio, 如果内置了 telegram 的 https://t.me/+ 开头的链接，则默认静默超过5分钟
         user_info = await manager.get_user_extra_info(member_name)
@@ -112,13 +114,19 @@ async def member_captcha(event: types.ChatMemberUpdated):
             bio = user_info["bio"]
             if bio:
                 if "https://t.me/+" in bio:
-                    logger.info(f"{log_prefix} member bio found https://t.me/+, bad score +50")
+                    logger.info(
+                        f"{log_prefix} member bio found https://t.me/+, bad score +50"
+                    )
                     score = score + 50
                 if RE_TG_NAME.search(bio):
-                    logger.info(f"{log_prefix} member bio found tg username, bad score +50")
+                    logger.info(
+                        f"{log_prefix} member bio found tg username, bad score +50"
+                    )
                     score = score + 50
 
-        logger.warning(f"{log_prefix} score more then zero, member {member_name}({member_id}) with bio:{bio}")
+        logger.warning(
+            f"{log_prefix} score more then zero, member {member_name}({member_id}) with bio:{bio}"
+        )
     else:
         logger.info(f"{log_prefix} member has no username, bad score +10")
         score = score + 10
@@ -143,16 +151,21 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     message_content, reply_markup = await build_captcha_message(member, now)
 
-    reply = await manager.bot.send_message(chat.id, message_content, parse_mode="markdown", reply_markup=reply_markup)
+    reply = await manager.bot.send_message(
+        chat.id, message_content, parse_mode="markdown", reply_markup=reply_markup
+    )
 
-    await manager.lazy_session(chat.id, -1, member_id, "new_member_check", now + timedelta(seconds=DELETED_AFTER))
+    await manager.lazy_session(
+        chat.id,
+        -1,
+        member_id,
+        "new_member_check",
+        now + timedelta(seconds=DELETED_AFTER),
+    )
     await manager.delete_message(chat, reply, now + timedelta(seconds=DELETED_AFTER))
 
 
-@manager.register(
-    "callback_query",
-    lambda q: q.message.reply_markup is not None,
-)
+@manager.register("callback_query")
 async def new_member_callback(query: types.CallbackQuery):
     """
     处理用户点击后的逻辑
@@ -206,7 +219,9 @@ async def new_member_callback(query: types.CallbackQuery):
     if is_admin and not is_self:
         items = data.split("__")
         if len(items) != 3:
-            logger.warning(f"{prefix} admin {operator.id}({manager.username(operator)}) invalid data {data}")
+            logger.warning(
+                f"{prefix} admin {operator.id}({manager.username(operator)}) invalid data {data}"
+            )
         else:
             member_id, _, op = items
             member_id = int(member_id)
@@ -228,7 +243,9 @@ async def new_member_callback(query: types.CallbackQuery):
             # reject
             elif op == "X":
                 await manager.delete_message(chat, msg)
-                await chat.ban(member_id, until_date=timedelta(days=30), revoke_messages=True)
+                await chat.ban(
+                    member_id, until_date=timedelta(days=30), revoke_messages=True
+                )
 
                 logger.warning(
                     f"{prefix} admin {operator.id}({manager.username(operator)}) kick "
@@ -236,7 +253,9 @@ async def new_member_callback(query: types.CallbackQuery):
                 )
 
             else:
-                logger.warning(f"{prefix} admin {operator.id}({manager.username(operator)}) invalid data {data}")
+                logger.warning(
+                    f"{prefix} admin {operator.id}({manager.username(operator)}) invalid data {data}"
+                )
 
     # user is chat member
     elif is_self:
@@ -245,7 +264,9 @@ async def new_member_callback(query: types.CallbackQuery):
 
             await accepted_member(chat, msg, operator)
 
-            logger.info(f"{prefix} user {operator.id}({manager.username(operator)}) is accepted")
+            logger.info(
+                f"{prefix} user {operator.id}({manager.username(operator)}) is accepted"
+            )
 
         elif data.endswith("__?"):
             content, reply_markup = await build_captcha_message(operator, msg.date)
@@ -253,9 +274,13 @@ async def new_member_callback(query: types.CallbackQuery):
             await msg.edit_text(content, parse_mode="markdown")
             await msg.edit_reply_markup(reply_markup=reply_markup)
 
-            logger.info(f"{prefix} user {operator.id}({manager.username(operator)}) click error button, reload")
+            logger.info(
+                f"{prefix} user {operator.id}({manager.username(operator)}) click error button, reload"
+            )
 
         else:
-            logger.warning(f"{prefix} member {operator.id}({manager.username(operator)}) invalid data {data}")
+            logger.warning(
+                f"{prefix} member {operator.id}({manager.username(operator)}) invalid data {data}"
+            )
 
     await query.answer(show_alert=False)
