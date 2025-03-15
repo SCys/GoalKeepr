@@ -71,7 +71,8 @@ class Session:
             if await rdb.exists(session.id):
                 old_data = loads(await rdb.get(session.id))
                 old_data["ts_update"] = now
-                ts_create = datetime.fromtimestamp(old_data["ts_create"])
+                # 2025-03-15T11:17:05+00:00
+                ts_create = datetime.strptime(old_data["ts_create"], "%Y-%m-%dT%H:%M:%S%z")
                 old_data["cost_captcha"] = (now - ts_create).total_seconds()
 
             await rdb.set(session.id, dumps(session.__dict__), TTL_SESSION)
