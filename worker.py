@@ -43,7 +43,7 @@ async def lazy_messages(bot: Bot):
     """
     处理延迟删除信息
     """
-    async with database.connection() as conn:
+    async with await database.connection() as conn:
         proxy = await conn.execute(SQL_FETCH_LAZY_DELETE_MESSAGES)
         rows = [i for i in await proxy.fetchall()]
         await proxy.close()
@@ -58,7 +58,7 @@ async def lazy_sessions(bot: Bot):
     """
     处理延迟会话
     """
-    async with database.connection() as conn:
+    async with await database.connection() as conn:
         proxy = await conn.execute(SQL_FETCH_SESSIONS)
         rows = [i for i in await proxy.fetchall()]
         await proxy.close()
@@ -66,7 +66,7 @@ async def lazy_sessions(bot: Bot):
     if not rows:
         return
 
-    async with database.connection() as conn:
+    async with await database.connection() as conn:
         for row in rows:
             id = row[0]
             chat = row[1]
@@ -90,7 +90,7 @@ async def main():
 
     bot = manager.bot
 
-    async with database.connection() as conn:
+    async with await database.connection() as conn:
         await conn.execute(SQL_CREATE_MESSAGES)
         await conn.execute(SQL_CREATE_NEW_MEMBER_SESSION)
 

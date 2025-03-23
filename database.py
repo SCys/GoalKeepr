@@ -13,6 +13,6 @@ async def connection():
 
 
 async def execute(query: str, *args, timeout=30.0, **kwargs):
-    conn = await connection()
-    await conn.execute(query, *args, **kwargs)
-    await conn.commit()
+    async with await connection() as conn:  
+        await conn.execute(query, *args, **kwargs)
+        await conn.commit()
