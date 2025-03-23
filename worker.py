@@ -43,45 +43,35 @@ async def lazy_messages(bot: Bot):
     """
     处理延迟删除信息
     """
-    async with await database.connection() as conn:
-        proxy = await conn.execute(SQL_FETCH_LAZY_DELETE_MESSAGES)
-        rows = [i for i in await proxy.fetchall()]
-        await proxy.close()
-
-        for row in rows:
-            if await manager.delete_message(row[1], row[2]):
-                await conn.execute("delete from lazy_delete_messages where id=$1", (row[0],))
-                await conn.commit()
+    rows = await database.execute_fetch(SQL_FETCH_LAZY_DELETE_MESSAGES)
+    
+    for row in rows:
+        if await manager.delete_message(row[1], row[2]):
+            await database.execute("delete from lazy_delete_messages where id=$1", (row[0],))
 
 
 async def lazy_sessions(bot: Bot):
     """
     处理延迟会话
     """
-    async with await database.connection() as conn:
-        proxy = await conn.execute(SQL_FETCH_SESSIONS)
-        rows = [i for i in await proxy.fetchall()]
-        await proxy.close()
-
+    rows = await database.execute_fetch(SQL_FETCH_SESSIONS)
+    
     if not rows:
         return
 
-    async with await database.connection() as conn:
-        for row in rows:
-            id = row[0]
-            chat = row[1]
-            msg = row[2]
-            member = row[3]
-            session_type = row[4]
+    for row in rows:
+        id = row[0]
+        chat = row[1]
+        msg = row[2]
+        member = row[3]
+        session_type = row[4]
 
-            func = manager.events.get(session_type)
-            if func and callable(func):
-                await func(bot, chat, msg, member)
+        func = manager.events.get(session_type)
+        if func and callable(func):
+            await func(bot, chat, msg, member)
 
-            await conn.execute("delete from lazy_sessions where id=$1", (id,))
-            logger.info(f"lazy session is touched:{id} {session_type}")
-
-        await conn.commit()
+        await database.execute("delete from lazy_sessions where id=$1", (id,))
+        logger.info(f"lazy session is touched:{id} {session_type}")
 
 
 async def main():
@@ -90,12 +80,12 @@ async def main():
 
     bot = manager.bot
 
-    async with await database.connection() as conn:
-        await conn.execute(SQL_CREATE_MESSAGES)
-        await conn.execute(SQL_CREATE_NEW_MEMBER_SESSION)
-
-        # 清理不必要的数据
-        await conn.execute("delete from lazy_sessions where checkout_at < datetime('now','-60 seconds')")
+    # Initialize database tables
+    await database.execute(SQL_CREATE_MESSAGES)
+    await database.execute(SQL_CREATE_NEW_MEMBER_SESSION)
+    
+    # 清理不必要的数据
+    await database.execute("delete from lazy_sessions where checkout_at < datetime('now','-60 seconds')")
 
     for name, func in manager.events.items():
         logger.info(f"event:{name} => {func}")
