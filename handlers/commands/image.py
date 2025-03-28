@@ -125,13 +125,13 @@ async def image(msg: types.Message):
 
             # convert size
             if size == "mini":
-                size = "128x128"
+                size = "128x128"  # icon
             elif size == "small":
-                size = "512x512"
-            elif size == "large":
-                size = "768x1024"
-            else:
                 size = "768x768"
+            elif size == "large":
+                size = "1024x1280"
+            else:
+                size = "1024x1024"
 
             prompt = prompt.strip()
 
@@ -139,9 +139,10 @@ async def image(msg: types.Message):
         except:
             logger.exception(f"{prefix} parse prompt error")
 
-    if ',' not in prompt:
+    if "," not in prompt:
         try:
-            prompt_new = await generate_text("""你是一个专为Flux.1 Dev模型设计的提示词优化专家。用户提供原始绘画描述后，你需要按以下规则优化并输出最终提示词：  
+            prompt_new = await generate_text(
+                """你是一个专为Flux.1 Dev模型设计的提示词优化专家。用户提供原始绘画描述后，你需要按以下规则优化并输出最终提示词：  
 
         1. **明确主体与细节**  
         - 添加具体特征（如服饰、材质、动作、表情），使用形容词强化画面感（例：*glowing neon lights, intricate lace details*）。  
@@ -162,10 +163,12 @@ async def image(msg: types.Message):
 
         ---
 
-        输入: """ + prompt)
+        输入: """
+                + prompt
+            )
             if prompt_new:
                 prompt = prompt_new
-                
+
             reply_content = f"Prompt:\n{prompt}"
 
         except Exception:
