@@ -24,29 +24,8 @@ class ModelDescription:
 
 PROMPT_SYSTEM = None
 CONVERSATION_TTL = 3600
-DEFUALT_MODEL = "gemini-2.0-flash-exp"
+DEFUALT_MODEL = "gemini-2.5-pro-exp-03-25"
 SUPPORTED_MODELS = {
-    "gemini-1.5-flash": ModelDescription(
-        name="Gemini 1.5 Flash",
-        input_length=1048576,
-        output_length=8192,
-        rate_minute=15,
-        rate_daily=1500,
-    ),
-    "gemini-2.0-flash-exp": ModelDescription(
-        name="Gemini 2.0 Flash Exp",
-        input_length=1048576,
-        output_length=8192,
-        rate_minute=10,
-        rate_daily=1500,
-    ),
-    "gemini-2.0-flash-thinking-exp": ModelDescription(
-        name="Gemini 2.0 Flash Thinking Exp",
-        input_length=32768,
-        output_length=8192,
-        rate_minute=10,
-        rate_daily=1500,
-    ),
     "gemini-2.0-pro-exp-02-05": ModelDescription(
         name="Gemini 2.0 Pro Exp 02-05",
         input_length=1048576,
@@ -54,26 +33,12 @@ SUPPORTED_MODELS = {
         rate_minute=10,
         rate_daily=50,
     ),
-    "mixtral-8x7b-32768": ModelDescription(
-        name="Mixtral 8x7b from Groq",
-        input_length=32768,
-        output_length=2048,
-        rate_minute=0,
-        rate_daily=0,
-    ),
-    "gemma2-9b-it": ModelDescription(
-        name="Gemma2 9b IT from Groq",
-        input_length=4096,
-        output_length=2048,
-        rate_minute=0,
-        rate_daily=0,
-    ),
-    "deepseek-r1-distill-llama-70b": ModelDescription(
-        name="DeepSeek R1 Distill Llama 70B",
-        input_length=128000,  # 128k
-        output_length=4096,
-        rate_minute=0,
-        rate_daily=0,
+    "gemini-2.5-pro-exp-03-25": ModelDescription(
+        name="Gemini 2.5 Pro Exp 03-25",
+        input_length=1048576,
+        output_length=65536,
+        rate_minute=2,
+        rate_daily=50,
     ),
 }
 
