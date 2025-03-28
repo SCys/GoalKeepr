@@ -97,7 +97,7 @@ async def image(msg: types.Message):
     # advanced options
 
     # get options
-    size = "768x768"
+    size = "1024x1024"
     step = 12
     model = "flux1-dev-fp8.safetensors"
     cfg = 1
