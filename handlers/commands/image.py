@@ -114,8 +114,8 @@ async def image(msg: types.Message):
                 elif opt.startswith("step:"):
                     step = int(opt[5:])
 
-                    if step > 24:
-                        step = 24
+                    if step > 50:
+                        step = 50
                     if step < 2:
                         step = 2
                 elif opt.startswith("model:"):
