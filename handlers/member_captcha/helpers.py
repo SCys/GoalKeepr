@@ -221,5 +221,5 @@ async def check_spams_with_llm(
 
         return [(member["id"], member["reason"]) for member in spams if member.get("id") and member.get("reason")]
     except Exception as e:
-        logger.error(f"check_spams_with_llm error: {e}")
+        logger.exception(f"check_spams_with_llm error: {e}")
         return []
