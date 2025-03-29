@@ -13,7 +13,7 @@ from loguru import logger
 
 from manager import manager
 
-from .helpers import accepted_member, build_captcha_message
+from .helpers import accepted_member, build_captcha_message, check_spams_with_llm
 from .session import Session
 from utils.advertising import check_advertising
 
@@ -119,6 +119,45 @@ async def member_captcha(event: types.ChatMemberUpdated):
                 # if RE_TG_NAME.search(bio):
                 strings_will_be_check.append(bio)
                 session.member_bio = bio
+
+    # TODO 需要优化，如果检测到广告，则直接静音，而不是发送消息
+    try:
+        llm_cost = datetime.now()
+
+        spams_result = await check_spams_with_llm(
+            [member],
+            session,
+            strings_will_be_check,
+            now,
+        )
+        if spams_result and len(spams_result) > 0:
+            # 过滤掉不需要的内容
+            spams_result = [
+                item for item in spams_result if item[0] == member_id
+            ]
+
+            if spams_result:
+                # TODO 需要优化，如果检测到广告，则直接静音，而不是发送消息
+                # try:
+                #     await manager.send(
+                #         chat.id,
+                #         f"用户 {member_id}({member_fullname}) 经过LLM(Gemma3 27B)检测，可能存在广告内容，请管理员手动处理。原因：{spams_result[0][1]}\n"
+                #         f"Member {member_id}({member_fullname}) has been muted due to containing advertising content.",
+                #         auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
+                #     )
+                #     return
+                # except Exception as e:
+                #     logger.error(f"Failed to ban user {member_fullname}: {e}")
+
+                logger.warning(
+                    f"{log_prefix}({member_fullname})"
+                    f"({member_name})({session.member_bio}) "
+                    f"contains advertising content: {spams_result[0][1]} "
+                    f"total cost {datetime.now() - llm_cost} "
+                )
+
+    except Exception as e:
+        logger.exception(f"Failed to check spams with llm: {e}")
 
     # 检查广告和关键字
     for txt in strings_will_be_check:

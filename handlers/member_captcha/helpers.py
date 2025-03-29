@@ -1,10 +1,14 @@
 import random
 from datetime import datetime, timedelta
-from typing import Tuple, Union
+from typing import List, Optional, Tuple, Union
 
+import orjson as json
 from aiogram import types
 
 from manager import manager
+from utils.txt import generate_text
+
+SPAM_MODEL_NAME = "gemma-3-27b-it"
 
 WELCOME_TEXT = (
     "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 *%(icon)s* 按钮后才能发言。\n\n *30秒* 内不操作即会被送走。\n\n"
@@ -150,3 +154,72 @@ async def accepted_member(chat: types.Chat, msg: types.Message, user: types.User
         chat, await msg.answer(content, parse_mode="markdown"), msg.date + timedelta(seconds=DELETED_AFTER)
     )
     await manager.lazy_session_delete(chat.id, user.id, "new_member_check")
+
+
+async def check_spams_with_llm(
+    members: List[Union[
+        types.ChatMemberOwner,
+        types.ChatMemberAdministrator,
+        types.ChatMemberMember,
+        types.ChatMemberRestricted,
+        types.ChatMemberLeft,
+        types.ChatMemberBanned,
+        types.User,
+    ]],
+    session=None,
+    additional_strings=None,
+    now=None,
+) -> List[Tuple[int, str]]:
+    try:
+        members_data = []
+        for member in members:
+            if hasattr(member, 'user'):
+                user = member.user
+            else:
+                user = member
+                
+            member_data = {
+                "id": user.id,
+                "username": getattr(user, 'username', None),
+                "first_name": getattr(user, 'first_name', None),
+                "last_name": getattr(user, 'last_name', None),
+                "fullname": user.full_name,
+            }
+            
+            if session and hasattr(session, 'member_bio') and session.member_bio:
+                member_data["bio"] = session.member_bio
+                
+            members_data.append(member_data)
+            
+        members_str = "\n".join([f"{i + 1}. {json.dumps(member)}" for i, member in enumerate(members_data)])
+
+        prompt = "分辨出那些用户是SPAM，这些用户资料来自 Telegram，判断依据：\n"
+        prompt += "1. username可能为null，不过fullname肯定有\n"
+        prompt += "2. 检查bio是否包含广告或推广内容\n"
+        prompt += "3. 检查用户名是否看起来像随机生成的\n"
+        prompt += "4. 检查用户资料是否有可疑模式\n\n"
+        prompt += f"用户数据：\n{members_str}\n\n"
+        
+        if additional_strings and len(additional_strings) > 0:
+            prompt += f"附加信息：\n{json.dumps(additional_strings)}\n\n"
+            
+        prompt += '仅输出JSON结构,不要输出其他任何资料，每个用户资料内添加一个 "reason" 字段说明判断理由\n\n'
+        prompt += '{ "spams": [] }\n'
+
+        result = await generate_text(prompt, SPAM_MODEL_NAME)
+        if not result:
+            return []
+
+        result = result.strip().replace("```json", "").replace("```", "")
+        data = json.loads(result)
+        if not data:
+            return []
+
+        spams = data.get("spams", [])
+        if not spams or len(spams) == 0:
+            return []
+
+        return [(member["id"], member["reason"]) for member in spams if member.get("id") and member.get("reason")]
+    except Exception as e:
+        logger.error(f"check_spams_with_llm error: {e}")
+        return []

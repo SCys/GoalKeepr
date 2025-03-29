@@ -165,7 +165,7 @@ async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str):
         return telegramify_markdown.markdownify(text + f"\n\nPower by *{SUPPORTED_MODELS[model_name].name}*")
 
 
-async def generate_text(prompt: str, model_name: Optional[str] = None):
+async def generate_text(prompt: str, model_name: Optional[str] = None, max_tokens=4096):
     config = manager.config
 
     host = config["ai"]["proxy_host"]
@@ -183,7 +183,7 @@ async def generate_text(prompt: str, model_name: Optional[str] = None):
     data = {
         # "temperature": 1,
         "model": model_name,
-        "max_tokens": 4096,
+        "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
     }
 
