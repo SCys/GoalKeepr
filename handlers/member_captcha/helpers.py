@@ -6,7 +6,7 @@ import orjson as json
 from aiogram import types
 
 from manager import manager
-from utils import generate_text
+from ..utils import generate_text
 
 SPAM_MODEL_NAME = "gemma-3-27b-it"
 
