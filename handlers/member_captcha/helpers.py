@@ -1,12 +1,12 @@
 import random
 from datetime import datetime, timedelta
-from typing import List, Optional, Tuple, Union
+from typing import List,  Tuple, Union
 
 import orjson as json
 from aiogram import types
 
 from manager import manager
-from utils.txt import generate_text
+from utils import generate_text
 
 SPAM_MODEL_NAME = "gemma-3-27b-it"
 
