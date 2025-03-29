@@ -214,6 +214,6 @@ async def generate_text(prompt: str, model_name: Optional[str] = None, max_token
             logger.error(f"generate text error: {code} {message}")
             return
 
-        logger.info(f"generate txt use model {model_name}({SUPPORTED_MODELS[model_name].name})")
+        logger.info(f"generate txt use model {model_name}")
 
         return data["choices"][0]["message"]["content"]
