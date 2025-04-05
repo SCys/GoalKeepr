@@ -59,7 +59,7 @@ async def setting_command(msg: types.Message):
         ]
     )
 
-    await msg.send_message(text, reply_markup=keyboard, disable_web_page_preview=True, disable_notification=True)
+    await msg.answer(text, reply_markup=keyboard, disable_web_page_preview=True, disable_notification=True)
     log.info(f"群组 {chat.id} 调用设置命令")
 
 
