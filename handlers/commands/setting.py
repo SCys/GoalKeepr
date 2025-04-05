@@ -37,23 +37,13 @@ async def setting_command(msg: types.Message):
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(
-                    text="认证剔除",
-                    callback_data="su:nm:ban"
-                )
+                InlineKeyboardButton(text="新成员处理方法: 认证剔除", callback_data="su:nm:ban"),
+                InlineKeyboardButton(text="新成员处理方法: 自动静默", callback_data="su:nm:silence"),
+                InlineKeyboardButton(text="新成员处理方法: 无作为", callback_data="su:nm:none"),
             ],
             [
-                InlineKeyboardButton(
-                    text="自动静默",
-                    callback_data="su:nm:silence"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="无作为",
-                    callback_data="su:nm:none"
-                )
-            ],
+                InlineKeyboardButton(text="取消", callback_data="cancel"),
+            ]
         ]
     )
 
@@ -71,8 +61,12 @@ async def setting_callback(query: types.CallbackQuery):
     if not rdb:
         log.error("Redis connection failed")
         return
-
+    
     try:
+        if query.data == "cancel":
+            await query.message.delete()
+            return
+
         # 使用':'分隔解析callback_data，例如 "su:nm:ban"
         parts = query.data.split(":")
         if len(parts) != 3 or parts[0] != "su" or parts[1] != "nm":
