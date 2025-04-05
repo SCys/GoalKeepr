@@ -7,7 +7,7 @@ SETTINGS_DEFAULT_VALUE = {
     "auto_ban_time_seconds": 24 * 60 * 60,
 }
 
-NEW_MEBMER_CHECK_METHODS = {"ban": "禁止", "silence": "静默", "none": "无作为"}
+NEW_MEBMER_CHECK_METHODS = {"ban": "认证剔除", "silence": "自动静默", "none": "无作为"}
 
 
 async def settings_get(rdb: aioredis.Redis, chat_id: int):

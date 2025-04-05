@@ -38,13 +38,13 @@ async def setting_command(msg: types.Message):
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="禁止",
+                    text="认证剔除",
                     callback_data="su:nm:ban"
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="静默",
+                    text="自动静默",
                     callback_data="su:nm:silence"
                 )
             ],
