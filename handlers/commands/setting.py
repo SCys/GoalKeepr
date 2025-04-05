@@ -22,7 +22,7 @@ async def setting_command(msg: types.Message):
     if not rdb:
         log.error("Redis connection failed")
         return
-    
+
     settings = await settings_get(rdb, chat.id)
 
     new_member_check_method = settings.get("new_member_check_method", "ban")
@@ -33,27 +33,25 @@ async def setting_command(msg: types.Message):
     text += f"新成员处理方法: {new_member_check_method_name}\n"
     text += f"点击按钮修改设置"
 
-    # 构建按钮 - 使用JSON结构的callback_data
+    # 构建按钮，使用简化的callback_data格式 "su:nm:<value>"
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
                     text="禁止",
-                    callback_data=json.dumps({"action": "setting_update", "key": "new_member_check_method", "value": "ban"}),
+                    callback_data="su:nm:ban"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="静默",
-                    callback_data=json.dumps(
-                        {"action": "setting_update", "key": "new_member_check_method", "value": "silence"}
-                    ),
+                    callback_data="su:nm:silence"
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="无作为",
-                    callback_data=json.dumps({"action": "setting_update", "key": "new_member_check_method", "value": "none"}),
+                    callback_data="su:nm:none"
                 )
             ],
         ]
@@ -68,36 +66,38 @@ async def setting_callback(query: types.CallbackQuery):
     if not await manager.is_admin(query.message.chat, query.from_user):
         log.warning(f"用户 {query.from_user.id} 尝试修改群组设置，但不是管理员")
         return
-    
+
     rdb = await manager.get_redis()
     if not rdb:
         log.error("Redis connection failed")
         return
 
     try:
-        data = json.loads(query.data)
-        if data["action"] == "setting_update":
-            key = data["key"]
-            value = data["value"]
+        # 使用':'分隔解析callback_data，例如 "su:nm:ban"
+        parts = query.data.split(":")
+        if len(parts) != 3 or parts[0] != "su" or parts[1] != "nm":
+            raise ValueError("callback_data格式错误")
+        value = parts[2]
+        key = "new_member_check_method"
 
-            # 更新设置
-            await settings_set(rdb, query.message.chat.id, {key: value})
+        # 更新设置
+        await settings_set(rdb, query.message.chat.id, {key: value})
 
-            # 读取更新后的设置
-            settings = await settings_get(rdb, query.message.chat.id)
-            new_member_check_method = settings.get("new_member_check_method", "ban")
-            new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(new_member_check_method, "未知")
+        # 读取更新后的设置
+        settings = await settings_get(rdb, query.message.chat.id)
+        new_member_check_method = settings.get("new_member_check_method", "ban")
+        new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(new_member_check_method, "未知")
 
-            # 更新消息文本
-            text = f"设置已更新！\n\n"
-            text += f"当前设置：\n"
-            text += f"新成员处理方法: {new_member_check_method_name}\n"
+        # 更新消息文本
+        text = f"设置已更新！\n\n"
+        text += f"当前设置：\n"
+        text += f"新成员处理方法: {new_member_check_method_name}\n"
 
-            log.info(f"群组 {query.message.chat.id} 更新设置: {key} = {value}")
+        log.info(f"群组 {query.message.chat.id} 更新设置: {key} = {value}")
 
-            await query.answer("设置已更新")
-            await query.message.edit_text(text)
-    except (json.JSONDecodeError, KeyError) as e:
+        await query.answer("设置已更新")
+        await query.message.edit_text(text)
+    except Exception as e:
         log.error(f"处理设置回调时出错: {e}")
         await query.answer("处理请求时出错")
 
