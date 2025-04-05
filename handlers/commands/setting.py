@@ -37,9 +37,9 @@ async def setting_command(msg: types.Message):
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="新成员处理方法: 认证剔除", callback_data="su:nm:ban"),
-                InlineKeyboardButton(text="新成员处理方法: 自动静默", callback_data="su:nm:silence"),
-                InlineKeyboardButton(text="新成员处理方法: 无作为", callback_data="su:nm:none"),
+                InlineKeyboardButton(text="认证剔除", callback_data="su:nm:ban"),
+                InlineKeyboardButton(text="自动静默", callback_data="su:nm:silence"),
+                InlineKeyboardButton(text="无作为", callback_data="su:nm:none"),
             ],
             [
                 InlineKeyboardButton(text="取消", callback_data="cancel"),
