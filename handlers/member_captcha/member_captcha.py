@@ -1,7 +1,3 @@
-"""
-校验新入群成员
-"""
-
 import asyncio
 import re
 from datetime import datetime, timedelta, timezone
@@ -13,9 +9,10 @@ from loguru import logger
 
 from manager import manager
 
-from .helpers import accepted_member, build_captcha_message, check_spams_with_llm
+from .helpers import accepted_member, build_captcha_message
 from .session import Session
 from utils.advertising import check_advertising
+from utils.llm import check_spams_with_llm
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
 DELETED_AFTER = 30

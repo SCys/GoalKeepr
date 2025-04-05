@@ -14,3 +14,6 @@ from .image import image
 
 # text completion
 from .chat import chat
+
+# setting
+from .setting import setting_command, setting_callback
