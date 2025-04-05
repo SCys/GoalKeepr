@@ -19,7 +19,10 @@ async def settings_get(rdb: aioredis.Redis, chat_id: int):
     if settings is None:
         return SETTINGS_DEFAULT_VALUE
 
-    return dict(zip(settings[::2], settings[1::2]))
+    # return dict(zip(settings[::2], settings[1::2]))
+    return {
+        k.decode("utf-8"): v.decode("utf-8") for k, v in settings.items()
+    }
 
 
 async def settings_set(rdb: aioredis.Redis, chat_id: int, mappings: dict):
