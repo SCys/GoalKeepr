@@ -18,7 +18,12 @@ async def setting_command(msg: types.Message):
         await chat.delete_message(msg.message_id)
         return
 
-    settings = await settings_get(manager.rdb, chat.id)
+    rdb = await manager.get_redis()
+    if not rdb:
+        log.error("Redis connection failed")
+        return
+    
+    settings = await settings_get(rdb, chat.id)
 
     new_member_check_method = settings.get("new_member_check_method", "ban")
     new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(new_member_check_method, "未知")
@@ -63,6 +68,11 @@ async def setting_callback(query: types.CallbackQuery):
     if not await manager.is_admin(query.message.chat, query.from_user):
         log.warning(f"用户 {query.from_user.id} 尝试修改群组设置，但不是管理员")
         return
+    
+    rdb = await manager.get_redis()
+    if not rdb:
+        log.error("Redis connection failed")
+        return
 
     try:
         data = json.loads(query.data)
@@ -71,10 +81,10 @@ async def setting_callback(query: types.CallbackQuery):
             value = data["value"]
 
             # 更新设置
-            await settings_set(manager.rdb, query.message.chat.id, {key: value})
+            await settings_set(rdb, query.message.chat.id, {key: value})
 
             # 读取更新后的设置
-            settings = await settings_get(manager.rdb, query.message.chat.id)
+            settings = await settings_get(rdb, query.message.chat.id)
             new_member_check_method = settings.get("new_member_check_method", "ban")
             new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(new_member_check_method, "未知")
 
