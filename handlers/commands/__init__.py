@@ -16,4 +16,4 @@ from .image import image
 from .chat import chat
 
 # setting
-from .setting import setting_command, setting_callback
+from .group_setting import setting_command, setting_callback

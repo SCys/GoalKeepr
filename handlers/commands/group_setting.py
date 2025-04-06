@@ -1,5 +1,3 @@
-import json
-
 from aiogram import types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -10,7 +8,7 @@ from manager.group import NEW_MEBMER_CHECK_METHODS, settings_get, settings_set
 log = manager.logger
 
 
-@manager.register("message", Command("setting", ignore_case=True, ignore_mention=True))
+@manager.register("message", Command("group_setting", ignore_case=True, ignore_mention=True))
 async def setting_command(msg: types.Message):
     chat = msg.chat
     user = msg.from_user
@@ -42,7 +40,7 @@ async def setting_command(msg: types.Message):
                 InlineKeyboardButton(text="无作为", callback_data="su:nm:none"),
             ],
             [
-                InlineKeyboardButton(text="取消", callback_data="cancel"),
+                InlineKeyboardButton(text="取消", callback_data="su:_:cancel"),
             ]
         ]
     )
@@ -56,6 +54,11 @@ async def setting_callback(query: types.CallbackQuery):
     if not await manager.is_admin(query.message.chat, query.from_user):
         log.warning(f"用户 {query.from_user.id} 尝试修改群组设置，但不是管理员")
         return
+    
+    # 检查callback_data是否以"su:nm:"开头
+    # 这可以防止其他回调数据干扰
+    if not query.data.startswith("su:"):
+        return
 
     rdb = await manager.get_redis()
     if not rdb:
@@ -63,14 +66,15 @@ async def setting_callback(query: types.CallbackQuery):
         return
     
     try:
-        if query.data == "cancel":
+        if query.data == "su:_:cancel":
             await query.message.delete()
             return
 
         # 使用':'分隔解析callback_data，例如 "su:nm:ban"
         parts = query.data.split(":")
         if len(parts) != 3 or parts[0] != "su" or parts[1] != "nm":
-            raise ValueError("callback_data格式错误")
+            return
+            
         value = parts[2]
         key = "new_member_check_method"
 
