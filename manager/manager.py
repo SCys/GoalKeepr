@@ -13,7 +13,6 @@ from aiogram.exceptions import TelegramBadRequest
 from bs4 import BeautifulSoup, Tag
 
 import database
-from manager import callback_handler
 
 from .settings import SETTINGS_TEMPLATE
 
@@ -60,6 +59,7 @@ class Manager:
         logger.info("bot is setup")
 
         self.setup_handlers()
+        self.setup_callback()
 
 
     def load_config(self):
@@ -107,6 +107,10 @@ class Manager:
             method = observer.register
             method(func, *args, **kwargs)
             logger.info(f"dispatcher {func.__name__}:{observer.event_name}.{method.__name__}({args}, {kwargs})")
+
+    def setup_callback(self):
+        self.dp.callback_query.register(self.default_callback)
+        logger.info("dispatcher callback_query is setup")
 
     def register(self, type_name, *args, **kwargs):
         """
@@ -359,3 +363,11 @@ class Manager:
 
     async def create_session(self):
         return await self.bot.session.create_session()  # type: ignore
+
+
+    async def default_callback(self, query: types.CallbackQuery):
+        """
+        默认回调处理程序
+        """
+        for func, args, kwargs in self.callback_handlers:
+            await func(query, *args, **kwargs)    
