@@ -1,3 +1,4 @@
+from pprint import pp
 from aiogram import types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -83,6 +84,10 @@ async def group_setting_callback(query: types.CallbackQuery):
 
         # 读取更新后的设置
         settings = await settings_get(rdb, query.message.chat.id)
+
+        import pprint
+        pprint.pprint(settings)
+
         new_member_check_method = settings.get("new_member_check_method", "ban")
         new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(new_member_check_method, "未知")
 

@@ -109,7 +109,7 @@ class Manager:
             logger.info(f"dispatcher {func.__name__}:{observer.event_name}.{method.__name__}({args}, {kwargs})")
 
     def setup_callback(self):
-        self.dp.callback_query.register(self.default_callback)
+        self.dp.callback_query.register(self._callback_handler)
         logger.info("dispatcher callback_query is setup")
 
     def register(self, type_name, *args, **kwargs):
@@ -365,7 +365,7 @@ class Manager:
         return await self.bot.session.create_session()  # type: ignore
 
 
-    async def default_callback(self, query: types.CallbackQuery):
+    async def _callback_handler(self, query: types.CallbackQuery):
         """
         默认回调处理程序
         """
