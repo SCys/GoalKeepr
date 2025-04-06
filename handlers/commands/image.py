@@ -13,7 +13,7 @@ import translators as ts
 from manager import manager
 from utils import comfy_api
 
-from ..utils import strip_text_prefix, contains_chinese, generate_text
+from ..utils import strip_text_prefix, contains_chinese, chat_completions
 
 logger = manager.logger
 
@@ -141,7 +141,7 @@ async def image(msg: types.Message):
 
     if "," not in prompt:
         try:
-            prompt_new = await generate_text(
+            prompt_new = await chat_completions(
                 """你是一个专为Flux.1 Dev模型设计的提示词优化专家。用户提供原始绘画描述后，你需要按以下规则优化并输出最终提示词：  
 
         1. **明确主体与细节**  

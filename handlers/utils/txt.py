@@ -165,7 +165,7 @@ async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str):
         return telegramify_markdown.markdownify(text + f"\n\nPower by *{SUPPORTED_MODELS[model_name].name}*")
 
 
-async def generate_text(prompt: str, model_name: Optional[str] = None, max_tokens=4096):
+async def chat_completions(prompt: str, model_name: Optional[str] = None, **kwargs):
     config = manager.config
 
     host = config["ai"]["proxy_host"]
@@ -181,10 +181,9 @@ async def generate_text(prompt: str, model_name: Optional[str] = None, max_token
     # request openai v1 like api
     url = f"{host}/v1/chat/completions"
     data = {
-        # "temperature": 1,
         "model": model_name,
-        "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
+        **kwargs,
     }
 
     session = await manager.bot.session.create_session()  # type: ignore
@@ -212,7 +211,7 @@ async def generate_text(prompt: str, model_name: Optional[str] = None, max_token
             code = data["error"]["code"]
             message = data["error"]["message"]
             logger.error(f"generate text error: {code} {message}")
-            return
+            return message
 
         logger.info(f"generate txt use model {model_name}")
 
