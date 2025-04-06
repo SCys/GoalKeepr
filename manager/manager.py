@@ -3,7 +3,7 @@ import sys
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
-from typing import Optional, Union
+from typing import Callable, List, Optional, Union
 
 import aiohttp
 import aioredis
@@ -13,6 +13,7 @@ from aiogram.exceptions import TelegramBadRequest
 from bs4 import BeautifulSoup, Tag
 
 import database
+from manager import callback_handler
 
 from .settings import SETTINGS_TEMPLATE
 
@@ -35,11 +36,31 @@ class Manager:
     # routes
     handlers = []
     events = {}
+    callback_handlers: List[Callable] = []
 
     # running status
     is_running = False
 
     logger = logger
+
+
+    def setup(self):
+        self.load_config()
+
+        self.setup_logger()
+
+        token = self.config["telegram"]["token"]
+        if not token:
+            logger.error("telegram token is missing")
+            sys.exit(1)
+
+        self.bot = Bot(token)
+        # DEBUG PROXY
+        # self.bot.session.proxy = 'http://10.1.3.16:3002'
+        logger.info("bot is setup")
+
+        self.setup_handlers()
+
 
     def load_config(self):
         """加载 main.ini，默认会配置相关代码"""
@@ -58,18 +79,6 @@ class Manager:
                 logger.info("settings is loaded from main.ini")
             except IOError:
                 pass
-
-    def setup(self):
-        self.setup_logger()
-
-        token = self.config["telegram"]["token"]
-        if not token:
-            logger.error("telegram token is missing")
-            sys.exit(1)
-
-        self.bot = Bot(token)
-        # self.bot.session.proxy = 'http://10.1.3.16:3002'
-        logger.info("bot is setup")
 
     def setup_logger(self):
         """设置logger"""
@@ -99,17 +108,20 @@ class Manager:
             method(func, *args, **kwargs)
             logger.info(f"dispatcher {func.__name__}:{observer.event_name}.{method.__name__}({args}, {kwargs})")
 
-    def register(self, type_name, *dispatcher_args, **dispatcher_kwargs):
+    def register(self, type_name, *args, **kwargs):
         """
         延迟注册到 Dispatcher
         """
 
         def wrapper(func):
-            self.handlers.append((func, type_name, dispatcher_args, dispatcher_kwargs))
+            if type_name == 'callback_query':
+                self.callback_handlers.append((func, args, kwargs))
+            else:
+                self.handlers.append((func, type_name, args, kwargs))
 
             @wraps(func)
             async def _wrapper(*args, **kwargs):
-                return func(*args, **kwargs)
+                return await func(*args, **kwargs)
 
             return _wrapper
 

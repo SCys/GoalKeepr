@@ -5,9 +5,7 @@ from manager import manager
 
 
 async def main():
-    manager.load_config()
     manager.setup()
-    manager.setup_handlers()
 
     try:
         manager.is_running = True

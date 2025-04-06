@@ -9,7 +9,7 @@ log = manager.logger
 
 
 @manager.register("message", Command("group_setting", ignore_case=True, ignore_mention=True))
-async def setting_command(msg: types.Message):
+async def group_setting_command(msg: types.Message):
     chat = msg.chat
     user = msg.from_user
     if not await manager.is_admin(chat, user):
@@ -41,7 +41,7 @@ async def setting_command(msg: types.Message):
             ],
             [
                 InlineKeyboardButton(text="取消", callback_data="su:_:cancel"),
-            ]
+            ],
         ]
     )
 
@@ -50,21 +50,21 @@ async def setting_command(msg: types.Message):
 
 
 @manager.register("callback_query")
-async def setting_callback(query: types.CallbackQuery):
-    if not await manager.is_admin(query.message.chat, query.from_user):
-        log.warning(f"用户 {query.from_user.id} 尝试修改群组设置，但不是管理员")
-        return
-    
+async def group_setting_callback(query: types.CallbackQuery):
     # 检查callback_data是否以"su:nm:"开头
     # 这可以防止其他回调数据干扰
     if not query.data.startswith("su:"):
+        return
+
+    if not await manager.is_admin(query.message.chat, query.from_user):
+        log.warning(f"用户 {query.from_user.id} 尝试修改群组设置，但不是管理员")
         return
 
     rdb = await manager.get_redis()
     if not rdb:
         log.error("Redis connection failed")
         return
-    
+
     try:
         if query.data == "su:_:cancel":
             await query.message.delete()
@@ -74,7 +74,7 @@ async def setting_callback(query: types.CallbackQuery):
         parts = query.data.split(":")
         if len(parts) != 3 or parts[0] != "su" or parts[1] != "nm":
             return
-            
+
         value = parts[2]
         key = "new_member_check_method"
 
