@@ -24,7 +24,7 @@ class ModelDescription:
 
 PROMPT_SYSTEM = None
 CONVERSATION_TTL = 3600
-DEFUALT_MODEL = "gemini-2.5-pro-exp-03-25"
+DEFUALT_MODEL = "google/gemini-2.5-pro-exp-03-25:free"
 SUPPORTED_MODELS = {
     "gemini-2.0-pro-exp-02-05": ModelDescription(
         name="Gemini 2.0 Pro Exp 02-05",
@@ -136,7 +136,7 @@ async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str):
     data = {
         # "temperature": 1,
         "model": model_name,
-        "max_tokens": model_input_length,
+        # "max_tokens": model_input_length,
         "messages": chat_history,
     }
 
