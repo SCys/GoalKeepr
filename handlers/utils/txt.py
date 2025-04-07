@@ -54,6 +54,13 @@ SUPPORTED_MODELS = {
         rate_minute=5,
         rate_daily=2500,
     ),
+    "qwen/qwen2.5-vl-32b-instruct:free": ModelDescription(
+        name="Qwen 2.5 VL 32B Instruct(openrouter:free)",
+        input_length=8096,
+        output_length=8096,
+        rate_minute=5,
+        rate_daily=2500,
+    ),
 }
 
 
