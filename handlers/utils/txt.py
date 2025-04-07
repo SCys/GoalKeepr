@@ -1,9 +1,9 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Dict, List, Optional, Any, Union
 
 import telegramify_markdown
 from aiogram import types
-from aiohttp import ClientTimeout
+from aiohttp import ClientSession, ClientTimeout, ClientResponse
 from orjson import dumps, loads
 
 from manager import manager
@@ -24,7 +24,7 @@ class ModelDescription:
 
 PROMPT_SYSTEM = None
 CONVERSATION_TTL = 3600
-DEFUALT_MODEL = "google/gemini-2.5-pro-exp-03-25:free"
+DEFAULT_MODEL = "google/gemini-2.5-pro-exp-03-25:free"
 SUPPORTED_MODELS = {
     "gemini-2.0-pro-exp-02-05": ModelDescription(
         name="Gemini 2.0 Pro Exp 02-05",
@@ -41,14 +41,14 @@ SUPPORTED_MODELS = {
         rate_daily=50,
     ),
     "google/gemini-2.5-pro-exp-03-25:free": ModelDescription(
-        name="Gemini 2.5 Pro Exp 03-25",
+        name="Gemini 2.5 Pro Exp 03-25(openrouter:free)",
         input_length=1000000,
         output_length=65536,
         rate_minute=5,
         rate_daily=2500,
     ),
     "meta-llama/llama-4-scout:free": ModelDescription(
-        name="Meta Llama 4 Scout",
+        name="Meta Llama 4 Scout(openrouter:free)",
         input_length=512000,
         output_length=512000,
         rate_minute=5,
@@ -57,13 +57,52 @@ SUPPORTED_MODELS = {
 }
 
 
-async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str):
+async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict[str, Any]:
+    """Make API request to LLM provider and handle common error cases"""
+    session = await manager.bot.session.create_session()  # type: ignore
+    
+    try:
+        async with session.post(
+            url,
+            json=data,
+            headers={"Authorization": f"Bearer {proxy_token}"},
+            timeout=ClientTimeout(
+                total=100,
+                connect=5,
+                sock_read=90,
+                sock_connect=10,
+            ),
+        ) as response:
+            if response.status != 200:
+                error_message = await response.text()
+                error_code = response.status
+                logger.error(f"API request error: {error_code} {error_message}")
+                raise ValueError(f"System error: {error_code} {error_message}")
+
+            response_data = await response.json()
+
+            # check error
+            if "error" in response_data:
+                code = response_data["error"].get("code", "unknown")
+                message = response_data["error"].get("message", "Unknown error")
+                logger.error(f"API response error: {code} {message}")
+                raise ValueError(message)
+                
+            return response_data
+    except Exception as e:
+        if not isinstance(e, ValueError):
+            logger.exception("Unexpected error during API request")
+            raise ValueError(f"Request failed: {str(e)}")
+        raise
+
+
+async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str) -> Optional[str]:
     config = manager.config
 
     host = config["ai"]["proxy_host"]
     if not host:
         logger.error("proxy host is empty")
-        return
+        return None
 
     proxy_token = config["ai"]["proxy_token"]
 
@@ -75,7 +114,7 @@ async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str):
     ]
 
     # first key as default model
-    model_name = DEFUALT_MODEL
+    model_name = DEFAULT_MODEL
     model_input_length = SUPPORTED_MODELS[model_name].input_length
 
     rdb = await manager.get_redis()
@@ -96,9 +135,9 @@ async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str):
         if prompt_system_person:
             prompt_system = str(prompt_system_person).strip()
 
-        # global model
-        model_global = settings_global.get("model")
+        # Select model based on user and global settings
         model_person = settings_person.get("model")
+        model_global = settings_global.get("model")
 
         if model_person in SUPPORTED_MODELS:
             model_name = model_person
@@ -107,10 +146,9 @@ async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str):
 
         # fallback to default model
         if not model_name or model_name not in SUPPORTED_MODELS:
-            model_name = DEFUALT_MODEL
+            model_name = DEFAULT_MODEL
 
         model_input_length = SUPPORTED_MODELS[model_name].input_length
-
         truncate_input = min(model_input_length * 0.99, model_input_length - 1024)
 
         # 从Redis获取之前的对话历史
@@ -120,79 +158,56 @@ async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str):
             prev_chat_history = loads(prev_chat_history)
             chat_history = [*prev_chat_history, *chat_history]
 
-            # 限制Tokens数字为32k，并且删除多余的历史记录
+            # 限制Tokens数字，并且删除多余的历史记录
             tokens = 0
             for i, msg in enumerate(chat_history):
                 tokens += count_tokens(msg["content"])
                 if tokens > truncate_input:
-                    chat_history = chat_history[0 : i - 1]
+                    chat_history = chat_history[0:i-1]
                     break
 
     if prompt_system:
         chat_history.insert(0, {"role": "system", "content": prompt_system})
 
-    # request openai v1 like api
+    # API request preparation
     url = f"{host}/v1/chat/completions"
     data = {
-        # "temperature": 1,
         "model": model_name,
-        # "max_tokens": model_input_length,
+        "max_tokens": 4096,  # 设置一个合理的固定输出token限制
         "messages": chat_history,
     }
 
-    # show use model info
+    # Log model usage information
     logger.info(f"chat {chat.id} user {member.id} generate txt use model {model_name}({SUPPORTED_MODELS[model_name].name})")
 
-    session = await manager.bot.session.create_session()  # type: ignore
-    async with session.post(
-        url,
-        json=data,
-        headers={"Authorization": f"Bearer {proxy_token}"},
-        timeout=ClientTimeout(
-            total=100,
-            connect=5,
-            sock_read=90,
-            sock_connect=10,
-        ),
-    ) as response:
-        if response.status != 200:
-            error_message = await response.text()
-            error_code = response.status
-            logger.error(f"generate text error: {error_code} {error_message}")
-            return f"System error: {error_code} {error_message}"
-
-        data = await response.json()
-
-        # check error
-        if "error" in data:
-            code = data["error"]["code"]
-            message = data["error"]["message"]
-            logger.error(f"generate text error: {code} {message}")
-            return
-
-        text = data["choices"][0]["message"]["content"]
+    try:
+        response_data = await _api_request(url, data, proxy_token)
+        text = response_data["choices"][0]["message"]["content"]
+        
         if rdb:
-            # 保存到Redis，确保保存的TTL为10分钟
+            # 保存到Redis，确保保存对话历史
             chat_history.append({"role": "assistant", "content": text})
             await rdb.set(f"chat:history:{member.id}", dumps(chat_history), ex=CONVERSATION_TTL)
 
-        return telegramify_markdown.markdownify(text + f"\n\nPower by *{SUPPORTED_MODELS[model_name].name}*")
+        return telegramify_markdown.markdownify(text + f"\n\nPowered by *{SUPPORTED_MODELS[model_name].name}*")
+    except ValueError as e:
+        return str(e)
 
 
-async def chat_completions(prompt: str, model_name: Optional[str] = None, **kwargs):
+async def chat_completions(prompt: str, model_name: Optional[str] = None, **kwargs) -> Optional[str]:
     config = manager.config
 
     host = config["ai"]["proxy_host"]
     if not host:
         logger.error("proxy host is empty")
-        return
+        return None
 
     if not model_name:
-        model_name = DEFUALT_MODEL
+        model_name = DEFAULT_MODEL
 
     proxy_token = config["ai"]["proxy_token"]
 
-    # request openai v1 like api
+    # API request preparation
     url = f"{host}/v1/chat/completions"
     data = {
         "model": model_name,
@@ -200,33 +215,9 @@ async def chat_completions(prompt: str, model_name: Optional[str] = None, **kwar
         **kwargs,
     }
 
-    session = await manager.bot.session.create_session()  # type: ignore
-    async with session.post(
-        url,
-        json=data,
-        headers={"Authorization": f"Bearer {proxy_token}"},
-        timeout=ClientTimeout(
-            total=100,
-            connect=5,
-            sock_read=90,
-            sock_connect=10,
-        ),
-    ) as response:
-        if response.status != 200:
-            error_message = await response.text()
-            error_code = response.status
-            logger.error(f"generate text error: {error_code} {error_message}")
-            return f"System error: {error_code} {error_message}"
-
-        data = await response.json()
-
-        # check error
-        if "error" in data:
-            code = data["error"]["code"]
-            message = data["error"]["message"]
-            logger.error(f"generate text error: {code} {message}")
-            return message
-
+    try:
+        response_data = await _api_request(url, data, proxy_token)
         logger.info(f"generate txt use model {model_name}")
-
-        return data["choices"][0]["message"]["content"]
+        return response_data["choices"][0]["message"]["content"]
+    except ValueError as e:
+        return str(e)
