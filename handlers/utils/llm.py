@@ -7,7 +7,7 @@ import orjson as json
 
 from ..utils import chat_completions
 
-SPAM_MODEL_NAME = "gemini-2.0-flash-lite-001"
+SPAM_MODEL_NAME = "qwen/qwen2.5-vl-32b-instruct:free"
 
 async def check_spams_with_llm(
     members: List[Union[
@@ -64,10 +64,20 @@ async def check_spams_with_llm(
         })
         if not result:
             return []
-
+        
+        
         result = result.strip().replace("```json", "").replace("```", "")
-        data = json.loads(result)
+        try:
+            data = json.loads(result)
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse LLM response as JSON: {result[:200]}... Error: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error parsing LLM response: {e}")
+            return []
+
         if not data:
+            logger.warning("Empty data received from LLM response")
             return []
 
         spams = data.get("spams", [])
