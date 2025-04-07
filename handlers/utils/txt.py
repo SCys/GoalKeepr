@@ -35,10 +35,24 @@ SUPPORTED_MODELS = {
     ),
     "gemini-2.5-pro-exp-03-25": ModelDescription(
         name="Gemini 2.5 Pro Exp 03-25",
-        input_length=1048576,
+        input_length=1000000,
         output_length=65536,
         rate_minute=2,
         rate_daily=50,
+    ),
+    "google/gemini-2.5-pro-exp-03-25:free": ModelDescription(
+        name="Gemini 2.5 Pro Exp 03-25",
+        input_length=1000000,
+        output_length=65536,
+        rate_minute=5,
+        rate_daily=2500,
+    ),
+    "meta-llama/llama-4-scout:free": ModelDescription(
+        name="Meta Llama 4 Scout",
+        input_length=512000,
+        output_length=512000,
+        rate_minute=5,
+        rate_daily=2500,
     ),
 }
 
