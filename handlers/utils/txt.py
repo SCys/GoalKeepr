@@ -61,6 +61,13 @@ SUPPORTED_MODELS = {
         rate_minute=5,
         rate_daily=2500,
     ),
+    "grok-3": ModelDescription(
+        name="Grok 3",
+        input_length=131072,
+        output_length=65536,
+        rate_minute=5,
+        rate_daily=2500,
+    ),
 }
 
 
