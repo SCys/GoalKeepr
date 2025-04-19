@@ -208,7 +208,7 @@ async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str) ->
         return str(e)
 
 
-async def chat_completions(prompt: str, model_name: Optional[str] = None, **kwargs) -> Optional[str]:
+async def chat_completions(messages: List[Dict[str, Any]], model_name: Optional[str] = None, **kwargs) -> Optional[str]:
     config = manager.config
 
     host = config["ai"]["proxy_host"]
@@ -225,7 +225,7 @@ async def chat_completions(prompt: str, model_name: Optional[str] = None, **kwar
     url = f"{host}/v1/chat/completions"
     data = {
         "model": model_name,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": messages, # [{"role": "user", "content": prompt}],
         **kwargs,
     }
 

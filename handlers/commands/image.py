@@ -22,6 +22,28 @@ QUEUE_NAME = "txt2img"
 DELETED_AFTER = 3  # 3s
 
 
+IMAGE_OPTIMIZE_MODEL = "gpt-4o-mini"
+IMAGE_OPTIMIZE_PROMPT = """你是一个专为Flux.1 Dev模型设计的提示词优化专家。用户提供原始绘画描述后，你需要按以下规则优化并输出最终提示词：  
+
+1. **明确主体与细节**  
+- 添加具体特征（如服饰、材质、动作、表情），使用形容词强化画面感（例：*glowing neon lights, intricate lace details*）。  
+- 若涉及人物，需指定年龄、姿态、服装风格，并加入防止畸变的负面词（如*extra fingers, deformed hands*）。  
+
+2. **场景与风格强化**  
+- 补充环境细节（光线、季节、背景物体），指定艺术风格（*cinematic lighting, cyberpunk, Studio Ghibli*）。  
+- 若需文字生成，用*quotation marks*标注文本内容并描述排版（例：*chalk-written on a blackboard*）。  
+
+3. **技术参数适配**  
+- 推荐添加质量关键词（*ultra-detailed, 8K resolution, Unreal Engine render*）与镜头类型（*wide-angle, macro*）。  
+
+4. **逻辑与创意引导**  
+- 将抽象概念转化为具象元素（例：*"hope" → sunlight breaking through storm clouds*）。  
+- 若描述模糊，提供多选项（例：*“奇幻场景”可细化为“龙与城堡”或“外星森林”*）。  
+
+**输出格式**：仅输出优化后的提示词。"""
+
+
+
 @dataclass
 class Task:
     chat_id: int
@@ -141,31 +163,10 @@ async def image(msg: types.Message):
 
     if "," not in prompt:
         try:
-            prompt_new = await chat_completions(
-                """你是一个专为Flux.1 Dev模型设计的提示词优化专家。用户提供原始绘画描述后，你需要按以下规则优化并输出最终提示词：  
-
-        1. **明确主体与细节**  
-        - 添加具体特征（如服饰、材质、动作、表情），使用形容词强化画面感（例：*glowing neon lights, intricate lace details*）。  
-        - 若涉及人物，需指定年龄、姿态、服装风格，并加入防止畸变的负面词（如*extra fingers, deformed hands*）。  
-
-        2. **场景与风格强化**  
-        - 补充环境细节（光线、季节、背景物体），指定艺术风格（*cinematic lighting, cyberpunk, Studio Ghibli*）。  
-        - 若需文字生成，用*quotation marks*标注文本内容并描述排版（例：*chalk-written on a blackboard*）。  
-
-        3. **技术参数适配**  
-        - 推荐添加质量关键词（*ultra-detailed, 8K resolution, Unreal Engine render*）与镜头类型（*wide-angle, macro*）。  
-
-        4. **逻辑与创意引导**  
-        - 将抽象概念转化为具象元素（例：*"hope" → sunlight breaking through storm clouds*）。  
-        - 若描述模糊，提供多选项（例：*“奇幻场景”可细化为“龙与城堡”或“外星森林”*）。  
-
-        **输出格式**：仅输出优化后的提示词。
-
-        ---
-
-        输入: """
-                + prompt
-            )
+            prompt_new = await chat_completions([
+                {"role": "system", "content": IMAGE_OPTIMIZE_PROMPT},
+                {"role": "user", "content": prompt},
+            ], model_name=IMAGE_OPTIMIZE_MODEL)
             if prompt_new:
                 prompt = prompt_new
 
