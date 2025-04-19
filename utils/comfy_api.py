@@ -101,7 +101,7 @@ async def generate_image(
             "_meta": {"title": "FluxGuidance"},
         },
         "27": {
-            "inputs": {"width": 768, "height": 1280, "batch_size": 1},
+            "inputs": {"width": width, "height": height, "batch_size": 1},
             "class_type": "EmptySD3LatentImage",
             "_meta": {"title": "EmptySD3LatentImage"},
         },
@@ -109,8 +109,8 @@ async def generate_image(
             "inputs": {
                 "max_shift": 1.15,
                 "base_shift": 0.5,
-                "width": 768,
-                "height": 1280,
+                "width": width,
+                "height": height,
                 "model": ["49", 0],
             },
             "class_type": "ModelSamplingFlux",
