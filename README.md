@@ -28,6 +28,7 @@ tr - 将输入的文本翻译为中文 translate the input text into Chinese
 image - 通过文本生成图像 Generate images through text.Support English. Chinese will translate to English.
 sdxl - 通过文本生成图像 Generate images through text(Power by cloudflare, use SDXL)
 chat - 支持上下文的聊天功能，允许配置相关参数，详情请输入 Chat function that supports context, allows configuration of related parameters, please enter for details
+group_setting - 群组设置，可以设置新成员加入群组时的处理方式，包括：认证剔除，手动解封，无作为，静默2周 Setup the way to handle new members joining the group, including: certification removal, manual unban, no action, silence for 2 weeks
 </pre>
 
 配置文件 main.ini
