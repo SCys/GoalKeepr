@@ -1,4 +1,5 @@
-from pprint import pp
+from datetime import datetime, timedelta
+
 from aiogram import types
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -114,8 +115,8 @@ async def group_setting_callback(query: types.CallbackQuery):
 
         log.info(f"群组 {query.message.chat.id} 更新设置: {key} = {value}")
 
-        await query.answer("设置已更新")
         await query.message.edit_text(text)
+        await manager.delete_message(query.message.chat.id, query.message.message_id, datetime.now() + timedelta(seconds=15))
     except Exception as e:
         log.error(f"处理设置回调时出错: {e}")
         await query.answer("处理请求时出错")
