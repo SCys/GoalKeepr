@@ -60,13 +60,15 @@ async def group_setting_command(msg: types.Message):
         ]
     )
 
-    await msg.answer(
+    msg = await msg.answer(
         text,
         reply_markup=keyboard,
         disable_web_page_preview=True,
         disable_notification=True,
     )
     log.info(f"群组 {chat.id} 调用设置命令")
+
+    await manager.delete_message(chat.id, msg.message_id, datetime.now() + timedelta(seconds=25))
 
 
 @manager.register("callback_query")
