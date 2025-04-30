@@ -8,11 +8,20 @@ from manager.group import NEW_MEBMER_CHECK_METHODS, settings_get, settings_set
 
 log = manager.logger
 
+SUPPORT_TYPES = ["private", "group", "supergroup", "channel"]
 
-@manager.register("message", Command("group_setting", ignore_case=True, ignore_mention=True))
+
+@manager.register(
+    "message", Command("group_setting", ignore_case=True, ignore_mention=True)
+)
 async def group_setting_command(msg: types.Message):
     chat = msg.chat
     user = msg.from_user
+
+    # check types
+    if chat.type not in SUPPORT_TYPES:
+        return
+
     if not await manager.is_admin(chat, user):
         await chat.delete_message(msg.message_id)
         return
@@ -22,13 +31,13 @@ async def group_setting_command(msg: types.Message):
         log.error("Redis connection failed")
         return
 
-    settings = await settings_get(rdb, chat.id)
-
-    new_member_check_method = settings.get("new_member_check_method", "ban")
-    new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(new_member_check_method, "未知")
+    new_member_check_method = await settings_get(rdb, chat.id, "new_member_check_method", "ban")
+    new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(
+        new_member_check_method, "未知"
+    )
 
     # 构建说明
-    text = f"当前设置：\n"
+    text = f"当前群组设置：\n"
     text += f"新成员处理方法: {new_member_check_method_name}\n"
     text += f"点击按钮修改设置"
 
@@ -46,7 +55,12 @@ async def group_setting_command(msg: types.Message):
         ]
     )
 
-    await msg.answer(text, reply_markup=keyboard, disable_web_page_preview=True, disable_notification=True)
+    await msg.answer(
+        text,
+        reply_markup=keyboard,
+        disable_web_page_preview=True,
+        disable_notification=True,
+    )
     log.info(f"群组 {chat.id} 调用设置命令")
 
 
@@ -86,10 +100,13 @@ async def group_setting_callback(query: types.CallbackQuery):
         settings = await settings_get(rdb, query.message.chat.id)
 
         import pprint
+
         pprint.pprint(settings)
 
         new_member_check_method = settings.get("new_member_check_method", "ban")
-        new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(new_member_check_method, "未知")
+        new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(
+            new_member_check_method, "未知"
+        )
 
         # 更新消息文本
         text = f"设置已更新！\n\n"

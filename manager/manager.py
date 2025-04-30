@@ -176,7 +176,6 @@ class Manager:
     async def is_admin(self, chat: types.Chat, member: types.User):
         try:
             admins = await self.bot.get_chat_administrators(chat.id)
-            # return len([i for i in admins if i.can_delete_messages and i.user.id == member.id]) > 0
             return len([i for i in admins if i.user.id == member.id]) > 0
         except Exception as e:
             logger.error(f"chat {chat.id} member {member.id} check failed:{e}")
