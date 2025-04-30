@@ -8,10 +8,11 @@ from aiogram.filters import IS_MEMBER, IS_NOT_MEMBER, ChatMemberUpdatedFilter
 from loguru import logger
 
 from manager import manager
+from manager.group import settings_get
 from utils.advertising import check_advertising
 
 from ..utils.llm import check_spams_with_llm
-from .helpers import accepted_member, build_captcha_message
+from .helpers import accepted_member, build_captcha_message, HANDLE_PERMISSIONS
 from .session import Session
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
@@ -61,19 +62,30 @@ async def member_captcha(event: types.ChatMemberUpdated):
     #     logger.info(f"{log_prefix} | 管理员邀请")
     #     return
 
+    rdb = await manager.get_redis()
+    if not rdb:
+        logger.warning("Redis connection failed")
+        return
+
+    new_member_check_method = await settings_get(
+        rdb, chat.id, "new_member_check_method", "ban"
+    )
+
     now = event.date
-    logger.info(f"{log_prefix} | 新成员加入 | 时间:{now}")
+    logger.info(
+        f"{log_prefix} | 新成员加入 | 时间:{now} | 处理方式:{new_member_check_method}"
+    )
+
+    # none
+    if new_member_check_method == "none":
+        logger.info(f"{log_prefix} | 无作为 | 新成员加入")
+        return
 
     # 收紧新成员权限，禁止发送消息
     try:
         if not await chat.restrict(
             member_id,
-            permissions=types.ChatPermissions(
-                can_send_messages=False,
-                can_send_media_messages=False,
-                can_send_other_messages=False,
-                can_add_web_page_previews=False,
-            ),
+            permissions=HANDLE_PERMISSIONS,
         ):
             logger.error(f"{log_prefix} | 权限不足 | 无法限制用户")
             return
@@ -82,6 +94,42 @@ async def member_captcha(event: types.ChatMemberUpdated):
         return
 
     logger.info(f"{log_prefix} | 权限限制成功")
+
+    # 手动解封
+    if new_member_check_method == "silence":
+        # 通告15秒并且告知管理员可以通过 /group_setting 命令修改设置
+        await manager.send(
+            chat.id,
+            f"新成员 {member_id} 加入群组，请管理员手动解封\n\n"
+            f"管理员可以通过 /group_setting 命令修改设置",
+            auto_deleted_at=event.date + timedelta(seconds=15),
+        )
+        logger.info(f"{log_prefix} | 静默处理 | 新成员加入")
+        return
+
+    # 静默2周
+    elif new_member_check_method == "sleep_2weeks":
+        if not await chat.restrict(
+            member_id,
+            permissions=types.ChatPermissions(
+                can_send_messages=False,
+                can_send_media_messages=False,
+                can_send_other_messages=False,
+                can_add_web_page_previews=False,
+            ),
+            until_date=timedelta(days=14),
+        ):
+            logger.error(f"{log_prefix} | 权限不足 | 无法限制用户")
+            return
+
+        await manager.send(
+            chat.id,
+            f"新成员 {member_id} 加入群组，已静默2周。\n\n"
+            f"管理员可以通过 /group_setting 命令修改设置",
+            auto_deleted_at=event.date + timedelta(seconds=15),
+        )
+        logger.info(f"{log_prefix} | 静默2周 | 新成员加入")
+        return
 
     # 获取会话信息
     session = await Session.get(chat, member, event, now)
@@ -96,9 +144,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
         # if _member.status != ChatMemberStatus.RESTRICTED:
         if not isinstance(_member, types.ChatMemberRestricted):
             status_name = ChatMemberStatus(member.status).name
-            logger.info(
-                f"{log_prefix} | 用户状态变更 | 当前状态:{status_name}"
-            )
+            logger.info(f"{log_prefix} | 用户状态变更 | 当前状态:{status_name}")
             return
 
         # 忽略可以发送消息的成员
@@ -139,9 +185,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
         )
         if spams_result and len(spams_result) > 0:
             # 过滤掉不需要的内容
-            spams_result = [
-                item for item in spams_result if item[0] == member_id
-            ]
+            spams_result = [item for item in spams_result if item[0] == member_id]
 
             if spams_result:
                 llm_cost_time = datetime.now() - llm_start_time
@@ -166,17 +210,19 @@ async def member_captcha(event: types.ChatMemberUpdated):
                     f"Message from {member_id} contains advertising content and has been removed.",
                     auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
                 )
-                
+
                 log_details = f"匹配词:{matched_word}"
                 if session.member_username:
                     log_details += f" | 用户名:@{session.member_username}"
                 if session.member_bio:
                     log_details += f" | Bio:{session.member_bio}"
-                
+
                 logger.warning(f"{log_prefix} | 检测到广告内容 | {log_details}")
 
                 # 禁止包含广告的用户
-                await chat.ban(member_id, until_date=timedelta(days=30), revoke_messages=True)
+                await chat.ban(
+                    member_id, until_date=timedelta(days=30), revoke_messages=True
+                )
                 logger.info(f"{log_prefix} | 用户已被封禁 | 封禁时长:30天")
 
                 return
@@ -267,7 +313,7 @@ async def new_member_callback(query: types.CallbackQuery):
     # 管理员操作处理
     if is_admin and not is_self:
         logger.debug(f"{log_prefix} | 管理员操作 | 数据:{data}")
-        
+
         items = data.split("__")
         if len(items) != 3:
             logger.warning(f"{log_prefix} | 数据格式错误")
@@ -283,7 +329,7 @@ async def new_member_callback(query: types.CallbackQuery):
             member_info = f"目标成员:{member_id}"
             if member.user.username:
                 member_info += f"(@{member.user.username})"
-            
+
             # 接受新成员
             if op == "O":
                 await manager.delete_message(chat, msg)
@@ -298,7 +344,9 @@ async def new_member_callback(query: types.CallbackQuery):
                     member_id, until_date=timedelta(days=30), revoke_messages=True
                 )
 
-                logger.warning(f"{log_prefix} | 管理员拒绝成员 | {member_info} | 封禁时长:30天")
+                logger.warning(
+                    f"{log_prefix} | 管理员拒绝成员 | {member_info} | 封禁时长:30天"
+                )
 
             else:
                 logger.warning(f"{log_prefix} | 未知操作类型 | 操作:{op}")
@@ -306,7 +354,7 @@ async def new_member_callback(query: types.CallbackQuery):
     # 新成员自己操作处理
     elif is_self:
         logger.debug(f"{log_prefix} | 成员自验证 | 数据:{data}")
-        
+
         # 验证成功
         if data.endswith("__!"):
             await manager.delete_message(chat, msg, msg.date)

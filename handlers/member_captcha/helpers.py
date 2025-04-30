@@ -13,6 +13,13 @@ WELCOME_TEXT = (
 )
 DELETED_AFTER = 30
 
+HANDLE_PERMISSIONS = types.ChatPermissions(
+    can_send_messages=True,
+    can_send_media_messages=True,
+    can_send_other_messages=True,
+    can_add_web_page_previews=True,
+)
+
 ICONS = {
     "爱心|Love": "❤️️",
     "感叹号|Exclamation mark": "❗",
@@ -114,12 +121,7 @@ async def accepted_member(chat: types.Chat, msg: types.Message, user: types.User
     try:
         await chat.restrict(
             user.id,
-            permissions=types.ChatPermissions(
-                can_send_messages=True,
-                can_send_media_messages=True,
-                can_send_other_messages=True,
-                can_add_web_page_previews=True,
-            ),
+            permissions=HANDLE_PERMISSIONS,
         )
     except Exception as e:
         logger.error(f"{prefix} restrict {user.id} error {e}")

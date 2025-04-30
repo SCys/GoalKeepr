@@ -51,8 +51,9 @@ async def group_setting_command(msg: types.Message):
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="认证剔除", callback_data="su:nm:ban"),
-                InlineKeyboardButton(text="自动静默", callback_data="su:nm:silence"),
+                InlineKeyboardButton(text="手动解封", callback_data="su:nm:silence"),
                 InlineKeyboardButton(text="无作为", callback_data="su:nm:none"),
+                InlineKeyboardButton(text="静默2周", callback_data="su:nm:sleep_2weeks"),
             ],
             [
                 InlineKeyboardButton(text="取消", callback_data="su:_:cancel"),
