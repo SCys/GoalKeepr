@@ -39,7 +39,7 @@ async def group_setting_command(msg: types.Message):
     # 构建说明
     text = f"⚙️ 群组设置面板\n\n"
     text += f"📋 当前配置：\n"
-    text += f"🔹 新成员处理方式：{new_member_check_method_name}\n\n"
+    text += f"🔹 新成员处理方式：{new_member_check_method_name}({new_member_check_method})\n\n"
     text += f"👇 点击下方按钮修改设置"
 
     # 构建按钮，使用简化的callback_data格式 "su:nm:<value>"
