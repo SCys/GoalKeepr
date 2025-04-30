@@ -25,6 +25,9 @@ async def group_setting_command(msg: types.Message):
     if not await manager.is_admin(chat, user):
         await chat.delete_message(msg.message_id)
         return
+    
+    # remove message
+    await msg.delete()
 
     rdb = await manager.get_redis()
     if not rdb:
