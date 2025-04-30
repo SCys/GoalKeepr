@@ -1,5 +1,5 @@
 import aioredis
-from typing import Optional
+from typing import Optional, Union
 
 SETTINGS_KEY_PREFIX = "group:settings:"
 
@@ -11,15 +11,15 @@ SETTINGS_DEFAULT_VALUE = {
 NEW_MEBMER_CHECK_METHODS = {"ban": "认证剔除", "silence": "自动静默", "none": "无作为"}
 
 
-async def settings_get(rdb: aioredis.Redis, chat_id: int, key: str=None, default_value: Optional[str]=None):
+async def settings_get(rdb: aioredis.Redis, chat_id: int, key: str=None, default_value: Optional[str]=None) -> Union[str, dict]:
     """
     Get settings for a specific chat.
     """
     if key:
-        settings = await rdb.hget(SETTINGS_KEY_PREFIX + str(chat_id), key)
-        if settings is None:
+        value = await rdb.hget(SETTINGS_KEY_PREFIX + str(chat_id), key)
+        if value is None:
             return default_value
-        return settings
+        return value.decode("utf-8")
 
     settings = await rdb.hgetall(SETTINGS_KEY_PREFIX + str(chat_id))
 
