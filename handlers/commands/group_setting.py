@@ -32,6 +32,7 @@ async def group_setting_command(msg: types.Message):
         return
 
     new_member_check_method = await settings_get(rdb, chat.id, "new_member_check_method", "ban")
+    new_member_check_method = str(new_member_check_method)
     new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(
         new_member_check_method, "未知"
     )
@@ -99,6 +100,7 @@ async def group_setting_callback(query: types.CallbackQuery):
 
         # 读取更新后的设置
         new_member_check_method = await settings_get(rdb, query.message.chat.id, "new_member_check_method", "ban")
+        new_member_check_method = str(new_member_check_method)
         new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(
             new_member_check_method, "未知"
         )

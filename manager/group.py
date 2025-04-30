@@ -1,4 +1,5 @@
 import aioredis
+from typing import Optional
 
 SETTINGS_KEY_PREFIX = "group:settings:"
 
@@ -10,7 +11,7 @@ SETTINGS_DEFAULT_VALUE = {
 NEW_MEBMER_CHECK_METHODS = {"ban": "认证剔除", "silence": "自动静默", "none": "无作为"}
 
 
-async def settings_get(rdb: aioredis.Redis, chat_id: int, key: str=None, default_value: str=None):
+async def settings_get(rdb: aioredis.Redis, chat_id: int, key: str=None, default_value: Optional[str]=None):
     """
     Get settings for a specific chat.
     """
