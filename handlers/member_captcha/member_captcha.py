@@ -97,12 +97,10 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
     # 手动解封
     if new_member_check_method == "silence":
-        # 通告15秒并且告知管理员可以通过 /group_setting 命令修改设置
         await manager.send(
             chat.id,
-            f"新成员 {member_id} 加入群组，请管理员手动解封\n\n"
+            f"新成员 {member_fullname}({member_id}) 加入群组，请管理员手动解封\n\n"
             f"管理员可以通过 /group_setting 命令修改设置",
-            auto_deleted_at=event.date + timedelta(seconds=15),
         )
         logger.info(f"{log_prefix} | 静默处理 | 新成员加入")
         return
@@ -124,9 +122,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
         await manager.send(
             chat.id,
-            f"新成员 {member_id} 加入群组，已静默2周。\n\n"
+            f"新成员 {member_fullname}({member_id}) 加入群组，已静默2周。\n\n"
             f"管理员可以通过 /group_setting 命令修改设置",
-            auto_deleted_at=event.date + timedelta(seconds=15),
         )
         logger.info(f"{log_prefix} | 静默2周 | 新成员加入")
         return
