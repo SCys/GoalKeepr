@@ -12,7 +12,7 @@ from manager.group import settings_get
 from utils.advertising import check_advertising
 
 from ..utils.llm import check_spams_with_llm
-from .helpers import accepted_member, build_captcha_message, HANDLE_PERMISSIONS
+from .helpers import accepted_member, build_captcha_message
 from .session import Session
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group"]
@@ -85,7 +85,12 @@ async def member_captcha(event: types.ChatMemberUpdated):
     try:
         if not await chat.restrict(
             member_id,
-            permissions=HANDLE_PERMISSIONS,
+            permissions=types.ChatPermissions(
+                can_send_messages=False,
+                can_send_media_messages=False,
+                can_send_other_messages=False,
+                can_add_web_page_previews=False,
+            ),
         ):
             logger.error(f"{log_prefix} | 权限不足 | 无法限制用户")
             return
