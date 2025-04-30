@@ -18,6 +18,9 @@ SUPPORT_TYPES = ["private", "group", "supergroup", "channel"]
 async def group_setting_command(msg: types.Message):
     chat = msg.chat
     user = msg.from_user
+    
+    # remove message
+    await msg.delete()
 
     # check types
     if chat.type not in SUPPORT_TYPES:
@@ -26,9 +29,6 @@ async def group_setting_command(msg: types.Message):
     if not await manager.is_admin(chat, user):
         await chat.delete_message(msg.message_id)
         return
-    
-    # remove message
-    await msg.delete()
 
     rdb = await manager.get_redis()
     if not rdb:
