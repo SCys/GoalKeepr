@@ -37,9 +37,10 @@ async def group_setting_command(msg: types.Message):
     )
 
     # 构建说明
-    text = f"当前群组设置：\n"
-    text += f"新成员处理方法: {new_member_check_method_name}\n"
-    text += f"点击按钮修改设置"
+    text = f"⚙️ 群组设置面板\n\n"
+    text += f"📋 当前配置：\n"
+    text += f"🔹 新成员处理方式：{new_member_check_method_name}\n\n"
+    text += f"👇 点击下方按钮修改设置"
 
     # 构建按钮，使用简化的callback_data格式 "su:nm:<value>"
     keyboard = InlineKeyboardMarkup(
@@ -70,11 +71,11 @@ async def group_setting_callback(query: types.CallbackQuery):
     # 这可以防止其他回调数据干扰
     if not query.data.startswith("su:"):
         return
-
+    
     if not await manager.is_admin(query.message.chat, query.from_user):
         log.warning(f"用户 {query.from_user.id} 尝试修改群组设置，但不是管理员")
         return
-
+    
     rdb = await manager.get_redis()
     if not rdb:
         log.error("Redis connection failed")
@@ -97,21 +98,16 @@ async def group_setting_callback(query: types.CallbackQuery):
         await settings_set(rdb, query.message.chat.id, {key: value})
 
         # 读取更新后的设置
-        settings = await settings_get(rdb, query.message.chat.id)
-
-        import pprint
-
-        pprint.pprint(settings)
-
-        new_member_check_method = settings.get("new_member_check_method", "ban")
+        new_member_check_method = await settings_get(rdb, query.message.chat.id, "new_member_check_method", "ban")
         new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(
             new_member_check_method, "未知"
         )
 
         # 更新消息文本
-        text = f"设置已更新！\n\n"
-        text += f"当前设置：\n"
-        text += f"新成员处理方法: {new_member_check_method_name}\n"
+        text = f"✅ 设置已成功更新！\n\n"
+        text += f"📋 当前群组配置：\n"
+        text += f"🔹 新成员处理方式：{new_member_check_method_name}\n"
+        text += f"\n如需进一步调整，请再次使用 /group_setting 命令"
 
         log.info(f"群组 {query.message.chat.id} 更新设置: {key} = {value}")
 
