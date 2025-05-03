@@ -110,6 +110,29 @@ async def member_captcha(event: types.ChatMemberUpdated):
         logger.info(f"{log_prefix} | 静默处理 | 新成员加入")
         return
 
+    # 静默1周
+    elif new_member_check_method == "sleep_1week":
+        if not await chat.restrict(
+            member_id,
+            permissions=types.ChatPermissions(
+                can_send_messages=False,
+                can_send_media_messages=False,
+                can_send_other_messages=False,
+                can_add_web_page_previews=False,
+            ),
+            until_date=timedelta(days=7),
+        ):
+            logger.error(f"{log_prefix} | 权限不足 | 无法限制用户")
+            return
+
+        await manager.send(
+            chat.id,
+            f"新成员 {member_fullname}({member_id}) 加入群组，已静默1周。\n\n"
+            f"管理员可以通过 /group_setting 命令修改设置",
+        )
+        logger.info(f"{log_prefix} | 静默1周 | 新成员加入")
+        return
+
     # 静默2周
     elif new_member_check_method == "sleep_2weeks":
         if not await chat.restrict(

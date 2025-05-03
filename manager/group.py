@@ -8,7 +8,7 @@ SETTINGS_DEFAULT_VALUE = {
     "auto_ban_time_seconds": 24 * 60 * 60,
 }
 
-NEW_MEBMER_CHECK_METHODS = {"ban": "认证剔除", "silence": "手动解封", "none": "无作为", "sleep_2weeks": "静默2周"}
+NEW_MEBMER_CHECK_METHODS = {"ban": "认证剔除", "silence": "手动解封", "none": "无作为", "sleep_1week": "静默1周", "sleep_2weeks": "静默2周"}
 
 
 async def settings_get(rdb: aioredis.Redis, chat_id: int, key: str=None, default_value: Optional[str]=None) -> Union[str, dict]:
