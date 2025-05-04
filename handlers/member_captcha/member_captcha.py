@@ -105,7 +105,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
         await manager.send(
             chat.id,
             f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，请管理员手动解封。"
-            f"Welcome to the group, please wait for admin to unmute you."
+            f"Welcome to the group, please wait for admin to unmute you.",
+            parse_mode="markdown",
         )
         logger.info(f"{log_prefix} | 静默处理 | 新成员加入")
         return
@@ -128,7 +129,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
         await manager.send(
             chat.id,
             f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，已静默1周。"
-            f"Welcome to the group, you are muted for 1 week."
+            f"Welcome to the group, you are muted for 1 week.",
+            parse_mode="markdown",
         )
         logger.info(f"{log_prefix} | 静默1周 | 新成员加入")
         return
@@ -151,7 +153,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
         await manager.send(
             chat.id,
             f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，已静默2周。"
-            f"Welcome to the group, you are muted for 2 weeks."
+            f"Welcome to the group, you are muted for 2 weeks.",
+            parse_mode="markdown",
         )
         logger.info(f"{log_prefix} | 静默2周 | 新成员加入")
         return
