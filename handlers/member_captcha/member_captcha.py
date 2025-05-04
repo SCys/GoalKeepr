@@ -104,8 +104,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
     if new_member_check_method == "silence":
         await manager.send(
             chat.id,
-            f"新成员 {member_fullname}({member_id}) 加入群组，请管理员手动解封\n\n"
-            f"管理员可以通过 /group_setting 命令修改设置",
+            f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，请管理员手动解封。"
+            f"Welcome to the group, please wait for admin to unmute you."
         )
         logger.info(f"{log_prefix} | 静默处理 | 新成员加入")
         return
@@ -127,8 +127,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
         await manager.send(
             chat.id,
-            f"新成员 {member_fullname}({member_id}) 加入群组，已静默1周。\n\n"
-            f"管理员可以通过 /group_setting 命令修改设置",
+            f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，已静默1周。"
+            f"Welcome to the group, you are muted for 1 week."
         )
         logger.info(f"{log_prefix} | 静默1周 | 新成员加入")
         return
@@ -150,8 +150,8 @@ async def member_captcha(event: types.ChatMemberUpdated):
 
         await manager.send(
             chat.id,
-            f"新成员 {member_fullname}({member_id}) 加入群组，已静默2周。\n\n"
-            f"管理员可以通过 /group_setting 命令修改设置",
+            f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，已静默2周。"
+            f"Welcome to the group, you are muted for 2 weeks."
         )
         logger.info(f"{log_prefix} | 静默2周 | 新成员加入")
         return
