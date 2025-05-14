@@ -249,7 +249,7 @@ async def generate_image(
         },
         "47": {
             "inputs": {
-            "lora_name": "flux/aidmaFLUXPro1.1-FLUX-v0.3.safetensors",
+            "lora_name": "flux/PinkieFluxProUltraFantasia.safetensors",
             "lora_strength": 1,
             "model": [
                 "46",
