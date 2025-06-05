@@ -7,8 +7,7 @@ import orjson as json
 
 from ..utils import chat_completions
 
-# SPAM_MODEL_NAME = "gemini-2.0-flash-lite-001"
-SPAM_MODEL_NAME = "grok-3-mini-fast"
+SPAM_MODEL_NAME = "gemma3"
 
 async def check_spams_with_llm(
     members: List[Union[

@@ -22,7 +22,7 @@ QUEUE_NAME = "txt2img"
 DELETED_AFTER = 3  # 3s
 
 
-IMAGE_OPTIMIZE_MODEL = "gpt-4o-mini"
+IMAGE_OPTIMIZE_MODEL = "qwen3"
 IMAGE_OPTIMIZE_PROMPT = """你是一个专为Flux.1 Dev模型设计的提示词优化专家。用户提供原始绘画描述后，你需要按以下规则优化并输出最终提示词：  
 
 1. **明确主体与细节**  
