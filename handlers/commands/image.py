@@ -40,6 +40,8 @@ IMAGE_OPTIMIZE_PROMPT = """你是一个专为Flux.1 Dev模型设计的提示词�
 - 将抽象概念转化为具象元素（例：*"hope" → sunlight breaking through storm clouds*）。  
 - 若描述模糊，提供多选项（例：*“奇幻场景”可细化为“龙与城堡”或“外星森林”*）。  
 
+5. 仅输出英文的 Prompt，不要输出任何其他内容。
+
 **输出格式**：仅输出优化后的提示词。"""
 
 
