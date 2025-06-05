@@ -24,49 +24,49 @@ class ModelDescription:
 
 PROMPT_SYSTEM = None
 CONVERSATION_TTL = 3600
-DEFAULT_MODEL = "google/gemini-2.5-pro-exp-03-25:free"
+DEFAULT_MODEL = "deepseek-r1"
 SUPPORTED_MODELS = {
-    "gemini-2.0-pro-exp-02-05": ModelDescription(
-        name="Gemini 2.0 Pro Exp 02-05",
+    "gemini-2.5-pro": ModelDescription(
+        name="Gemini 2.5 Pro",
         input_length=1048576,
-        output_length=8192,
+        output_length=65535,
         rate_minute=10,
-        rate_daily=50,
+        rate_daily=500,
     ),
-    "gemini-2.5-pro-exp-03-25": ModelDescription(
-        name="Gemini 2.5 Pro Exp 03-25",
-        input_length=1000000,
-        output_length=65536,
-        rate_minute=2,
-        rate_daily=50,
-    ),
-    "google/gemini-2.5-pro-exp-03-25:free": ModelDescription(
-        name="Gemini 2.5 Pro Exp 03-25(openrouter:free)",
-        input_length=1000000,
-        output_length=65536,
+    "llama-4": ModelDescription(
+        name="Meta Llama 4 Maverick",
+        input_length=128000, # 128k
+        output_length=4096, # 4k
         rate_minute=5,
-        rate_daily=2500,
+        rate_daily=1000,
     ),
-    "meta-llama/llama-4-scout:free": ModelDescription(
-        name="Meta Llama 4 Scout(openrouter:free)",
-        input_length=512000,
-        output_length=512000,
+    "deepseek-r1": ModelDescription(
+        name="DeepSeek R1 0528",
+        input_length=163840, # 164k
+        output_length=163840, # 164k
         rate_minute=5,
-        rate_daily=2500,
+        rate_daily=1000,
     ),
-    "qwen/qwen2.5-vl-32b-instruct:free": ModelDescription(
-        name="Qwen 2.5 VL 32B Instruct(openrouter:free)",
-        input_length=8096,
-        output_length=8096,
-        rate_minute=5,
-        rate_daily=2500,
-    ),
-    "grok-3": ModelDescription(
+    "grok": ModelDescription(
         name="Grok 3",
         input_length=131072,
         output_length=65536,
         rate_minute=5,
-        rate_daily=2500,
+        rate_daily=1000,
+    ),
+    "qwen3": ModelDescription(
+        name="Qwen 3.2 235B A22",
+        input_length=40960, # 41k
+        output_length=40960, # 41k
+        rate_minute=5,
+        rate_daily=1000,
+    ),
+    "gemma3": ModelDescription(
+        name="Gemma 3 27b",
+        input_length=96000, # 96k
+        output_length=8192, # 8k
+        rate_minute=5,
+        rate_daily=1000,
     ),
 }
 
