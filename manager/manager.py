@@ -35,7 +35,7 @@ class Manager:
     # routes
     handlers = []
     events = {}
-    callback_handlers: List = []
+    callback_handlers: List[types.CallbackQuery] = []
 
     # running status
     is_running = False
@@ -124,7 +124,7 @@ class Manager:
 
         def wrapper(func):
             if type_name == "callback_query":
-                self.callback_handlers.append((func, args, kwargs))
+                self.callback_handlers.append(func)
                 logger.info(f"dispatcher callback_query {func.__name__} is registered")
             else:
                 self.handlers.append((func, type_name, args, kwargs))
@@ -388,6 +388,5 @@ class Manager:
         默认回调处理程序
         """
 
-        for func, args, kwargs in self.callback_handlers:
-            await func(query, *args, **kwargs)
-            logger.info(f"callback_query {func.__name__} is called with message {query.message}")
+        for func in self.callback_handlers:
+            await func(query)

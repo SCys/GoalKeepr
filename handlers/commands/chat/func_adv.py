@@ -404,7 +404,8 @@ def get_user_id(msg: types.Message, arguments: List[str]):
 
 @manager.register("callback_query")
 async def chat_admin_settings_callback(query: types.CallbackQuery):
-    # 这可以防止其他回调数据干扰
+    logger.info(f"callback_query {query.data} is called with message {query.message}")
+
     if not query.data or not query.data.startswith("admin:settings"):
         logger.warning(f"callback_query {query.data} is not admin:settings")
         return
@@ -447,6 +448,3 @@ async def chat_admin_settings_callback(query: types.CallbackQuery):
             auto_deleted_at=query.message.date + timedelta(seconds=DELETED_AFTER),
         )
         logger.info(f"admin:settings:models setup default model to {model}")
-
-
-    return
