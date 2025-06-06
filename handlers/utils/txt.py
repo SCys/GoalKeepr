@@ -26,8 +26,22 @@ PROMPT_SYSTEM = None
 CONVERSATION_TTL = 3600
 DEFAULT_MODEL = "deepseek-r1"
 SUPPORTED_MODELS = {
-    "gemini-2.5-pro": ModelDescription(
+    "gemini-pro": ModelDescription(
         name="Gemini 2.5 Pro",
+        input_length=1048576,
+        output_length=65535,
+        rate_minute=10,
+        rate_daily=500,
+    ),
+    "gemini-flash": ModelDescription(
+        name="Gemini 2.5 Flash",
+        input_length=1048576,
+        output_length=65535,
+        rate_minute=10,
+        rate_daily=500,
+    ),
+    "gemini-flash-lite": ModelDescription(
+        name="Gemini 2.5 Flash Lite",
         input_length=1048576,
         output_length=65535,
         rate_minute=10,
@@ -61,7 +75,7 @@ SUPPORTED_MODELS = {
         rate_minute=5,
         rate_daily=1000,
     ),
-    "gemma3": ModelDescription(
+    "gemma-3": ModelDescription(
         name="Gemma 3 27b",
         input_length=96000, # 96k
         output_length=8192, # 8k
