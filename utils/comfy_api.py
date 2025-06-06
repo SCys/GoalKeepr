@@ -206,10 +206,10 @@ async def generate_image(
     except Exception as e:
         logger.exception(f"生成图片时发生错误")
         return None
-
+    
     # check image is generated
     for i in range(60):  # 240 times
-        await asyncio.sleep(3)
+        await asyncio.sleep(7)
 
         try:
             timeout = ClientTimeout(total=10)
@@ -222,7 +222,7 @@ async def generate_image(
                     history = await history_response.json()
                     if prompt_id not in history:
                         logger.warning(f"prompt id {prompt_id} not in history")
-                        return None
+                        continue
 
                     # 获取生成的图片文件名
                     outputs: dict = history[prompt_id]["outputs"]
