@@ -276,8 +276,7 @@ async def process_task(task: Task):
 
         input_file = types.BufferedInputFile(
             img_raw,
-            # base64.b64decode(img_raw.split(",", 1)[0]),
-            filename=f"txt2img_{task.chat_id}_{task.user_id}_{task.created_at}.avif",
+            filename=f"txt2img_{task.chat_id}_{task.user_id}_{task.created_at}.webp",
         )
         cost = datetime.now() - created_at
 
