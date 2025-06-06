@@ -3,7 +3,7 @@ import sys
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
-from typing import Callable, List, Optional, Union
+from typing import List, Optional, Union
 
 import aiohttp
 import aioredis
@@ -35,7 +35,7 @@ class Manager:
     # routes
     handlers = []
     events = {}
-    callback_handlers: List[Callable] = []
+    callback_handlers: List
 
     # running status
     is_running = False
@@ -387,5 +387,7 @@ class Manager:
         """
         默认回调处理程序
         """
+
         for func, args, kwargs in self.callback_handlers:
             await func(query, *args, **kwargs)
+            logger.info(f"callback_query {func.__name__} is called with message {query.message}")

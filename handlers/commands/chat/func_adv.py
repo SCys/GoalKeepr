@@ -445,5 +445,7 @@ async def chat_admin_settings_callback(query: types.CallbackQuery):
             f"全局默认模型已设置为{model}",
             auto_deleted_at=query.message.date + timedelta(seconds=DELETED_AFTER),
         )
+        logger.info(f"admin:settings:models setup default model to {model}")
+
 
     return
