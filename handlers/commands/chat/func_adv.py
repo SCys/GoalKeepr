@@ -405,23 +405,22 @@ def get_user_id(msg: types.Message, arguments: List[str]):
 @manager.register("callback_query")
 async def chat_admin_settings_callback(query: types.CallbackQuery):
     if not query.data or not query.data.startswith("admin:settings"):
-        logger.warning(f"callback_query {query.data} is not admin:settings")
         return
     
     administrator = manager.config["ai"]["administrator"]
     if not administrator or query.from_user.id != int(administrator):
-        logger.warning(f"user {query.from_user.id} is not administrator")
+        logger.warning(f"chat  user {query.from_user.id} is not administrator")
         return
     
     rdb = await manager.get_redis()
     if not rdb:
-        logger.error("Redis connection failed")
+        logger.error("redis connection failed")
         return
 
     # 使用':'分隔解析callback_data，例如 "admin:settings:models"
     parts = query.data.split(":")
-    if len(parts) < 2 or not query.data.startswith("admin:settings"):
-        logger.warning(f"callback_query {query.data} is not admin:settings")
+    if len(parts) < 2:
+        logger.warning(f"{query.data} is invalid callback_data")
         return
 
     subcommand = parts[2]
@@ -446,3 +445,7 @@ async def chat_admin_settings_callback(query: types.CallbackQuery):
             auto_deleted_at=query.message.date + timedelta(seconds=DELETED_AFTER),
         )
         logger.info(f"admin:settings:models setup default model to {model}")
+
+    else:
+        # subcommand is not support
+        logger.warning(f"subcommand {subcommand} is not supported")
