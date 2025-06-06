@@ -208,10 +208,10 @@ async def generate_image(
         logger.exception(f"生成图片时发生错误")
         return None
 
-    try:
-        # 等待图片生成完成
-        timeout = ClientTimeout(total=10)
-        for i in range(240):  # 240 times
+    # check image is generated
+    for i in range(240):  # 240 times
+        try:
+            timeout = ClientTimeout(total=10)
             async with ClientSession(timeout=timeout) as session:
                 async with session.get(f"{endpoint}/history") as history_response:
                     if history_response.status != 200:
@@ -251,10 +251,11 @@ async def generate_image(
                         raise Exception(f"获取图片文件名时发生错误: {e}")
             await asyncio.sleep(1)
 
-    except Exception as e:
-        logger.exception(f"获取图片时发生错误")
-        return None
+        except Exception as e:
+            logger.exception(f"获取图片时发生错误")
+            return None
 
+    # download image raw data
     try:
         timeout = ClientTimeout(total=30)
         async with ClientSession(timeout=timeout) as session:
