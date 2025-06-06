@@ -161,7 +161,7 @@ async def generate_image(
                 "filename_prefix": "ComfyUI",
                 "filename_keys": "sampler_name, cfg, steps, %F %H-%M-%S",
                 "foldername_prefix": "",
-                "foldername_keys": "ckpt_name",
+                "foldername_keys": "api",
                 "delimiter": "-",
                 "save_job_data": "disabled",
                 "job_data_per_image": False,
@@ -170,7 +170,7 @@ async def generate_image(
                 "counter_digits": 4,
                 "counter_position": "last",
                 "one_counter_per_folder": True,
-                "image_preview": True,
+                "image_preview": False,
                 "output_ext": ".avif",
                 "quality": 75,
                 "images": ["8", 0],
@@ -202,24 +202,18 @@ async def generate_image(
                             and len(history[prompt_id]["outputs"]) > 0
                         ):
                             # 获取生成的图片文件名
-                            image_filename = history[prompt_id]["outputs"]["9"][
-                                "images"
-                            ][0]["filename"]
+                            image_filename = history[prompt_id]["outputs"]["48"]["images"][0]["filename"]
+
+                            logger.info(f"image file is exported: {image_filename}")
 
                             # 通过 /view 接口获取图片数据
                             async with session.get(
-                                f"{endpoint}/view?filename={image_filename}"
+                                f"{endpoint}/view?filename={image_filename}&subfolder=api&type=output"
                             ) as image_response:
                                 if image_response.status == 200:
                                     image_data = await image_response.read()
-                                    base64_data = base64.b64encode(image_data).decode(
-                                        "utf-8"
-                                    )
-                                    return base64_data
-                                else:
-                                    raise Exception(
-                                        f"获取图片失败: {image_response.status}"
-                                    )
+                                    return base64.b64encode(image_data).decode("utf-8")
+                                raise Exception(f"获取图片失败: {image_response.status}")
                 await asyncio.sleep(1)
 
     except Exception as e:
