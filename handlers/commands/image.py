@@ -322,6 +322,8 @@ async def worker():
 
         raw = await rdb.rpop(QUEUE_NAME)
         if raw:
+            logger.info(f"image worker is processing task")
+
             try:
                 task = Task(**loads(raw))
                 await process_task(task)
