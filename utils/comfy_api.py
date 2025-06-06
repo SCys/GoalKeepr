@@ -182,9 +182,11 @@ async def generate_image(
     }
 
     logger.info(f"generate image: {prompt}")
+    
+    prompt_id = None
+    image_filename =  None
 
     try:
-        prompt_id = None
         timeout = ClientTimeout(total=15)
         async with ClientSession(timeout=timeout) as session:
             # 发送工作流请求
@@ -208,6 +210,7 @@ async def generate_image(
 
     try:
         # 等待图片生成完成
+        timeout = ClientTimeout(total=10)
         for i in range(240):  # 240 times
             async with ClientSession(timeout=timeout) as session:
                 async with session.get(f"{endpoint}/history") as history_response:
@@ -246,15 +249,23 @@ async def generate_image(
                         pprint.pprint(outputs)
                         logger.exception(f"获取图片文件名时发生错误: {e}")
                         raise Exception(f"获取图片文件名时发生错误: {e}")
-
-                    # 通过 /view 接口获取图片数据
-                    async with session.get(
-                        f"{endpoint}/view?filename={image_filename}&subfolder=api&type=output"
-                    ) as image_response:
-                        if image_response.status == 200:
-                            return await image_response.read()
-                        raise Exception(f"获取图片失败: {image_response.status}")
             await asyncio.sleep(1)
 
     except Exception as e:
-        logger.exception(f"生成图片时发生错误")
+        logger.exception(f"获取图片时发生错误")
+        return None
+
+    try:
+        timeout = ClientTimeout(total=30)
+        async with ClientSession(timeout=timeout) as session:
+            # 通过 /view 接口获取图片数据
+            async with session.get(
+                f"{endpoint}/view?filename={image_filename}&subfolder=api&type=output"
+            ) as image_response:
+                if image_response.status == 200:
+                    return await image_response.read()
+                raise Exception(f"获取图片失败: {image_response.status}")
+
+    except Exception as e:
+        logger.exception(f"获取图片时发生错误")
+        return None
