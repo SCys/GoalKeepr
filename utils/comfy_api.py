@@ -197,26 +197,12 @@ async def generate_image(
                 async with session.get(f"{endpoint}/history") as history_response:
                     if history_response.status == 200:
                         history = await history_response.json()
-                        if (
-                            prompt_id in history
-                            and len(history[prompt_id]["outputs"]) > 0
-                        ):
+                        if prompt_id in history:
                             # 获取生成的图片文件名
-                            """
-                            "outputs": {
-                                "178": {
-                                    "images": [
-                                    {
-                                        "filename": "ComfyUI-euler_ancestral-3.5-24-2025-06-06 05-25-08-0215.avif",
-                                        "subfolder": "pony/JunkJuice.UbeSauce",
-                                        "type": "output"
-                                    }
-                                    ]
-                                }
-                            }
-                            """
-
                             outputs: dict = history[prompt_id]["outputs"]
+                            if not outputs:
+                                continue
+
                             try:
                                 image_filename = outputs.popitem()[1]["images"][0]["filename"]
                                 logger.info(f"image file is exported: {image_filename}")
