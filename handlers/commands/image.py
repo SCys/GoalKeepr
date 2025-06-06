@@ -266,8 +266,13 @@ async def process_task(task: Task):
         # img_raw = resp["image"]
         logger.info(f"{prefix} task is processed(cost {cost.total_seconds()}s/120s).")
 
+        if not img_raw:
+            logger.warning(f"{prefix} image is empty, ignored")
+            return
+
         input_file = types.BufferedInputFile(
-            base64.b64decode(img_raw.split(",", 1)[0]),
+            img_raw
+            # base64.b64decode(img_raw.split(",", 1)[0]),
             filename=f"txt2img_{task.chat_id}_{task.user_id}_{task.created_at}.png",
         )
         cost = datetime.now() - created_at

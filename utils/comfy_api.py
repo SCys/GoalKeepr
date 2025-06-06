@@ -230,8 +230,7 @@ async def generate_image(
                                 f"{endpoint}/view?filename={image_filename}&subfolder=api&type=output"
                             ) as image_response:
                                 if image_response.status == 200:
-                                    image_data = await image_response.read()
-                                    return base64.b64encode(image_data).decode("utf-8")
+                                    return await image_response.read()
                                 raise Exception(f"获取图片失败: {image_response.status}")
                 await asyncio.sleep(1)
 
