@@ -449,3 +449,5 @@ async def chat_admin_settings_callback(query: types.CallbackQuery):
     else:
         # subcommand is not support
         logger.warning(f"subcommand {subcommand} is not supported")
+
+    await query.answer()

@@ -392,4 +392,3 @@ class Manager:
                 await func(query)
             except Exception as e:
                 logger.exception(f"callback_query {query.id} handler {func.__name__} error: {e}")
-
