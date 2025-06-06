@@ -430,7 +430,7 @@ async def chat_admin_settings_callback(query: types.CallbackQuery):
     settings = loads(settings) if settings else {}
 
     # handle admin:settings:models
-    if subcommand == "models":
+    if subcommand == "model":
         # set default model
         model = arguments[0]
         if model not in SUPPORTED_MODELS:
