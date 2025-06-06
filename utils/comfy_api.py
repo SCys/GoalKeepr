@@ -3,6 +3,8 @@ import base64
 
 from manager import manager
 
+logger = manager.logger
+
 
 async def generate_image(
     endpoint: str,
@@ -221,4 +223,4 @@ async def generate_image(
                 await asyncio.sleep(1)
 
     except Exception as e:
-        raise Exception(f"生成图片时发生错误: {str(e)}")
+        logger.exception(f"生成图片时发生错误")
