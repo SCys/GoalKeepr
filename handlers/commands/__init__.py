@@ -13,7 +13,7 @@ from .sdxl import sdxl
 from .image import image
 
 # text completion
-from .chat import chat
+from .chat import chat, chat_admin_settings_callback
 
 # setting
 from .group_setting import group_setting_command, group_setting_callback

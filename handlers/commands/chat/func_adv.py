@@ -401,3 +401,47 @@ def get_user_id(msg: types.Message, arguments: List[str]):
         arguments.pop(1)
 
     return target_user_id
+
+@manager.register("callback_query")
+async def chat_admin_settings_callback(query: types.CallbackQuery):
+    # 检查callback_data是否以"su:nm:"开头
+    # 这可以防止其他回调数据干扰
+    if not query.data.startswith("admin:settings"):
+        return
+    
+    if not await manager.is_admin(query.message.chat, query.from_user):
+        logger.warning(f"用户 {query.from_user.id} 尝试修改群组设置，但不是管理员")
+        return
+    
+    rdb = await manager.get_redis()
+    if not rdb:
+        logger.error("Redis connection failed")
+        return
+
+    # 使用':'分隔解析callback_data，例如 "admin:settings:models"
+    parts = query.data.split(":")
+    if len(parts) != 3 or parts[0] != "admin" or parts[1] != "settings":
+        return
+
+    subcommand = parts[2]
+    arguments = parts[3:]
+
+    settings = await rdb.get(f"chat:settings:global")
+    settings = loads(settings) if settings else {}
+
+    # handle admin:settings:models
+    if subcommand == "models":
+        # set default model
+        model = arguments[0]
+        if model not in SUPPORTED_MODELS:
+            return
+
+        settings["model"] = model
+        await rdb.set(f"chat:settings:global", dumps(settings))
+        await manager.reply(
+            query.message,
+            f"全局默认模型已设置为{model}",
+            auto_deleted_at=query.message.date + timedelta(seconds=DELETED_AFTER),
+        )
+
+    return
