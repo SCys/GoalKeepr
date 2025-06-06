@@ -406,10 +406,12 @@ def get_user_id(msg: types.Message, arguments: List[str]):
 async def chat_admin_settings_callback(query: types.CallbackQuery):
     # 这可以防止其他回调数据干扰
     if not query.data or not query.data.startswith("admin:settings"):
+        logger.warning(f"callback_query {query.data} is not admin:settings")
         return
     
-    if not await manager.is_admin(query.message.chat, query.from_user):
-        logger.warning(f"用户 {query.from_user.id} 尝试修改群组设置，但不是管理员")
+    administrator = manager.config["ai"]["administrator"]
+    if not administrator or query.from_user.id != int(administrator):
+        logger.warning(f"user {query.from_user.id} is not administrator")
         return
     
     rdb = await manager.get_redis()
@@ -419,7 +421,8 @@ async def chat_admin_settings_callback(query: types.CallbackQuery):
 
     # 使用':'分隔解析callback_data，例如 "admin:settings:models"
     parts = query.data.split(":")
-    if len(parts) != 3 or parts[0] != "admin" or parts[1] != "settings":
+    if len(parts) < 2 or not query.data.startswith("admin:settings"):
+        logger.warning(f"callback_query {query.data} is not admin:settings")
         return
 
     subcommand = parts[2]
