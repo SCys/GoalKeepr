@@ -89,17 +89,23 @@ async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict
     """Make API request to LLM provider and handle common error cases"""
     session = await manager.bot.session.create_session()  # type: ignore
     
+    # 根据模型类型设置不同的超时时间
+    model_name = data.get("model", DEFAULT_MODEL)
+
+    # 默认超时设置
+    timeout_config = ClientTimeout(
+        total=180,  # 3分钟总超时
+        connect=15,
+        sock_read=170,  # 2分50秒读取超时
+        sock_connect=20,
+    )
+    
     try:
         async with session.post(
             url,
             json=data,
             headers={"Authorization": f"Bearer {proxy_token}"},
-            timeout=ClientTimeout(
-                total=100,
-                connect=5,
-                sock_read=90,
-                sock_connect=10,
-            ),
+            timeout=timeout_config,
         ) as response:
             if response.status != 200:
                 error_message = await response.text()
@@ -119,8 +125,16 @@ async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict
             return response_data
     except Exception as e:
         if not isinstance(e, ValueError):
-            logger.exception("Unexpected error during API request")
-            raise ValueError(f"Request failed: {str(e)}")
+            # 针对不同类型的异常提供更具体的错误信息
+            if "SocketTimeoutError" in str(type(e)) or "TimeoutError" in str(type(e)):
+                logger.error(f"Request timeout for model {model_name}: {str(e)}")
+                raise ValueError(f"请求超时，模型 {model_name} 响应时间过长，请稍后重试")
+            elif "ClientConnectorError" in str(type(e)):
+                logger.error(f"Connection error: {str(e)}")
+                raise ValueError("无法连接到AI服务，请检查网络连接")
+            else:
+                logger.exception("Unexpected error during API request")
+                raise ValueError(f"请求失败: {str(e)}")
         raise
 
 
@@ -249,3 +263,4 @@ async def chat_completions(messages: List[Dict[str, Any]], model_name: Optional[
         return response_data["choices"][0]["message"]["content"]
     except ValueError as e:
         return str(e)
+

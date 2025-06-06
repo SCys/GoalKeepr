@@ -201,7 +201,7 @@ class Manager:
 
         try:
             session = await self.create_session()
-            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=7)) as response:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15, sock_read=12)) as response:
                 if response.status != 200:
                     return {"error": f"Failed to fetch page for {username}, status: {response.status}"}
 
