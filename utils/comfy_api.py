@@ -172,7 +172,7 @@ async def generate_image(
                 "counter_position": "last",
                 "one_counter_per_folder": True,
                 "image_preview": True,
-                "output_ext": ".webp",
+                "output_ext": ".avif",
                 "quality": 75,
                 "images": ["8", 0],
             },
