@@ -260,7 +260,11 @@ async def process_task(task: Task):
     cfg = task.options.get("cfg", 1)
 
     try:
-        img_raw = await comfy_api.generate_image(endpoint, model, prompt, size, step, cfg)
+        # 添加任务超时（300秒）
+        img_raw = await asyncio.wait_for(
+            comfy_api.generate_image(endpoint, model, prompt, size, step, cfg),
+            timeout=300.0
+        )
         cost = datetime.now() - created_at
 
         # img_raw = resp["image"]
@@ -280,6 +284,14 @@ async def process_task(task: Task):
         caption = f"{task.reply_content}\n\n" f"Size: {size} Step: {step}\n" f"Cost: {str(cost)[:-7]}s"
 
         await manager.delete_message(task.chat_id, task.reply_message_id)
+    except asyncio.TimeoutError:
+        logger.warning(f"{prefix} task timeout after 300s")
+        await manager.edit_text(
+            task.chat_id,
+            task.reply_message_id,
+            f"Task is timeout after 300s, please try again later.",
+        )
+        return
     except Exception as e:
         logger.exception(f"{prefix} sd txt2img error")
         await manager.edit_text(
