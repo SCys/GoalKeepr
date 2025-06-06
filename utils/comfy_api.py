@@ -38,244 +38,146 @@ async def generate_image(
     workflow = {
         "6": {
             "inputs": {
-            "text": prompt,
-            "clip": [
-                "44",
-                0
-            ]
+                "text": prompt,
+                "clip": ["44", 0],
             },
             "class_type": "CLIPTextEncode",
-            "_meta": {
-            "title": "CLIP Text Encode (Positive Prompt)"
-            }
+            "_meta": {"title": "CLIP Text Encode (Positive Prompt)"},
         },
         "8": {
-            "inputs": {
-            "samples": [
-                "13",
-                0
-            ],
-            "vae": [
-                "10",
-                0
-            ]
-            },
+            "inputs": {"samples": ["13", 0], "vae": ["10", 0]},
             "class_type": "VAEDecode",
-            "_meta": {
-            "title": "VAE Decode"
-            }
-        },
-        "9": {
-            "inputs": {
-            "filename_prefix": "ComfyUI",
-            "images": [
-                "8",
-                0
-            ]
-            },
-            "class_type": "SaveImage",
-            "_meta": {
-            "title": "Save Image"
-            }
+            "_meta": {"title": "VAE Decode"},
         },
         "10": {
-            "inputs": {
-            "vae_name": "ae.safetensors"
-            },
+            "inputs": {"vae_name": "ae.safetensors"},
             "class_type": "VAELoader",
-            "_meta": {
-            "title": "Load VAE"
-            }
+            "_meta": {"title": "Load VAE"},
         },
         "13": {
             "inputs": {
-            "noise": [
-                "25",
-                0
-            ],
-            "guider": [
-                "22",
-                0
-            ],
-            "sampler": [
-                "16",
-                0
-            ],
-            "sigmas": [
-                "17",
-                0
-            ],
-            "latent_image": [
-                "27",
-                0
-            ]
+                "noise": ["25", 0],
+                "guider": ["22", 0],
+                "sampler": ["16", 0],
+                "sigmas": ["17", 0],
+                "latent_image": ["27", 0],
             },
             "class_type": "SamplerCustomAdvanced",
-            "_meta": {
-            "title": "SamplerCustomAdvanced"
-            }
+            "_meta": {"title": "SamplerCustomAdvanced"},
         },
         "16": {
-            "inputs": {
-            "sampler_name": "euler_ancestral"
-            },
+            "inputs": {"sampler_name": "euler_ancestral"},
             "class_type": "KSamplerSelect",
-            "_meta": {
-            "title": "KSamplerSelect"
-            }
+            "_meta": {"title": "KSamplerSelect"},
         },
         "17": {
             "inputs": {
-            "scheduler": "simple",
-            "steps": steps,
-            "denoise": 1,
-            "model": [
-                "30",
-                0
-            ]
+                "scheduler": "sgm_uniform",
+                "steps": steps,
+                "denoise": 1,
+                "model": ["30", 0],
             },
             "class_type": "BasicScheduler",
-            "_meta": {
-            "title": "BasicScheduler"
-            }
+            "_meta": {"title": "BasicScheduler"},
         },
         "22": {
-            "inputs": {
-            "model": [
-                "30",
-                0
-            ],
-            "conditioning": [
-                "26",
-                0
-            ]
-            },
+            "inputs": {"model": ["30", 0], "conditioning": ["26", 0]},
             "class_type": "BasicGuider",
-            "_meta": {
-            "title": "BasicGuider"
-            }
+            "_meta": {"title": "BasicGuider"},
         },
         "25": {
-            "inputs": {
-            "noise_seed": 422135306982087
-            },
+            "inputs": {"noise_seed": 707794554454994},
             "class_type": "RandomNoise",
-            "_meta": {
-            "title": "RandomNoise"
-            }
+            "_meta": {"title": "RandomNoise"},
         },
         "26": {
-            "inputs": {
-            "guidance": 3.5,
-            "conditioning": [
-                "6",
-                0
-            ]
-            },
+            "inputs": {"guidance": 3.5, "conditioning": ["6", 0]},
             "class_type": "FluxGuidance",
-            "_meta": {
-            "title": "FluxGuidance"
-            }
+            "_meta": {"title": "FluxGuidance"},
         },
         "27": {
-            "inputs": {
-            "width": width,
-            "height": height,
-            "batch_size": 1
-            },
+            "inputs": {"width": width, "height": height, "batch_size": 1},
             "class_type": "EmptySD3LatentImage",
-            "_meta": {
-            "title": "EmptySD3LatentImage"
-            }
+            "_meta": {"title": "EmptySD3LatentImage"},
         },
         "30": {
             "inputs": {
-            "max_shift": 1.15,
-            "base_shift": 0.5,
-            "width": width,
-            "height": height,
-            "model": [
-                "49",
-                0
-            ]
+                "max_shift": 1.15,
+                "base_shift": 0.5,
+                "width": width,
+                "height": height,
+                "model": ["47", 0],
             },
             "class_type": "ModelSamplingFlux",
-            "_meta": {
-            "title": "ModelSamplingFlux"
-            }
+            "_meta": {"title": "ModelSamplingFlux"},
         },
         "44": {
             "inputs": {
-            "model_type": "flux",
-            "text_encoder1": "t5xxl_fp8_e4m3fn.safetensors",
-            "text_encoder2": "clip_l.safetensors",
-            "t5_min_length": 512,
-            "use_4bit_t5": "disable",
-            "int4_model": "none"
+                "model_type": "flux",
+                "text_encoder1": "hidream/t5xxl_fp8_e4m3fn_scaled.safetensors",
+                "text_encoder2": "hidream/clip_l_hidream.safetensors",
+                "t5_min_length": 512,
+                "use_4bit_t5": "disable",
+                "int4_model": "none",
             },
             "class_type": "NunchakuTextEncoderLoader",
-            "_meta": {
-            "title": "Nunchaku Text Encoder Loader"
-            }
+            "_meta": {"title": "Nunchaku Text Encoder Loader"},
         },
         "45": {
             "inputs": {
-            "model_path": "svdq-int4-flux.1-dev",
-            "cache_threshold": 0,
-            "attention": "nunchaku-fp16",
-            "cpu_offload": "auto",
-            "device_id": 0,
-            "data_type": "float16",
-            "i2f_mode": "enabled"
+                "model_path": "svdq-int4-flux.1-dev",
+                "cache_threshold": 0,
+                "attention": "nunchaku-fp16",
+                "cpu_offload": "auto",
+                "device_id": 0,
+                "data_type": "float16",
+                "i2f_mode": "enabled",
             },
             "class_type": "NunchakuFluxDiTLoader",
-            "_meta": {
-            "title": "Nunchaku FLUX DiT Loader"
-            }
+            "_meta": {"title": "Nunchaku FLUX DiT Loader"},
         },
         "46": {
             "inputs": {
-            "lora_name": "flux/flux1-turbo.safetensors",
-            "lora_strength": 1,
-            "model": [
-                "45",
-                0
-            ]
+                "lora_name": "flux/MoriiMee_Gothic_Niji_Style_FLUX.safetensors",
+                "lora_strength": 1,
+                "model": ["45", 0],
             },
             "class_type": "NunchakuFluxLoraLoader",
-            "_meta": {
-            "title": "Nunchaku FLUX.1 LoRA Loader"
-            }
+            "_meta": {"title": "Nunchaku FLUX.1 LoRA Loader"},
         },
         "47": {
             "inputs": {
-            "lora_name": "flux/PinkieFluxProUltraFantasia.safetensors",
-            "lora_strength": 1,
-            "model": [
-                "46",
-                0
-            ]
+                "lora_name": "flux/PinkieFluxProUltraFantasia.safetensors",
+                "lora_strength": 1.0000000000000002,
+                "model": ["46", 0],
             },
             "class_type": "NunchakuFluxLoraLoader",
-            "_meta": {
-            "title": "Nunchaku FLUX.1 LoRA Loader"
-            }
+            "_meta": {"title": "Nunchaku FLUX.1 LoRA Loader"},
         },
-        "49": {
+        "48": {
             "inputs": {
-            "lora_name": "flux/detailifier_flux-000006.safetensors",
-            "lora_strength": 1,
-            "model": [
-                "47",
-                0
-            ]
+                "filename_prefix": "ComfyUI",
+                "filename_keys": "sampler_name, cfg, steps, %F %H-%M-%S",
+                "foldername_prefix": "",
+                "foldername_keys": "ckpt_name",
+                "delimiter": "-",
+                "save_job_data": "disabled",
+                "job_data_per_image": False,
+                "job_custom_text": "",
+                "save_metadata": True,
+                "counter_digits": 4,
+                "counter_position": "last",
+                "one_counter_per_folder": True,
+                "image_preview": True,
+                "output_ext": ".avif",
+                "quality": 75,
+                "images": ["8", 0],
             },
-            "class_type": "NunchakuFluxLoraLoader",
-            "_meta": {
-            "title": "Nunchaku FLUX.1 LoRA Loader"
-            }
-        }
+            "class_type": "SaveImageExtended",
+            "_meta": {"title": "💾 Save Image Extended"},
+        },
     }
+
     try:
         session = await manager.create_session()
         # 发送工作流请求
