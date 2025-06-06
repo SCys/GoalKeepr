@@ -141,7 +141,7 @@ async def generate_image(
         },
         "46": {
             "inputs": {
-                "lora_name": "flux/MoriiMee_Gothic_Niji_Style_FLUX.safetensors",
+                "lora_name": "flux/FluxMythAn1meL1nes.safetensors",
                 "lora_strength": 1,
                 "model": ["45", 0],
             },
