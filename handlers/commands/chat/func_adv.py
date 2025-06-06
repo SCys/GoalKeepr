@@ -436,6 +436,7 @@ async def chat_admin_settings_callback(query: types.CallbackQuery):
         # set default model
         model = arguments[0]
         if model not in SUPPORTED_MODELS:
+            logger.warning(f"model {model} is not supported")
             return
 
         settings["model"] = model
