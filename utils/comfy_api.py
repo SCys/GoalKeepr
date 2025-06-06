@@ -214,7 +214,7 @@ async def generate_image(
                                 
                                 images = output_data["images"]
                                 if not images or len(images) == 0:
-                                    logger.warning(f"images 列表为空，继续等待...")
+                                    # logger.warning(f"images 列表为空，继续等待...")
                                     continue
                                 
                                 image_filename = images[0]["filename"]
@@ -232,7 +232,7 @@ async def generate_image(
                                 if image_response.status == 200:
                                     return await image_response.read()
                                 raise Exception(f"获取图片失败: {image_response.status}")
-                await asyncio.sleep(1)
+                await asyncio.sleep(3)
 
     except Exception as e:
         logger.exception(f"生成图片时发生错误")
