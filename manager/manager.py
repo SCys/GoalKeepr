@@ -120,8 +120,10 @@ class Manager:
         def wrapper(func):
             if type_name == "callback_query":
                 self.callback_handlers.append((func, args, kwargs))
+                logger.info(f"dispatcher callback_query {func.__name__} is registered")
             else:
                 self.handlers.append((func, type_name, args, kwargs))
+                logger.info(f"dispatcher {func.__name__}:{type_name}({args}, {kwargs})")
 
             @wraps(func)
             async def _wrapper(*args, **kwargs):

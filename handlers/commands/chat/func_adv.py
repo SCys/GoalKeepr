@@ -404,9 +404,8 @@ def get_user_id(msg: types.Message, arguments: List[str]):
 
 @manager.register("callback_query")
 async def chat_admin_settings_callback(query: types.CallbackQuery):
-    # 检查callback_data是否以"su:nm:"开头
     # 这可以防止其他回调数据干扰
-    if not query.data.startswith("admin:settings"):
+    if not query.data or not query.data.startswith("admin:settings"):
         return
     
     if not await manager.is_admin(query.message.chat, query.from_user):
