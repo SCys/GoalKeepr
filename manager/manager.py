@@ -35,7 +35,7 @@ class Manager:
     # routes
     handlers = []
     events = {}
-    callback_handlers: List
+    callback_handlers: List = []
 
     # running status
     is_running = False
