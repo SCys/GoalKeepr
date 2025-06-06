@@ -239,7 +239,7 @@ async def process_task(task: Task):
     created_at = datetime.fromtimestamp(task.created_at)
 
     cost = datetime.now() - created_at
-    if cost > timedelta(minutes=10):
+    if cost > timedelta(minutes=5):
         logger.warning(f"{prefix} task is expired, ignored")
         await manager.edit_text(task.chat_id, task.reply_message_id, f"Task is expired.")
         return
