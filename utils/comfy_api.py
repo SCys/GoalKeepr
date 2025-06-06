@@ -204,13 +204,26 @@ async def generate_image(
                                 continue
 
                             try:
-                                image_filename = outputs.popitem()[1]["images"][0]["filename"]
+                                # 获取第一个输出节点的结果
+                                output_key, output_data = outputs.popitem()
+                                
+                                # 检查是否有图片输出
+                                if "images" not in output_data:
+                                    logger.warning(f"输出中没有找到 'images' 字段")
+                                    continue
+                                
+                                images = output_data["images"]
+                                if not images or len(images) == 0:
+                                    logger.warning(f"images 列表为空，继续等待...")
+                                    continue
+                                
+                                image_filename = images[0]["filename"]
                                 logger.info(f"image file is exported: {image_filename}")
                             except Exception as e:
                                 import pprint
                                 pprint.pprint(outputs)
-                                logger.exception(f"获取图片文件名时发生错误")
-                                raise Exception(f"获取图片文件名时发生错误")
+                                logger.exception(f"获取图片文件名时发生错误: {e}")
+                                raise Exception(f"获取图片文件名时发生错误: {e}")
 
                             # 通过 /view 接口获取图片数据
                             async with session.get(
