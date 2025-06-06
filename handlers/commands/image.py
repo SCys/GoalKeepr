@@ -308,6 +308,8 @@ async def worker():
     if not rdb:
         logger.warning(f"redis is not ready, ignored")
         return
+    
+    logger.info(f"image worker is started")
 
     while True:
         await asyncio.sleep(0.1)
