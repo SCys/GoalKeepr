@@ -3,7 +3,7 @@ import sys
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import aiohttp
 import aioredis
@@ -35,7 +35,7 @@ class Manager:
     # routes
     handlers = []
     events = {}
-    callback_handlers: List[types.CallbackQuery] = []
+    callback_handlers: List[Callable] = []
 
     # running status
     is_running = False
@@ -110,12 +110,11 @@ class Manager:
 
     def setup_callback(self):
         # list callback handler
-        for func, args, kwargs in self.callback_handlers:
+        for func in self.callback_handlers:
             logger.info(f"dispatcher callback_query {func.__name__} is registered")
 
         self.dp.callback_query.register(self._callback_handler)
         logger.info("dispatcher callback_query is setup")
-
 
     def register(self, type_name, *args, **kwargs):
         """
@@ -389,4 +388,8 @@ class Manager:
         """
 
         for func in self.callback_handlers:
-            await func(query)
+            try:
+                await func(query)
+            except Exception as e:
+                logger.exception(f"callback_query {query.id} handler {func.__name__} error: {e}")
+
