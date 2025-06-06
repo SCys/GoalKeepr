@@ -208,7 +208,7 @@ async def generate_image(
         return None
     
     # check image is generated
-    for i in range(60):  # 240 times
+    for i in range(30):  # 30 times
         await asyncio.sleep(7)
 
         try:
