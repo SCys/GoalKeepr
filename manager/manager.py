@@ -42,7 +42,6 @@ class Manager:
 
     logger = logger
 
-
     def setup(self):
         self.load_config()
 
@@ -60,7 +59,6 @@ class Manager:
 
         self.setup_handlers()
         self.setup_callback()
-
 
     def load_config(self):
         """加载 main.ini，默认会配置相关代码"""
@@ -106,7 +104,9 @@ class Manager:
 
             method = observer.register
             method(func, *args, **kwargs)
-            logger.info(f"dispatcher {func.__name__}:{observer.event_name}.{method.__name__}({args}, {kwargs})")
+            logger.info(
+                f"dispatcher {func.__name__}:{observer.event_name}.{method.__name__}({args}, {kwargs})"
+            )
 
     def setup_callback(self):
         self.dp.callback_query.register(self._callback_handler)
@@ -118,7 +118,7 @@ class Manager:
         """
 
         def wrapper(func):
-            if type_name == 'callback_query':
+            if type_name == "callback_query":
                 self.callback_handlers.append((func, args, kwargs))
             else:
                 self.handlers.append((func, type_name, args, kwargs))
@@ -201,9 +201,15 @@ class Manager:
 
         try:
             session = await self.create_session()
-            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15, sock_read=12)) as response:
+            async with session.get(
+                url,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=15, sock_read=12),
+            ) as response:
                 if response.status != 200:
-                    return {"error": f"Failed to fetch page for {username}, status: {response.status}"}
+                    return {
+                        "error": f"Failed to fetch page for {username}, status: {response.status}"
+                    }
 
                 page_content = await response.text()
                 soup = BeautifulSoup(page_content, "html.parser")
@@ -225,7 +231,10 @@ class Manager:
             return
 
     async def delete_message(
-        self, chat: Union[int, types.Chat], msg: Union[int, types.Message, None], deleted_at: Union[datetime, None] = None
+        self,
+        chat: Union[int, types.Chat],
+        msg: Union[int, types.Message, None],
+        deleted_at: Union[datetime, None] = None,
     ):
         """
         延缓删除消息
@@ -256,7 +265,9 @@ class Manager:
 
         return True
 
-    async def lazy_session(self, chat: int, msg: int, member: int, type: str, deleted_at: datetime):
+    async def lazy_session(
+        self, chat: int, msg: int, member: int, type: str, deleted_at: datetime
+    ):
         await database.execute(
             "insert into lazy_sessions(chat,msg,member,type,checkout_at) values($1,$2,$3,$4,$5)",
             (chat, msg, member, type, deleted_at),
@@ -286,7 +297,7 @@ class Manager:
         except:
             logger.exception(f"chat {chat} message {msg} send error")
             return False
-        
+
         if auto_deleted_at is not None:
             await self.delete_message(chat, resp, auto_deleted_at)
 
@@ -333,7 +344,9 @@ class Manager:
                 args = args[1:]
 
         try:
-            await self.bot.edit_message_text(content, chat_id=chat, message_id=msg, *args, **kwargs)
+            await self.bot.edit_message_text(
+                content, chat_id=chat, message_id=msg, *args, **kwargs
+            )
             logger.info(f"chat {chat} message {msg} edited")
         except:
             logger.exception(f"chat {chat} message {msg} edit error")
@@ -363,10 +376,9 @@ class Manager:
     async def create_session(self):
         return await self.bot.session.create_session()  # type: ignore
 
-
     async def _callback_handler(self, query: types.CallbackQuery):
         """
         默认回调处理程序
         """
         for func, args, kwargs in self.callback_handlers:
-            await func(query, *args, **kwargs)    
+            await func(query, *args, **kwargs)
