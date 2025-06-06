@@ -199,47 +199,48 @@ async def generate_image(
                 
                 logger.info(f"prompt id: {prompt_id}")
 
-                # 等待图片生成完成
-                while True:
-                    async with session.get(f"{endpoint}/history") as history_response:
-                        if history_response.status == 200:
-                            history = await history_response.json()
-                            if prompt_id in history:
-                                # 获取生成的图片文件名
-                                outputs: dict = history[prompt_id]["outputs"]
-                                if not outputs:
+        # 等待图片生成完成
+        for i in range(240): # 240 times
+            async with ClientSession(timeout=timeout) as session:
+                async with session.get(f"{endpoint}/history") as history_response:
+                    if history_response.status == 200:
+                        history = await history_response.json()
+                        if prompt_id in history:
+                            # 获取生成的图片文件名
+                            outputs: dict = history[prompt_id]["outputs"]
+                            if not outputs:
+                                continue
+
+                            try:
+                                # 获取第一个输出节点的结果
+                                output_key, output_data = outputs.popitem()
+                                
+                                # 检查是否有图片输出
+                                if "images" not in output_data:
+                                    logger.warning(f"输出中没有找到 'images' 字段")
                                     continue
+                                
+                                images = output_data["images"]
+                                if not images or len(images) == 0:
+                                    # logger.warning(f"images 列表为空，继续等待...")
+                                    continue
+                                
+                                image_filename = images[0]["filename"]
+                                logger.info(f"image file is exported: {image_filename}")
+                            except Exception as e:
+                                import pprint
+                                pprint.pprint(outputs)
+                                logger.exception(f"获取图片文件名时发生错误: {e}")
+                                raise Exception(f"获取图片文件名时发生错误: {e}")
 
-                                try:
-                                    # 获取第一个输出节点的结果
-                                    output_key, output_data = outputs.popitem()
-                                    
-                                    # 检查是否有图片输出
-                                    if "images" not in output_data:
-                                        logger.warning(f"输出中没有找到 'images' 字段")
-                                        continue
-                                    
-                                    images = output_data["images"]
-                                    if not images or len(images) == 0:
-                                        # logger.warning(f"images 列表为空，继续等待...")
-                                        continue
-                                    
-                                    image_filename = images[0]["filename"]
-                                    logger.info(f"image file is exported: {image_filename}")
-                                except Exception as e:
-                                    import pprint
-                                    pprint.pprint(outputs)
-                                    logger.exception(f"获取图片文件名时发生错误: {e}")
-                                    raise Exception(f"获取图片文件名时发生错误: {e}")
-
-                                # 通过 /view 接口获取图片数据
-                                async with session.get(
-                                    f"{endpoint}/view?filename={image_filename}&subfolder=api&type=output"
-                                ) as image_response:
-                                    if image_response.status == 200:
-                                        return await image_response.read()
-                                    raise Exception(f"获取图片失败: {image_response.status}")
-                    await asyncio.sleep(3)
+                            # 通过 /view 接口获取图片数据
+                            async with session.get(
+                                f"{endpoint}/view?filename={image_filename}&subfolder=api&type=output"
+                            ) as image_response:
+                                if image_response.status == 200:
+                                    return await image_response.read()
+                                raise Exception(f"获取图片失败: {image_response.status}")
+            await asyncio.sleep(1)
 
     except Exception as e:
         logger.exception(f"生成图片时发生错误")
