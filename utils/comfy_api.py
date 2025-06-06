@@ -180,6 +180,8 @@ async def generate_image(
         },
     }
 
+    logger.info(f"generate image: {prompt}")
+
     try:
         session = await manager.create_session()
         # 发送工作流请求
@@ -191,6 +193,8 @@ async def generate_image(
 
             prompt_data = await prompt_response.json()
             prompt_id = prompt_data["prompt_id"]
+            
+            logger.info(f"prompt id: {prompt_id}")
 
             # 等待图片生成完成
             while True:
