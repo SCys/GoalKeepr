@@ -365,7 +365,7 @@ async def operations_admin(
         models_buttons = [
             types.InlineKeyboardButton(
                 text=f"{value.name} ({key})",
-                callback_data=f"admin:settings:model {key}"
+                callback_data=f"admin:settings:model:{key}"
             )
             for key, value in SUPPORTED_MODELS.items()
         ]
@@ -404,8 +404,6 @@ def get_user_id(msg: types.Message, arguments: List[str]):
 
 @manager.register("callback_query")
 async def chat_admin_settings_callback(query: types.CallbackQuery):
-    logger.info(f"callback_query {query.data} is called with message {query.message}")
-
     if not query.data or not query.data.startswith("admin:settings"):
         logger.warning(f"callback_query {query.data} is not admin:settings")
         return
