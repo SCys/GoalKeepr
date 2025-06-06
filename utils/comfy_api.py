@@ -203,13 +203,14 @@ async def generate_image(
 
                 logger.info(f"prompt id: {prompt_id}")
 
-        await asyncio.sleep(1)
     except Exception as e:
         logger.exception(f"生成图片时发生错误")
         return None
 
     # check image is generated
-    for i in range(240):  # 240 times
+    for i in range(60):  # 240 times
+        await asyncio.sleep(3)
+
         try:
             timeout = ClientTimeout(total=10)
             async with ClientSession(timeout=timeout) as session:
@@ -249,7 +250,6 @@ async def generate_image(
                         pprint.pprint(outputs)
                         logger.exception(f"获取图片文件名时发生错误: {e}")
                         raise Exception(f"获取图片文件名时发生错误: {e}")
-            await asyncio.sleep(1)
 
         except Exception as e:
             logger.exception(f"获取图片时发生错误")
