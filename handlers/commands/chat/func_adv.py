@@ -369,10 +369,15 @@ async def operations_admin(
             )
             for key, value in SUPPORTED_MODELS.items()
         ]
+        # 将按钮按行排列，每行最多2个按钮
+        button_rows = []
+        for i in range(0, len(models_buttons), 2):
+            button_rows.append(models_buttons[i:i+2])
+        
         await manager.reply(
             msg,
             f"现在默认模型：{model_default}，请选择要设置的模型",
-            reply_markup=types.InlineKeyboardMarkup(row_width=2).add(*models_buttons),
+            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=button_rows),
             auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER * 2),
         )
 
