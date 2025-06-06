@@ -202,9 +202,27 @@ async def generate_image(
                             and len(history[prompt_id]["outputs"]) > 0
                         ):
                             # 获取生成的图片文件名
-                            image_filename = history[prompt_id]["outputs"]["48"]["images"][0]["filename"]
+                            """
+                            "outputs": {
+                                "178": {
+                                    "images": [
+                                    {
+                                        "filename": "ComfyUI-euler_ancestral-3.5-24-2025-06-06 05-25-08-0215.avif",
+                                        "subfolder": "pony/JunkJuice.UbeSauce",
+                                        "type": "output"
+                                    }
+                                    ]
+                                }
+                            }
+                            """
 
-                            logger.info(f"image file is exported: {image_filename}")
+                            try:
+                                outputs: dict = history[prompt_id]["outputs"]
+                                image_filename = outputs.popitem()[1]["images"][0]["filename"]
+                                logger.info(f"image file is exported: {image_filename}")
+                            except Exception as e:
+                                logger.exception(f"获取图片文件名时发生错误")
+                                raise Exception(f"获取图片文件名时发生错误")
 
                             # 通过 /view 接口获取图片数据
                             async with session.get(
