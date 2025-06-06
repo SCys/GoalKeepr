@@ -227,9 +227,6 @@ async def generate_image(
                     # 获取生成的图片文件名
                     outputs: dict = history[prompt_id]["outputs"]
                     if not outputs:
-                        import pprint
-                        pprint.pprint(history[prompt_id]["outputs"])
-
                         logger.warning(f"prompt id {prompt_id} not in history")
                         continue
 
@@ -249,10 +246,8 @@ async def generate_image(
 
                         image_filename = images[0]["filename"]
                         logger.info(f"image file is exported: {image_filename}")
+                        break
                     except Exception as e:
-                        import pprint
-
-                        pprint.pprint(outputs)
                         logger.exception(f"获取图片文件名时发生错误: {e}")
                         raise Exception(f"获取图片文件名时发生错误: {e}")
 
