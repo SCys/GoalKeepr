@@ -173,7 +173,7 @@ async def generate_image(
                 "one_counter_per_folder": True,
                 "image_preview": True,
                 "output_ext": ".webp",
-                "quality": 75,
+                "quality": 90,
                 "images": ["8", 0],
             },
             "class_type": "SaveImageExtended",
