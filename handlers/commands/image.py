@@ -307,7 +307,7 @@ async def process_task(task: Task):
             reply_to_message_id=task.message_id,
             caption=caption[:1023],
             disable_notification=True,
-            has_spoiler=True,
+            # has_spoiler=True,
         )
         logger.info(f"{prefix} image is sent, cost: {str(cost)[:-7]}")
     except TelegramBadRequest as e:
