@@ -109,8 +109,13 @@ class Manager:
             )
 
     def setup_callback(self):
+        # list callback handler
+        for func, args, kwargs in self.callback_handlers:
+            logger.info(f"dispatcher callback_query {func.__name__} is registered")
+
         self.dp.callback_query.register(self._callback_handler)
         logger.info("dispatcher callback_query is setup")
+
 
     def register(self, type_name, *args, **kwargs):
         """
