@@ -171,7 +171,7 @@ async def generate_image(
                 "counter_digits": 4,
                 "counter_position": "last",
                 "one_counter_per_folder": True,
-                "image_preview": False,
+                "image_preview": True,
                 "output_ext": ".avif",
                 "quality": 75,
                 "images": ["8", 0],
@@ -221,11 +221,16 @@ async def generate_image(
 
                     history = await history_response.json()
                     if prompt_id not in history:
-                        continue
+                        logger.warning(f"prompt id {prompt_id} not in history")
+                        return None
 
                     # 获取生成的图片文件名
                     outputs: dict = history[prompt_id]["outputs"]
                     if not outputs:
+                        import pprint
+                        pprint.pprint(history[prompt_id]["outputs"])
+
+                        logger.warning(f"prompt id {prompt_id} not in history")
                         continue
 
                     try:
