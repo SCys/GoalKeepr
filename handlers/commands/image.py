@@ -2,6 +2,7 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
+import uuid
 
 from aiogram import types
 from aiogram.exceptions import TelegramBadRequest
@@ -82,15 +83,9 @@ class Task:
     prompt: str
     options: Dict[str, Any]
     created_at: float
-    status: str = "queued"
-    job_id: Optional[str] = None
-    task_id: Optional[str] = None
-
-    def __post_init__(self):
-        self.status = "queued"
-        # 为任务生成唯一标识符
-        if not self.task_id:
-            self.task_id = f"{self.msg.chat_id}_{self.msg.message_id}_{int(self.created_at)}"
+    status: str
+    job_id: Optional[str]
+    task_id: Optional[str]
 
     async def cancel(self) -> None:
         """取消任务"""
@@ -308,6 +303,9 @@ async def image(msg: types.Message):
             prompt=prompt,
             options=options,
             created_at=datetime.now().timestamp(),
+            status="queued",
+            job_id=None,
+            task_id=str(uuid.uuid4()),
         )
 
         # 将任务加入队列
