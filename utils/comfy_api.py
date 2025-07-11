@@ -538,6 +538,9 @@ async def get_image_bytes(endpoint: str, job_id: str) -> Optional[bytes]:
             # get filename and subfolder with node 48(workflow node number)
             filename = info.get("outputs", {}).get("48", {}).get("images", [{}])[0].get("filename")
             subfolder = info.get("outputs", {}).get("48", {}).get("images", [{}])[0].get("subfolder")
+
+            # print info full data
+            print(info)
             
             # download image
             image_data = await _download_image(session, endpoint, filename, subfolder)
