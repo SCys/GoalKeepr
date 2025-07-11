@@ -386,7 +386,7 @@ async def _download_image(
     try:
         async with session.get(url) as response:
             if response.status != 200:
-                raise ImageDownloadError(f"下载图片失败: HTTP {response.status}")
+                raise ImageDownloadError(f"下载图片失败: HTTP {response.status}, url: {url}")
 
             image_data = await response.read()
             logger.info(f" 图片下载成功，大小: {len(image_data)} bytes, url:{url}")
