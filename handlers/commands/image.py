@@ -424,6 +424,7 @@ async def process_task(task: Task):
 
         # 更新任务状态到 Redis
         await rdb.set(f"{REDIS_KEY_PREFIX}:{task.task_id}", dumps(task))
+        logger.info(f"{prefix} task {task.task_id} status updated to {task.status}")
 
     except Exception as e:
         # 处理任何异常，标记任务为完成
@@ -560,7 +561,7 @@ async def handle_processing_task(task: Task, endpoint: str, prefix: str):
 async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
     """处理完成的任务"""
     if not task.job_id:
-        logger.warning(f"{prefix} completed task has no job_id")
+        logger.warning(f"{prefix} completed task {task.task_id} has no job_id")
         await task.dequeue_task(rdb)
         return
 
@@ -569,7 +570,7 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
         img_raw = await task.get_image_bytes()
         
         if not img_raw:
-            logger.warning(f"{prefix} image is empty, ignored")
+            logger.warning(f"{prefix} completed task {task.task_id} image is empty, ignored")
             await safe_edit_text(
                 task.msg.chat_id,
                 task.msg.reply_message_id,
@@ -609,10 +610,10 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
             disable_notification=True,
         )
         
-        logger.info(f"{prefix} image is sent, cost: {cost.total_seconds():.1f}s")
+        logger.info(f"{prefix} completed task {task.task_id} image is sent, cost: {cost.total_seconds():.1f}s")
         
     except TelegramBadRequest as e:
-        logger.error(f"{prefix} send photo error: {e}")
+        logger.error(f"{prefix} completed task {task.task_id} send photo error: {e}")
         await safe_edit_text(
             task.msg.chat_id,
             task.msg.reply_message_id,
@@ -620,7 +621,7 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
             prefix
         )
     except comfy_api.ComfyAPIError as e:
-        logger.warning(f"{prefix} comfy api error: {e}")
+        logger.warning(f"{prefix} completed task {task.task_id} comfy api error: {e}")
         await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, f"Task is failed: {str(e)}", prefix)
     
     # 无论成功失败，都从队列中删除任务
@@ -629,7 +630,7 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
 
 async def handle_not_found_task(task: Task, prefix: str):
     """处理未找到的任务"""
-    logger.warning(f"{prefix} task not found on remote service")
+    logger.warning(f"{prefix} task {task.task_id} not found on remote service")
     await safe_edit_text(
         task.msg.chat_id,
         task.msg.reply_message_id,
