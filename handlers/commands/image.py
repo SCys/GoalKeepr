@@ -417,10 +417,12 @@ async def process_task(task: Task):
             await handle_processing_task(task, endpoint, prefix)
         elif task.status == "not_found":
             await handle_not_found_task(task, prefix)
+        elif task.status == "completed":
+            pass
         else:
             # 未知状态，标记为完成
             logger.warning(f"{prefix} unknown task status: {task.status}")
-            task.status = "unknown"
+            task.status = "completed"
 
         # 更新任务状态到 Redis
         await rdb.set(f"{REDIS_KEY_PREFIX}:{task.task_id}", dumps(task))
