@@ -535,9 +535,9 @@ async def get_image_bytes(endpoint: str, job_id: str) -> Optional[bytes]:
         async with ClientSession(timeout=DEFAULT_TIMEOUT) as session:
             info = await get_job_info(session, endpoint, job_id)
 
-            # get filename and subfolder
-            filename = info.get("outputs", {}).get("images", [{}])[0].get("filename")
-            subfolder = info.get("outputs", {}).get("images", [{}])[0].get("subfolder")
+            # get filename and subfolder with node 48(workflow node number)
+            filename = info.get("outputs", {}).get("48", {}).get("images", [{}])[0].get("filename")
+            subfolder = info.get("outputs", {}).get("48", {}).get("images", [{}])[0].get("subfolder")
             
             # download image
             image_data = await _download_image(session, endpoint, filename, subfolder)
