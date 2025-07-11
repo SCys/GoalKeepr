@@ -62,7 +62,7 @@ def _parse_image_size(size: str) -> Tuple[int, int]:
         raise ValueError("尺寸格式错误，应为 'widthxheight'，例如 '512x512'")
 
 
-def _create_workflow(model: str, prompt: str, width: int, height: int, steps: int, cfg: float, seed: Optional[int] = None) -> Dict[str, Any]:
+def create_workflow(checkpoint: str, prompt: str, width: int, height: int, steps: int, cfg: float, seed: Optional[int] = None) -> Dict[str, Any]:
     """
     创建 ComfyUI 工作流配置
 
@@ -81,12 +81,15 @@ def _create_workflow(model: str, prompt: str, width: int, height: int, steps: in
     if seed is None:
         seed = random.randint(*DEFAULT_SEED_RANGE)
 
-    if model not in WORKFLOWS:
-        model = "flux"
+    if checkpoint not in WORKFLOWS:
+        checkpoint = "flux"
 
-    workflow = WORKFLOWS[model]
+    if seed is None:
+        seed = random.randint(*DEFAULT_SEED_RANGE)
 
-    if model == "flux":
+    workflow = WORKFLOWS[checkpoint]
+
+    if checkpoint == "flux":
         workflow["6"]["inputs"]["text"] = prompt
         workflow["17"]["inputs"]["steps"] = steps
         workflow["27"]["inputs"]["width"] = width
@@ -274,7 +277,7 @@ async def generate_image(
         width, height = _parse_image_size(size)
 
         # 创建工作流
-        workflow = _create_workflow(prompt, width, height, steps, cfg, seed)
+        workflow = create_workflow(checkpoint, prompt, width, height, steps, cfg, seed)
 
         logger.info(f"开始生成图片: [{size}] {prompt}")
 
