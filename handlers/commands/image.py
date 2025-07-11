@@ -103,12 +103,12 @@ class Task:
         endpoint = manager.config["sd_api"]["endpoint"]
         return await comfy_api.job_status(endpoint, self.job_id)
 
-    async def get_image_bytes(self) -> Optional[bytes]:
+    async def download_image(self, filename: str, subfolder:str) -> Optional[bytes]:
         """获取图片字节"""
         if not self.job_id:
             return
         endpoint = manager.config["sd_api"]["endpoint"]
-        return await comfy_api.get_image_bytes(endpoint, self.job_id)
+        return await comfy_api.download_image(endpoint, filename, subfolder)
 
     async def enqueue_task(self, rdb) -> None:
         """将任务加入队列"""
@@ -311,7 +311,7 @@ async def image(msg: types.Message):
             return
 
         prefix += f" user {user.full_name}"
-        logger.info(f"{prefix} is using sd txt2img func")
+        logger.info(f"{prefix} is using image func")
 
         # 获取Redis连接并检查队列容量
         rdb = await manager.get_redis()
@@ -389,7 +389,7 @@ async def process_task(task: Task):
     endpoint = manager.config["sd_api"]["endpoint"]
     if not endpoint:
         task.status = "completed"
-        logger.warning(f"{prefix} sd api endpoint is empty")
+        logger.warning(f"{prefix} image endpoint is empty")
         await safe_edit_text(
             task.msg.chat_id,
             task.msg.reply_message_id,
@@ -570,8 +570,38 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
         return
 
     try:
+        info = await comfy_api.get_job_info(endpoint, task.job_id)
+        # status is completed
+        status_str = info.get("status", {}).get("status_str", "")
+        if status_str == "error":
+            logger.warning(f"{prefix} completed task {task.task_id} status is error, ignored")
+            await safe_edit_text(
+                task.msg.chat_id,
+                task.msg.reply_message_id,
+                "Task is failed: status is error",
+                prefix
+            )
+            await task.dequeue_task(rdb)
+            return
+        
+        outputs = info.get("outputs", {}).get("48", {})
+        images = outputs.get("images", [])
+        if not images:
+            logger.warning(f"{prefix} completed task {task.task_id} has no image, ignored")
+            await safe_edit_text(
+                task.msg.chat_id,
+                task.msg.reply_message_id,
+                "Task is failed: empty image result",
+                prefix
+            )
+            await task.dequeue_task(rdb)
+            return
+        
+        filename = images[0].get("filename")
+        subfolder = images[0].get("subfolder")
+
         # 获取生成的图片
-        img_raw = await task.get_image_bytes()
+        img_raw = await task.download_image(filename, subfolder)
         
         if not img_raw:
             logger.warning(f"{prefix} completed task {task.task_id} image is empty, ignored")
