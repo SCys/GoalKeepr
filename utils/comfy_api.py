@@ -151,9 +151,7 @@ async def _submit_workflow(
         raise WorkflowSubmissionError(f"提交工作流时发生错误: {e}")
 
 
-async def get_job_info(
-    session: ClientSession, endpoint: str, job_id: str
-) -> Dict[str, Any]:
+async def get_job_info(endpoint: str, job_id: str) -> Dict[str, Any]:
     """
     获取任务信息
 
@@ -166,70 +164,18 @@ async def get_job_info(
         任务信息字典
     """
     try:
-        async with session.get(f"{endpoint}/history/{job_id}") as response:
-            if response.status != 200:
-                raise Exception(f"API请求失败: HTTP {response.status}")
+        async with ClientSession(timeout=DEFAULT_TIMEOUT) as session:
+            async with session.get(f"{endpoint}/history/{job_id}") as response:
+                if response.status != 200:
+                    raise Exception(f"API请求失败: HTTP {response.status}")
 
-            return await response.json()
+                return await response.json()
 
     except ClientError as e:
         raise Exception(f"网络请求失败: {e}")
 
     except Exception as e:
         raise Exception(f"获取任务信息时发生错误: {e}")
-
-
-async def _wait_for_image_generation(
-    session: ClientSession, endpoint: str, prompt_id: str
-) -> str:
-    """
-    等待图片生成完成并获取文件名
-
-    Args:
-        session: HTTP 会话
-        endpoint: API 端点
-        prompt_id: 提示词 ID
-
-    Returns:
-        生成的图片文件名
-
-    Raises:
-        ImageGenerationTimeoutError: 生成超时
-    """
-    for attempt in range(MAX_RETRIES):
-        await asyncio.sleep(RETRY_DELAY)
-
-        try:
-            prompt_data = await get_job_info(session, endpoint, prompt_id)
-
-            # 获取生成的图片文件名
-            outputs = prompt_data.get("outputs", {})
-            if not outputs:
-                logger.debug(
-                    f"prompt_id {prompt_id} 的输出为空，尝试 {attempt + 1}/{MAX_RETRIES}"
-                )
-                continue
-
-            # 获取第一个输出节点的结果
-            for output_key, output_data in outputs.items():
-                images = output_data.get("images", [])
-                if images:
-                    image_filename = images[0]["filename"]
-                    logger.info(f"图片生成完成: {image_filename}")
-                    return image_filename
-
-            logger.debug(f"输出中暂无图片，尝试 {attempt + 1}/{MAX_RETRIES}")
-
-        except ClientError as e:
-            logger.warning(
-                f"检查生成状态时网络错误: {e}, 尝试 {attempt + 1}/{MAX_RETRIES}"
-            )
-        except Exception as e:
-            logger.error(
-                f"检查生成状态时发生错误: {e}, 尝试 {attempt + 1}/{MAX_RETRIES}"
-            )
-
-    raise ImageGenerationTimeoutError(f"图片生成超时，已尝试 {MAX_RETRIES} 次")
 
 
 async def download_image(endpoint: str, filename: str, subfolder: str) -> bytes:
