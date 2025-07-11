@@ -19,7 +19,7 @@ logger = manager.logger
 # 常量定义
 GLOBAL_TASK_LIMIT = 3
 QUEUE_NAME = "txt2img"
-DELETED_AFTER = 3  # 3s
+DELETED_AFTER = 60  # 60s
 DEFAULT_TASK_TIMEOUT = 300  # 5 minutes
 DEFAULT_GENERATION_TIMEOUT = 300  # 5 minutes
 WORKER_SLEEP_INTERVAL = 1  # 1s
