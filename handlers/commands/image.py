@@ -132,7 +132,32 @@ class Task:
         try:
             keys = await rdb.keys(f"{REDIS_KEY_PREFIX}:*")
             if keys:
-                return [loads(await rdb.get(key)) for key in keys]
+                tasks = []
+                for key in keys:
+                    task_data = loads(await rdb.get(key))
+                    # Reconstruct TaskMessage object
+                    msg_data = task_data['msg']
+                    task_msg = TaskMessage(
+                        chat_id=msg_data['chat_id'],
+                        chat_name=msg_data['chat_name'],
+                        user_id=msg_data['user_id'],
+                        user_name=msg_data['user_name'],
+                        message_id=msg_data['message_id'],
+                        reply_message_id=msg_data['reply_message_id'],
+                        reply_content=msg_data['reply_content']
+                    )
+                    # Reconstruct Task object
+                    task = Task(
+                        msg=task_msg,
+                        prompt=task_data['prompt'],
+                        options=task_data['options'],
+                        created_at=task_data['created_at'],
+                        status=task_data['status'],
+                        job_id=task_data['job_id'],
+                        task_id=task_data['task_id']
+                    )
+                    tasks.append(task)
+                return tasks
             return []
         except Exception as e:
             logger.error(f"Failed to get all tasks: {e}")
