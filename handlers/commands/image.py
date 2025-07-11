@@ -79,13 +79,12 @@ class Task:
     """图像生成任务数据类"""
 
     msg: TaskMessage
-    status: str = "queued"
     prompt: str
-    options: Dict[str, Any] 
-    created_at: float 
+    options: Dict[str, Any]
+    created_at: float
+    status: str = "queued"
     job_id: Optional[str] = None
-    task_id: Optional[str] = None  # 添加任务唯一标识符
-
+    task_id: Optional[str] = None
 
     def __post_init__(self):
         self.status = "queued"
