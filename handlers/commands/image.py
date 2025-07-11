@@ -79,16 +79,16 @@ class Task:
     """图像生成任务数据类"""
 
     msg: TaskMessage
-    status: str
+    status: str = "queued"
     prompt: str
-    options: Dict[str, Any]
-    created_at: float
-    job_id: Optional[str]
+    options: Dict[str, Any] 
+    created_at: float 
+    job_id: Optional[str] = None
     task_id: Optional[str] = None  # 添加任务唯一标识符
+
 
     def __post_init__(self):
         self.status = "queued"
-        self.created_at = datetime.now().timestamp()
         # 为任务生成唯一标识符
         if not self.task_id:
             self.task_id = f"{self.msg.chat_id}_{self.msg.message_id}_{int(self.created_at)}"
@@ -308,6 +308,7 @@ async def image(msg: types.Message):
             ),
             prompt=prompt,
             options=options,
+            created_at=datetime.now().timestamp(),
         )
 
         # 将任务加入队列
