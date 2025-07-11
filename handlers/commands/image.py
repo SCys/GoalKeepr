@@ -362,7 +362,7 @@ async def image(msg: types.Message):
 
         # 发送通知并更新任务
         message = f"Task is queued, please wait(~{task_size * 35}s)."
-        reply = await manager.reply(msg, message, now + timedelta(seconds=DELETED_AFTER))
+        reply = await msg.reply(message)
         task.msg.reply_message_id = reply.message_id
         
         # 更新任务到Redis，确保reply_message_id被保存
