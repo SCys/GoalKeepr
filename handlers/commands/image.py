@@ -386,7 +386,7 @@ async def process_task(task: Task):
     prefix = f"chat {task.msg.chat_id}({task.msg.chat_name}) msg {task.msg.message_id} user {task.msg.user_name}"
 
     # 检查配置
-    endpoint = manager.config
+    endpoint = manager.config["sd_api"]["endpoint"]
     if not endpoint:
         task.status = "completed"
         logger.warning(f"{prefix} sd api endpoint is empty")
