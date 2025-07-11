@@ -307,7 +307,7 @@ async def image(msg: types.Message):
         users, groups = PermissionManager.parse_user_groups_config(manager.config)
         if not PermissionManager.check_permission(user.id, chat.id, users, groups):
             logger.warning(f"{prefix} user {user.full_name} or group {chat.id} is not allowed")
-            await manager.reply(msg, "no permission", now + timedelta(seconds=DELETED_AFTER))
+            await manager.reply(msg, "you are not allowed to use this command", now + timedelta(seconds=DELETED_AFTER))
             return
 
         prefix += f" user {user.full_name}"
@@ -362,7 +362,7 @@ async def image(msg: types.Message):
 
         # 发送通知并更新任务
         message = f"Task is queued, please wait(~{task_size * 35}s)."
-        reply = await msg.reply(message, now + timedelta(seconds=DELETED_AFTER))
+        reply = await manager.reply(msg, message, now + timedelta(seconds=DELETED_AFTER))
         task.msg.reply_message_id = reply.message_id
         
         # 更新任务到Redis，确保reply_message_id被保存
