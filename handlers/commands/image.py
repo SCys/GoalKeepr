@@ -440,17 +440,8 @@ async def process_task(task: Task):
         task.status = "completed"
         await rdb.set(f"{REDIS_KEY_PREFIX}:{task.task_id}", dumps(task))
 
-    try:
-        if task.status == "completed":
-            await handle_completed_task(task, endpoint, prefix, rdb)
-    except Exception as e:
-        logger.exception(f"{prefix} handle completed task error: {e}")
-        await safe_edit_text(
-            task.msg.chat_id,
-            task.msg.reply_message_id,
-            f"Task is failed: {str(e)}",
-            prefix
-        )
+    if task.status == "completed":
+        await handle_completed_task(task, endpoint, prefix, rdb)
 
 
 async def handle_queued_task(task: Task, endpoint: str, prefix: str):
