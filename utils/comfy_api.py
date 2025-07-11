@@ -62,7 +62,15 @@ def _parse_image_size(size: str) -> Tuple[int, int]:
         raise ValueError("尺寸格式错误，应为 'widthxheight'，例如 '512x512'")
 
 
-def create_workflow(checkpoint: str, prompt: str, width: int, height: int, steps: int, cfg: float, seed: Optional[int] = None) -> Dict[str, Any]:
+def create_workflow(
+    checkpoint: str,
+    prompt: str,
+    width: int,
+    height: int,
+    steps: int,
+    cfg: float,
+    seed: Optional[int] = None,
+) -> Dict[str, Any]:
     """
     创建 ComfyUI 工作流配置
 
@@ -103,7 +111,9 @@ def create_workflow(checkpoint: str, prompt: str, width: int, height: int, steps
     return workflow
 
 
-async def _submit_workflow(session: ClientSession, endpoint: str, workflow: Dict[str, Any]) -> str:
+async def _submit_workflow(
+    session: ClientSession, endpoint: str, workflow: Dict[str, Any]
+) -> str:
     """
     提交工作流到 ComfyUI
 
@@ -141,7 +151,9 @@ async def _submit_workflow(session: ClientSession, endpoint: str, workflow: Dict
         raise WorkflowSubmissionError(f"提交工作流时发生错误: {e}")
 
 
-async def get_job_info(session: ClientSession, endpoint: str, job_id: str) -> Dict[str, Any]:
+async def get_job_info(
+    session: ClientSession, endpoint: str, job_id: str
+) -> Dict[str, Any]:
     """
     获取任务信息
 
@@ -167,7 +179,9 @@ async def get_job_info(session: ClientSession, endpoint: str, job_id: str) -> Di
         raise Exception(f"获取任务信息时发生错误: {e}")
 
 
-async def _wait_for_image_generation(session: ClientSession, endpoint: str, prompt_id: str) -> str:
+async def _wait_for_image_generation(
+    session: ClientSession, endpoint: str, prompt_id: str
+) -> str:
     """
     等待图片生成完成并获取文件名
 
@@ -191,7 +205,9 @@ async def _wait_for_image_generation(session: ClientSession, endpoint: str, prom
             # 获取生成的图片文件名
             outputs = prompt_data.get("outputs", {})
             if not outputs:
-                logger.debug(f"prompt_id {prompt_id} 的输出为空，尝试 {attempt + 1}/{MAX_RETRIES}")
+                logger.debug(
+                    f"prompt_id {prompt_id} 的输出为空，尝试 {attempt + 1}/{MAX_RETRIES}"
+                )
                 continue
 
             # 获取第一个输出节点的结果
@@ -205,9 +221,13 @@ async def _wait_for_image_generation(session: ClientSession, endpoint: str, prom
             logger.debug(f"输出中暂无图片，尝试 {attempt + 1}/{MAX_RETRIES}")
 
         except ClientError as e:
-            logger.warning(f"检查生成状态时网络错误: {e}, 尝试 {attempt + 1}/{MAX_RETRIES}")
+            logger.warning(
+                f"检查生成状态时网络错误: {e}, 尝试 {attempt + 1}/{MAX_RETRIES}"
+            )
         except Exception as e:
-            logger.error(f"检查生成状态时发生错误: {e}, 尝试 {attempt + 1}/{MAX_RETRIES}")
+            logger.error(
+                f"检查生成状态时发生错误: {e}, 尝试 {attempt + 1}/{MAX_RETRIES}"
+            )
 
     raise ImageGenerationTimeoutError(f"图片生成超时，已尝试 {MAX_RETRIES} 次")
 
@@ -234,7 +254,9 @@ async def download_image(endpoint: str, filename: str, subfolder: str) -> bytes:
         async with ClientSession(timeout=DEFAULT_TIMEOUT) as session:
             async with session.get(url) as response:
                 if response.status != 200:
-                    raise ImageDownloadError(f"下载图片失败: HTTP {response.status}, url: {url}")
+                    raise ImageDownloadError(
+                        f"下载图片失败: HTTP {response.status}, url: {url}"
+                    )
 
                 image_data = await response.read()
                 logger.info(f" 图片下载成功，大小: {len(image_data)} bytes, url:{url}")
