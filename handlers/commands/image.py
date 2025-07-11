@@ -405,6 +405,8 @@ async def process_task(task: Task):
         await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: redis is not ready", prefix)
         return
 
+    logger.info(f"{prefix} task {task.task_id} status: {task.status}")
+
     try:
         # 根据任务状态进行分类处理
         if task.status == "queued":
@@ -424,7 +426,6 @@ async def process_task(task: Task):
 
         # 更新任务状态到 Redis
         await rdb.set(f"{REDIS_KEY_PREFIX}:{task.task_id}", dumps(task))
-        logger.info(f"{prefix} task {task.task_id} status updated to {task.status}")
 
     except Exception as e:
         # 处理任何异常，标记任务为完成
