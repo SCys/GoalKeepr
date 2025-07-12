@@ -8,7 +8,6 @@ from aiogram import types
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from orjson import dumps, loads
-from PIL import Image
 
 
 from manager import manager
