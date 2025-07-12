@@ -588,7 +588,7 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
         size = task.options.get("size", DEFAULT_SIZE)
         step = task.options.get("step", DEFAULT_STEP)
 
-        image_url = f"https://one.iscys.com/Comfyu/{subfolder}/{filename}"
+        image_url = f"https://one.iscys.com/Comfy/{subfolder}/{filename}"
 
         if task.msg.reply_message_id != -1:
             await manager.bot.edit_message_text(
