@@ -58,8 +58,8 @@ WORKFLOWS = {
         },
         "50": {
             "inputs": {
-                "filename_prefix": "ComfyUI",
-                "filename_keys": "sampler_name, cfg, steps, %F %H-%M-%S",
+                "filename_prefix": "api",
+                "filename_keys": "sampler_name, cfg, steps, %F_%H-%M-%S",
                 "foldername_prefix": "",
                 "foldername_keys": "flux",
                 "delimiter": "-",
@@ -70,7 +70,7 @@ WORKFLOWS = {
                 "counter_digits": 4,
                 "counter_position": "last",
                 "one_counter_per_folder": True,
-                "image_preview": False,
+                "image_preview": True,
                 "output_ext": ".avif",
                 "quality": 90,
                 "images": ["8", 0],
