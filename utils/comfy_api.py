@@ -169,7 +169,8 @@ async def get_job_info(endpoint: str, job_id: str) -> Dict[str, Any]:
                 if response.status != 200:
                     raise Exception(f"API请求失败: HTTP {response.status}")
 
-                return await response.json()
+                info = await response.json()
+                return info.get(job_id, {})
 
     except ClientError as e:
         raise Exception(f"网络请求失败: {e}")
