@@ -49,15 +49,15 @@ SUPPORTED_MODELS = {
     ),
     "llama-4": ModelDescription(
         name="Meta Llama 4 Maverick",
-        input_length=128000, # 128k
-        output_length=4096, # 4k
+        input_length=128000,  # 128k
+        output_length=4096,  # 4k
         rate_minute=5,
         rate_daily=1000,
     ),
     "deepseek-r1": ModelDescription(
         name="DeepSeek R1 0528",
-        input_length=163840, # 164k
-        output_length=163840, # 164k
+        input_length=163840,  # 164k
+        output_length=163840,  # 164k
         rate_minute=5,
         rate_daily=1000,
     ),
@@ -70,15 +70,15 @@ SUPPORTED_MODELS = {
     ),
     "qwen3": ModelDescription(
         name="Qwen 3.2 235B A22",
-        input_length=40960, # 41k
-        output_length=40960, # 41k
+        input_length=40960,  # 41k
+        output_length=40960,  # 41k
         rate_minute=5,
         rate_daily=1000,
     ),
     "gemma-3": ModelDescription(
         name="Gemma 3 27b",
-        input_length=96000, # 96k
-        output_length=8192, # 8k
+        input_length=96000,  # 96k
+        output_length=8192,  # 8k
         rate_minute=5,
         rate_daily=1000,
     ),
@@ -88,7 +88,7 @@ SUPPORTED_MODELS = {
 async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict[str, Any]:
     """Make API request to LLM provider and handle common error cases"""
     session = await manager.bot.session.create_session()  # type: ignore
-    
+
     # 根据模型类型设置不同的超时时间
     model_name = data.get("model", DEFAULT_MODEL)
 
@@ -99,7 +99,7 @@ async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict
         sock_read=170,  # 2分50秒读取超时
         sock_connect=20,
     )
-    
+
     try:
         async with session.post(
             url,
@@ -121,7 +121,7 @@ async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict
                 message = response_data["error"].get("message", "Unknown error")
                 logger.error(f"API response error: {code} {message}")
                 raise ValueError(message)
-                
+
             return response_data
     except Exception as e:
         if not isinstance(e, ValueError):
@@ -205,7 +205,7 @@ async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str) ->
             for i, msg in enumerate(chat_history):
                 tokens += count_tokens(msg["content"])
                 if tokens > truncate_input:
-                    chat_history = chat_history[0:i-1]
+                    chat_history = chat_history[0 : i - 1]
                     break
 
     if prompt_system:
@@ -225,7 +225,7 @@ async def tg_generate_text(chat: types.Chat, member: types.User, prompt: str) ->
     try:
         response_data = await _api_request(url, data, proxy_token)
         text = response_data["choices"][0]["message"]["content"]
-        
+
         if rdb:
             # 保存到Redis，确保保存对话历史
             chat_history.append({"role": "assistant", "content": text})
@@ -242,7 +242,7 @@ async def chat_completions(messages: List[Dict[str, Any]], model_name: Optional[
     host = config["ai"]["proxy_host"]
     if not host:
         logger.error("proxy host is empty")
-        return None
+        return
 
     if not model_name:
         model_name = DEFAULT_MODEL
@@ -253,7 +253,7 @@ async def chat_completions(messages: List[Dict[str, Any]], model_name: Optional[
     url = f"{host}/v1/chat/completions"
     data = {
         "model": model_name,
-        "messages": messages, # [{"role": "user", "content": prompt}],
+        "messages": messages,  # [{"role": "user", "content": prompt}],
         **kwargs,
     }
 
@@ -263,4 +263,3 @@ async def chat_completions(messages: List[Dict[str, Any]], model_name: Optional[
         return response_data["choices"][0]["message"]["content"]
     except ValueError as e:
         return str(e)
-

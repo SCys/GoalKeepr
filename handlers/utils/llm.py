@@ -9,7 +9,7 @@ from loguru import logger
 
 from ..utils import chat_completions
 
-SPAM_MODELS = ["gemma3", "gemini-flash-lite"]
+SPAM_MODELS = ["gemini-flash-lite", "gemma3"]
 
 
 async def check_spams_with_llm(
