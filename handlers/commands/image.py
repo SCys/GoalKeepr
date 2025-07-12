@@ -269,7 +269,7 @@ class PromptProcessor:
     @staticmethod
     async def optimize_prompt(prompt: str) -> Tuple[str, str]:
         """优化提示词"""
-        reply_content = f"Prompt:\n{prompt}"
+        reply_content = prompt
 
         if "," in prompt:
             return prompt, reply_content
@@ -284,7 +284,7 @@ class PromptProcessor:
             )
             if optimized_prompt:
                 prompt = optimized_prompt
-                reply_content = f"Prompt:\n{prompt}"
+                reply_content = prompt
         except Exception as e:
             logger.warning(f"Prompt optimization failed: {e}")
 
