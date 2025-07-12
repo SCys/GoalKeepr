@@ -8,6 +8,8 @@ from aiogram import types
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from orjson import dumps, loads
+from PIL import Image
+
 
 from manager import manager
 from utils import comfy_api
@@ -582,27 +584,35 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
         cost = datetime.now() - datetime.fromtimestamp(task.created_at)
 
         # 准备发送图像
-        input_file = types.BufferedInputFile(
-            img_raw,
-            filename=f"txt2img_{task.msg.chat_id}_{task.msg.user_id}_{task.created_at}.webp",
-        )
+        input_file = types.BufferedInputFile(img_raw, filename=filename)
 
         size = task.options.get("size", DEFAULT_SIZE)
         step = task.options.get("step", DEFAULT_STEP)
 
-        caption = f"{task.msg.reply_content}\n\n" f"Size: {size} Step: {step}\n" f"Cost: {cost.total_seconds():.1f}s"
+        image_url = f"https://one.iscys.com/Comfyu/{subfolder}/{filename}"
 
-        # 删除进度消息
-        await safe_delete_message(task.msg.chat_id, task.msg.reply_message_id, prefix)
+        if task.msg.reply_message_id != -1:
+            await manager.bot.edit_message_text(
+                chat_id=task.msg.chat_id,
+                message_id=task.msg.reply_message_id,
+                text=f"Size: {size} Step: {step} Cost: {cost.total_seconds():.1f}s",
+            )
 
-        # 发送结果图像
-        await manager.bot.send_photo(
-            task.msg.chat_id,
-            input_file,
-            reply_to_message_id=task.msg.message_id,
-            caption=caption[:1023],
-            disable_notification=True,
-        )
+            await manager.bot.send_photo(
+                chat_id=task.msg.chat_id,
+                photo=input_file,
+                reply_to_message_id=task.msg.message_id,
+                caption=f"{task.msg.reply_content}",
+                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="Original|原始图片", url=image_url)]]),
+            )
+        else:
+            await manager.bot.send_photo(
+                chat_id=task.msg.chat_id,
+                photo=input_file,
+                reply_to_message_id=task.msg.message_id,
+                caption=f"Size: {size} Step: {step} Cost: {cost.total_seconds():.1f}s\n\n{task.msg.reply_content}",
+                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="Original|原始图片", url=image_url)]]),
+            )
 
         logger.info(f"{prefix} completed task {task.task_id} image is sent, cost: {cost.total_seconds():.1f}s")
 
