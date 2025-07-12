@@ -77,7 +77,7 @@ async def check_spams_with_llm(
                         temperature=0.5,
                         response_format={"type": "json_object"},
                     ),
-                    timeout=timedelta(seconds=7),
+                    timeout=7,
                 )
             except Exception as e:
                 logger.exception(f"check_spams_with_llm error: {e}")

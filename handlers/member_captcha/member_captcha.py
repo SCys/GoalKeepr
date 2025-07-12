@@ -213,7 +213,7 @@ async def member_captcha(event: types.ChatMemberUpdated):
                 strings_will_be_check,
                 now,
             ),
-            timeout=timedelta(seconds=20),
+            timeout=20
         )
         if spams_result and len(spams_result) > 0:
             # 过滤掉不需要的内容
