@@ -91,7 +91,7 @@ class Task:
         """取消任务"""
         if not self.job_id:
             return
-        
+
         endpoint = manager.config["sd_api"]["endpoint"]
         await comfy_api.job_cancel(endpoint, self.job_id)
 
@@ -103,7 +103,7 @@ class Task:
         endpoint = manager.config["sd_api"]["endpoint"]
         return await comfy_api.job_status(endpoint, self.job_id)
 
-    async def download_image(self, filename: str, subfolder:str) -> Optional[bytes]:
+    async def download_image(self, filename: str, subfolder: str) -> Optional[bytes]:
         """获取图片字节"""
         if not self.job_id:
             return
@@ -136,25 +136,25 @@ class Task:
                 for key in keys:
                     task_data = loads(await rdb.get(key))
                     # Reconstruct TaskMessage object
-                    msg_data = task_data['msg']
+                    msg_data = task_data["msg"]
                     task_msg = TaskMessage(
-                        chat_id=msg_data['chat_id'],
-                        chat_name=msg_data['chat_name'],
-                        user_id=msg_data['user_id'],
-                        user_name=msg_data['user_name'],
-                        message_id=msg_data['message_id'],
-                        reply_message_id=msg_data['reply_message_id'],
-                        reply_content=msg_data['reply_content']
+                        chat_id=msg_data["chat_id"],
+                        chat_name=msg_data["chat_name"],
+                        user_id=msg_data["user_id"],
+                        user_name=msg_data["user_name"],
+                        message_id=msg_data["message_id"],
+                        reply_message_id=msg_data["reply_message_id"],
+                        reply_content=msg_data["reply_content"],
                     )
                     # Reconstruct Task object
                     task = Task(
                         msg=task_msg,
-                        prompt=task_data['prompt'],
-                        options=task_data['options'],
-                        created_at=task_data['created_at'],
-                        status=task_data['status'],
-                        job_id=task_data['job_id'],
-                        task_id=task_data['task_id']
+                        prompt=task_data["prompt"],
+                        options=task_data["options"],
+                        created_at=task_data["created_at"],
+                        status=task_data["status"],
+                        job_id=task_data["job_id"],
+                        task_id=task_data["task_id"],
                     )
                     tasks.append(task)
                 return tasks
@@ -175,7 +175,7 @@ async def safe_edit_text(chat_id: int, message_id: int, text: str, prefix: str =
     if message_id <= 0:
         logger.warning(f"{prefix} invalid message_id: {message_id}, skipping edit")
         return
-    
+
     try:
         await manager.edit_text(chat_id, message_id, text)
     except Exception as e:
@@ -187,7 +187,7 @@ async def safe_delete_message(chat_id: int, message_id: int, prefix: str = ""):
     if message_id <= 0:
         logger.warning(f"{prefix} invalid message_id: {message_id}, skipping delete")
         return
-        
+
     try:
         await manager.delete_message(chat_id, message_id)
     except Exception as e:
@@ -364,7 +364,7 @@ async def image(msg: types.Message):
         message = f"Task is queued, please wait(~{task_size * 35}s)."
         reply = await msg.reply(message)
         task.msg.reply_message_id = reply.message_id
-        
+
         # 更新任务到Redis，确保reply_message_id被保存
         await task.enqueue_task(rdb)
 
@@ -390,12 +390,7 @@ async def process_task(task: Task):
     if not endpoint:
         task.status = "completed"
         logger.warning(f"{prefix} image endpoint is empty")
-        await safe_edit_text(
-            task.msg.chat_id,
-            task.msg.reply_message_id,
-            "Task is failed: remote service is closed",
-            prefix
-        )
+        await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: remote service is closed", prefix)
         return
 
     rdb = await manager.get_redis()
@@ -432,10 +427,7 @@ async def process_task(task: Task):
         cost = datetime.now() - datetime.fromtimestamp(task.created_at)
         logger.exception(f"{prefix} process task error: {e}")
         await safe_edit_text(
-            task.msg.chat_id,
-            task.msg.reply_message_id,
-            f"Task is failed(cost {cost.total_seconds():.1f}s), please try again later.\n\n{str(e)}",
-            prefix
+            task.msg.chat_id, task.msg.reply_message_id, f"Task is failed(cost {cost.total_seconds():.1f}s), please try again later.\n\n{str(e)}", prefix
         )
         task.status = "completed"
         await rdb.set(f"{REDIS_KEY_PREFIX}:{task.task_id}", dumps(task))
@@ -474,15 +466,10 @@ async def handle_queued_task(task: Task, endpoint: str, prefix: str):
             comfy_api.generate_image(endpoint, model, prompt, size, step, cfg),
             timeout=DEFAULT_GENERATION_TIMEOUT,
         )
-        
+
         if not job_id:
             logger.warning(f"{prefix} image job is empty, ignored")
-            await safe_edit_text(
-                task.msg.chat_id,
-                task.msg.reply_message_id,
-                "Task is failed: create image job failed",
-                prefix
-            )
+            await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: create image job failed", prefix)
             task.status = "completed"
             return
 
@@ -490,14 +477,11 @@ async def handle_queued_task(task: Task, endpoint: str, prefix: str):
         task.job_id = job_id
 
         logger.info(f"{prefix} image job is created with job_id: {job_id}")
-        
+
     except asyncio.TimeoutError:
         logger.warning(f"{prefix} image job timeout after {DEFAULT_GENERATION_TIMEOUT}s")
         await safe_edit_text(
-            task.msg.chat_id, 
-            task.msg.reply_message_id, 
-            f"Task is failed: http timeout after {DEFAULT_GENERATION_TIMEOUT}s, please try again later.",
-            prefix
+            task.msg.chat_id, task.msg.reply_message_id, f"Task is failed: http timeout after {DEFAULT_GENERATION_TIMEOUT}s, please try again later.", prefix
         )
         task.status = "completed"
     except comfy_api.ComfyAPIError as e:
@@ -522,7 +506,7 @@ async def handle_submitted_task(task: Task, endpoint: str, prefix: str):
         else:
             logger.warning(f"{prefix} failed to get task status")
             task.status = "not_found"
-            
+
     except comfy_api.ComfyAPIError as e:
         logger.warning(f"{prefix} comfy api error when getting status: {e}")
         task.status = "not_found"
@@ -541,22 +525,17 @@ async def handle_processing_task(task: Task, endpoint: str, prefix: str):
         if status_info:
             old_status = task.status
             task.status = status_info.get("status", "not_found")
-            
+
             if old_status != task.status:
                 logger.info(f"{prefix} task status changed from {old_status} to {task.status}")
-                
+
                 # 更新用户界面
                 cost = datetime.now() - datetime.fromtimestamp(task.created_at)
-                await safe_edit_text(
-                    task.msg.chat_id,
-                    task.msg.reply_message_id,
-                    f"Task is {task.status}(cost {cost.total_seconds():.1f}s)",
-                    prefix
-                )
+                await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, f"Task is {task.status}(cost {cost.total_seconds():.1f}s)", prefix)
         else:
             logger.warning(f"{prefix} failed to get task status")
             task.status = "not_found"
-            
+
     except comfy_api.ComfyAPIError as e:
         logger.warning(f"{prefix} comfy api error when getting status: {e}")
         task.status = "not_found"
@@ -575,63 +554,43 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
         status_str = info.get("status", {}).get("status_str", "")
         if status_str == "error":
             logger.warning(f"{prefix} completed task {task.task_id} status is error, ignored")
-            await safe_edit_text(
-                task.msg.chat_id,
-                task.msg.reply_message_id,
-                "Task is failed: status is error",
-                prefix
-            )
+            await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: status is error", prefix)
             await task.dequeue_task(rdb)
             return
-        
+
         # outputs first key, like 48/50/other number ? is outputs
         outputs = info.get("outputs", {})
         if not outputs:
             logger.warning(f"{prefix} completed task {task.task_id} has no outputs, ignored")
-            await safe_edit_text(
-                task.msg.chat_id,
-                task.msg.reply_message_id,
-                "Task is failed: empty outputs",
-                prefix
-            )
+            await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: empty outputs", prefix)
             await task.dequeue_task(rdb)
             return
-        
-        node_name = list(outputs.keys())[0] 
+
+        node_name = list(outputs.keys())[0]
         node_data = outputs.get(node_name, {})
 
         images = node_data.get("images", [])
         if not images:
             logger.warning(f"{prefix} completed task {task.task_id} has no image, ignored")
-            await safe_edit_text(
-                task.msg.chat_id,
-                task.msg.reply_message_id,
-                "Task is failed: empty image result",
-                prefix
-            )
+            await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: empty image result", prefix)
             await task.dequeue_task(rdb)
             return
-        
+
         filename = images[0].get("filename")
         subfolder = images[0].get("subfolder")
 
         # 获取生成的图片
         img_raw = await task.download_image(filename, subfolder)
-        
+
         if not img_raw:
             logger.warning(f"{prefix} completed task {task.task_id} image is empty, ignored")
-            await safe_edit_text(
-                task.msg.chat_id,
-                task.msg.reply_message_id,
-                "Task is failed: empty image result",
-                prefix
-            )
+            await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: empty image result", prefix)
             await task.dequeue_task(rdb)
             return
 
         # 计算耗时
         cost = datetime.now() - datetime.fromtimestamp(task.created_at)
-        
+
         # 准备发送图像
         input_file = types.BufferedInputFile(
             img_raw,
@@ -640,12 +599,8 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
 
         size = task.options.get("size", DEFAULT_SIZE)
         step = task.options.get("step", DEFAULT_STEP)
-        
-        caption = (
-            f"{task.msg.reply_content}\n\n"
-            f"Size: {size} Step: {step}\n"
-            f"Cost: {cost.total_seconds():.1f}s"
-        )
+
+        caption = f"{task.msg.reply_content}\n\n" f"Size: {size} Step: {step}\n" f"Cost: {cost.total_seconds():.1f}s"
 
         # 删除进度消息
         await safe_delete_message(task.msg.chat_id, task.msg.reply_message_id, prefix)
@@ -658,21 +613,16 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
             caption=caption[:1023],
             disable_notification=True,
         )
-        
+
         logger.info(f"{prefix} completed task {task.task_id} image is sent, cost: {cost.total_seconds():.1f}s")
-        
+
     except TelegramBadRequest as e:
         logger.error(f"{prefix} completed task {task.task_id} send photo error: {e}")
-        await safe_edit_text(
-            task.msg.chat_id,
-            task.msg.reply_message_id,
-            f"Task is failed: failed to send image. {str(e)}",
-            prefix
-        )
+        await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, f"Task is failed: failed to send image. {str(e)}", prefix)
     except comfy_api.ComfyAPIError as e:
         logger.warning(f"{prefix} completed task {task.task_id} comfy api error: {e}")
         await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, f"Task is failed: {str(e)}", prefix)
-    
+
     # 无论成功失败，都从队列中删除任务
     await task.dequeue_task(rdb)
 
@@ -680,12 +630,7 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
 async def handle_not_found_task(task: Task, prefix: str):
     """处理未找到的任务"""
     logger.warning(f"{prefix} task {task.task_id} not found on remote service")
-    await safe_edit_text(
-        task.msg.chat_id,
-        task.msg.reply_message_id,
-        "Task is failed: task not found on remote service",
-        prefix
-    )
+    await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: task not found on remote service", prefix)
     task.status = "completed"
 
 
@@ -706,7 +651,7 @@ async def worker():
 
                 tasks = await Task.all_tasks(rdb)
                 if tasks:
-                    logger.info(f"image worker is processing {len(tasks)} tasks")
+                    # logger.info(f"image worker is processing {len(tasks)} tasks")
                     for task in tasks:
                         await process_task(task)
                         await asyncio.sleep(WORKER_SLEEP_INTERVAL)
