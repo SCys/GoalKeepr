@@ -401,7 +401,7 @@ async def process_task(task: Task):
         await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: redis is not ready", prefix)
         return
 
-    logger.info(f"{prefix} task {task.task_id} status: {task.status}")
+    # logger.info(f"{prefix} task {task.task_id} status: {task.status}")
 
     try:
         # 根据任务状态进行分类处理
@@ -417,7 +417,7 @@ async def process_task(task: Task):
             pass
         else:
             # 未知状态，标记为完成
-            logger.warning(f"{prefix} unknown task status: {task.status}")
+            logger.warning(f"{prefix} unknown task status: {task.status}, and force set to completed")
             task.status = "completed"
 
         # 更新任务状态到 Redis

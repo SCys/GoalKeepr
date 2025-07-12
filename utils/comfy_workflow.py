@@ -71,7 +71,7 @@ WORKFLOWS = {
                 "counter_position": "last",
                 "one_counter_per_folder": True,
                 "image_preview": True,
-                "output_ext": ".avif",
+                "output_ext": ".webp",
                 "quality": 90,
                 "images": ["8", 0],
             },
