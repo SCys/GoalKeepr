@@ -561,7 +561,7 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
         # outputs first key, like 48/50/other number ? is outputs
         outputs = info.get("outputs", {})
         if not outputs:
-            logger.warning(f"{prefix} completed task {task.task_id} has no outputs, ignored")
+            logger.warning(f"{prefix} completed task {task.task_id} has no outputs, ignored:{info}")
             await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: empty outputs", prefix)
             await task.dequeue_task(rdb)
             return
