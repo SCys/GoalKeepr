@@ -32,7 +32,7 @@ REDIS_KEY_PREFIX = "image:"
 IMAGE_OPTIMIZE_MODEL = "gemini-flash"
 DEFAULT_SIZE = "1024x1024"
 DEFAULT_STEP = 16
-DEFAULT_MODEL = "svdq-int4-flux.1-dev"
+DEFAULT_MODEL = "flux"
 DEFAULT_CFG = 1
 
 # 尺寸映射
