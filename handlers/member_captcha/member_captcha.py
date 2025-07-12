@@ -205,11 +205,15 @@ async def member_captcha(event: types.ChatMemberUpdated):
         llm_start_time = datetime.now()
         logger.debug(f"{log_prefix} | 开始LLM检查")
 
-        spams_result = await check_spams_with_llm(
-            [member],
-            session,
-            strings_will_be_check,
-            now,
+        # use asyncio timeout keep work
+        spams_result = await asyncio.wait_for(
+            check_spams_with_llm(
+                [member],
+                session,
+                strings_will_be_check,
+                now,
+            ),
+            timeout=timedelta(seconds=20),
         )
         if spams_result and len(spams_result) > 0:
             # 过滤掉不需要的内容
