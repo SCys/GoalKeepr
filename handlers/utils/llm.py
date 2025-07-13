@@ -79,6 +79,10 @@ async def check_spams_with_llm(
                     ),
                     timeout=7,
                 )
+            except ValueError as e:
+                logger.error(f"check_spams_with_llm error: {e}")
+                continue
+
             except Exception as e:
                 logger.exception(f"check_spams_with_llm error: {e}")
                 continue
