@@ -29,7 +29,7 @@ REDIS_RETRY_INTERVAL = 2  # 2s
 REDIS_KEY_PREFIX = "image:"
 
 # 图像生成配置
-IMAGE_OPTIMIZE_MODEL = "gemini-flash"
+IMAGE_OPTIMIZE_MODELS = ["deepseek-r1", "gemini-flash"]
 DEFAULT_SIZE = "1024x1024"
 DEFAULT_STEP = 16
 DEFAULT_MODEL = "flux"
@@ -274,19 +274,24 @@ class PromptProcessor:
         if "," in prompt:
             return prompt, reply_content
 
-        try:
-            optimized_prompt = await chat_completions(
-                [
-                    {"role": "system", "content": IMAGE_OPTIMIZE_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                model_name=IMAGE_OPTIMIZE_MODEL,
-            )
-            if optimized_prompt:
-                prompt = optimized_prompt
-                reply_content = prompt
-        except Exception as e:
-            logger.warning(f"Prompt optimization failed: {e}")
+        for model in IMAGE_OPTIMIZE_MODELS:
+            try:
+                optimized_prompt = await chat_completions(
+                    [
+                        {"role": "system", "content": IMAGE_OPTIMIZE_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ],
+                    model_name=model,
+                )
+                if optimized_prompt:
+                    logger.info(f"Prompt optimized by {model}: {prompt} => {optimized_prompt}")
+
+                    prompt = optimized_prompt
+                    reply_content = prompt
+                    break
+
+            except Exception as e:
+                logger.warning(f"Prompt optimization failed: {e}")
 
         return prompt, reply_content
 
