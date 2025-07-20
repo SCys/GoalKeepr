@@ -84,7 +84,7 @@ def load_advertising_patterns() -> List[Dict[str, Any]]:
                 "compiled": compiled,
                 "name": name
             })
-            logger.info(f"Loaded advertising regex pattern: {name}")
+            # logger.info(f"Loaded advertising regex pattern: {name}")
         except re.error as e:
             logger.error(f"Failed to compile regex pattern '{pattern}': {e}")
     
