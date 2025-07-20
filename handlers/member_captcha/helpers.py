@@ -5,13 +5,14 @@ from typing import Tuple, Union
 from aiogram import types
 
 from manager import manager
+from .config import DELETED_AFTER
+from .security import restore_member_permissions
 
 WELCOME_TEXT = (
     "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 *%(icon)s* 按钮后才能发言。\n\n *30秒* 内不操作即会被送走。\n\n"
     "Welcome [%(title)s](tg://user?id=%(user_id)d). \n\n"
     "You would be allowed to send the message after choosing the right option for [*%(icon)s*] through pressing the correct button"
 )
-DELETED_AFTER = 30
 
 ICONS = {
     "爱心|Love": "❤️️",
@@ -109,20 +110,14 @@ async def build_captcha_message(
 
 
 async def accepted_member(chat: types.Chat, msg: types.Message, user: types.User):
+    """
+    接受新成员，恢复其权限并发送欢迎消息
+    """
     prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
 
-    try:
-        await chat.restrict(
-            user.id,
-            permissions=types.ChatPermissions(
-                can_send_messages=True,
-                can_send_media_messages=True,
-                can_send_other_messages=True,
-                can_add_web_page_previews=True,
-            ),
-        )
-    except Exception as e:
-        logger.error(f"{prefix} restrict {user.id} error {e}")
+    # 恢复成员权限
+    if not await restore_member_permissions(chat, user.id):
+        logger.error(f"{prefix} 恢复成员 {user.id} 权限失败")
         return
 
     logger.info(f"{prefix} member {user.id}({manager.username(user)}) is accepted")
