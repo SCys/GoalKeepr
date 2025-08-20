@@ -217,7 +217,7 @@ async def generate_image(
     endpoint: str,
     checkpoint: str,
     prompt: str,
-    size: str = "1024x1024",
+    size: str = "832x1216",
     steps: int = 16,
     cfg: float = 1.0,
     seed: Optional[int] = None,
