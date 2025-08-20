@@ -1,13 +1,6 @@
 WORKFLOWS = {
     "flux": {
-        "6": {
-            "inputs": {
-                "text": "",
-                "clip": ["44", 0],
-            },
-            "class_type": "CLIPTextEncode",
-            "_meta": {"title": "CLIP Text Encode (Positive Prompt)"},
-        },
+        "6": {"inputs": {"text": "", "clip": ["44", 0]}, "class_type": "CLIPTextEncode", "_meta": {"title": "CLIP Text Encode (Positive Prompt)"}},
         "8": {"inputs": {"samples": ["13", 0], "vae": ["10", 0]}, "class_type": "VAEDecode", "_meta": {"title": "VAE Decode"}},
         "10": {"inputs": {"vae_name": "ae.safetensors"}, "class_type": "VAELoader", "_meta": {"title": "Load VAE"}},
         "13": {
@@ -17,26 +10,30 @@ WORKFLOWS = {
         },
         "16": {"inputs": {"sampler_name": "euler_ancestral"}, "class_type": "KSamplerSelect", "_meta": {"title": "KSamplerSelect"}},
         "17": {
-            "inputs": {"scheduler": "sgm_uniform", "steps": 32, "denoise": 1, "model": ["30", 0]},
+            "inputs": {"scheduler": "sgm_uniform", "steps": 16, "denoise": 1, "model": ["30", 0]},
             "class_type": "BasicScheduler",
             "_meta": {"title": "BasicScheduler"},
         },
         "22": {"inputs": {"model": ["30", 0], "conditioning": ["26", 0]}, "class_type": "BasicGuider", "_meta": {"title": "BasicGuider"}},
-        "25": {"inputs": {"noise_seed": 393800090170174}, "class_type": "RandomNoise", "_meta": {"title": "RandomNoise"}},
-        "26": {"inputs": {"guidance": 3.5, "conditioning": ["6", 0]}, "class_type": "FluxGuidance", "_meta": {"title": "FluxGuidance"}},
-        "27": {"inputs": {"width": 1920, "height": 1080, "batch_size": 1}, "class_type": "EmptySD3LatentImage", "_meta": {"title": "EmptySD3LatentImage"}},
-        "30": {"inputs": {"max_shift": 1.15, "base_shift": 0.5, "width": 1920, "height": 1080, "model": ["51", 0]},"class_type": "ModelSamplingFlux","_meta": {"title": "ModelSamplingFlux"}},
+        "25": {"inputs": {"noise_seed": 249566775388566}, "class_type": "RandomNoise", "_meta": {"title": "RandomNoise"}},
+        "26": {"inputs": {"guidance": 2.1, "conditioning": ["6", 0]}, "class_type": "FluxGuidance", "_meta": {"title": "FluxGuidance"}},
+        "27": {"inputs": {"width": 832, "height": 1216, "batch_size": 1}, "class_type": "EmptySD3LatentImage", "_meta": {"title": "EmptySD3LatentImage"}},
+        "30": {
+            "inputs": {"max_shift": 1.15, "base_shift": 0.5, "width": 832, "height": 1216, "model": ["47", 0]},
+            "class_type": "ModelSamplingFlux",
+            "_meta": {"title": "ModelSamplingFlux"},
+        },
         "44": {
             "inputs": {
                 "model_type": "flux",
                 "text_encoder1": "clip-vit-large-patch14/model.safetensors",
-                "text_encoder2": "t5xxl_fp8_e4m3fn.safetensors",
+                "text_encoder2": "t5xxl_fp8_e4m3fn_scaled.safetensors",
                 "t5_min_length": 512,
                 "use_4bit_t5": "disable",
                 "int4_model": "none",
             },
             "class_type": "NunchakuTextEncoderLoader",
-            "_meta": {"title": "Nunchaku Text Encoder Loader"},
+            "_meta": {"title": "Nunchaku Text Encoder Loader (Deprecated)"},
         },
         "45": {
             "inputs": {
@@ -52,9 +49,9 @@ WORKFLOWS = {
             "_meta": {"title": "Nunchaku FLUX DiT Loader"},
         },
         "47": {
-            "inputs": {"lora_name": "flux/aidmaHyperrealism-FLUX-v0.3-[aidmaHyperrealism].safetensors", "lora_strength": 0.8, "model": ["45", 0]},
+            "inputs": {"lora_name": "flux/aidmaHyperrealism-FLUX-v0.3-[aidmaHyperrealism].safetensors", "lora_strength": 0.8, "model": ["55", 0]},
             "class_type": "NunchakuFluxLoraLoader",
-            "_meta": {"title": "Nunchaku FLUX.1 LoRA Loader"},
+            "_meta": {"title": "Nunchaku FLUX LoRA Loader"},
         },
         "50": {
             "inputs": {
@@ -78,10 +75,11 @@ WORKFLOWS = {
             "class_type": "SaveImageExtended",
             "_meta": {"title": "💾 Save Image Extended"},
         },
-        "51": {
-            "inputs": {"lora_name": "flux/flux1-turbo.safetensors", "lora_strength": 0.8, "model": ["47", 0]},
+        "53": {"inputs": {"value": ["8", 0]}, "class_type": "UnloadAllModels", "_meta": {"title": "UnloadAllModels"}},
+        "55": {
+            "inputs": {"lora_name": "flux/flux1-turbo.safetensors", "lora_strength": 0.6, "model": ["45", 0]},
             "class_type": "NunchakuFluxLoraLoader",
-            "_meta": {"title": "Nunchaku FLUX.1 LoRA Loader"},
+            "_meta": {"title": "Nunchaku FLUX LoRA Loader"},
         },
     }
 }
