@@ -52,7 +52,7 @@ WORKFLOWS = {
             "_meta": {"title": "Nunchaku FLUX DiT Loader"},
         },
         "47": {
-            "inputs": {"lora_name": "flux/PinkieFluxProUltraFantasia.safetensors", "lora_strength": 1.0000000000000002, "model": ["45", 0]},
+            "inputs": {"lora_name": "flux/aidmaHyperrealism-FLUX-v0.3-[aidmaHyperrealism].safetensors'", "lora_strength": 0.8, "model": ["45", 0]},
             "class_type": "NunchakuFluxLoraLoader",
             "_meta": {"title": "Nunchaku FLUX.1 LoRA Loader"},
         },
@@ -79,7 +79,7 @@ WORKFLOWS = {
             "_meta": {"title": "💾 Save Image Extended"},
         },
         "51": {
-            "inputs": {"lora_name": "flux/flux1-turbo.safetensors", "lora_strength": 1.0000000000000002, "model": ["47", 0]},
+            "inputs": {"lora_name": "flux/flux1-turbo.safetensors", "lora_strength": 0.8, "model": ["47", 0]},
             "class_type": "NunchakuFluxLoraLoader",
             "_meta": {"title": "Nunchaku FLUX.1 LoRA Loader"},
         },
