@@ -30,7 +30,7 @@ REDIS_KEY_PREFIX = "image:"
 
 # 图像生成配置
 IMAGE_OPTIMIZE_MODELS = ["deepseek-r1", "gemini-flash"]
-DEFAULT_SIZE = "1024x1024"
+DEFAULT_SIZE = "836x1216"
 DEFAULT_STEP = 16
 DEFAULT_MODEL = "flux"
 DEFAULT_CFG = 1
