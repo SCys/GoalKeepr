@@ -1,4 +1,5 @@
 import asyncio
+from configparser import ConfigParser
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
@@ -199,7 +200,7 @@ class PermissionManager:
     """权限管理类"""
 
     @staticmethod
-    def parse_user_groups_config(config: Dict[str, Any]) -> Tuple[List[int], List[int]]:
+    def parse_user_groups_config(config: ConfigParser) -> Tuple[List[int], List[int]]:
         """解析用户和群组权限配置"""
         try:
             users = [int(i) for i in config["image"]["users"].split(",") if i.strip()]
@@ -602,11 +603,15 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
                 text=f"Size: {size} Step: {step} Cost: {cost.total_seconds():.1f}s",
             )
 
+            caption = ""
+            if task.msg.reply_content:
+                caption = task.msg.reply_content[:1023]
+
             await manager.bot.send_photo(
                 chat_id=task.msg.chat_id,
                 photo=input_file,
                 reply_to_message_id=task.msg.message_id,
-                caption=task.msg.reply_content[:1023],
+                caption=caption,
                 reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="Original|原始图片", url=image_url)]]),
             )
         else:
