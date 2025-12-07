@@ -343,7 +343,12 @@ async def image(msg: types.Message):
 
         # 解析选项和优化提示词
         prompt, options = PromptProcessor.parse_options(raw_prompt)
-        prompt, reply_content = await PromptProcessor.optimize_prompt(prompt)
+
+        if options.get("model", DEFAULT_MODEL) == "zimage":
+            prompt = prompt
+            reply_content = prompt
+        else:
+            prompt, reply_content = await PromptProcessor.optimize_prompt(prompt)
 
         # 创建任务
         task = Task(
