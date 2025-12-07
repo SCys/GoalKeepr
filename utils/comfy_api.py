@@ -101,7 +101,7 @@ def create_workflow(
         workflow["3"]["inputs"]["seed"] = seed
         workflow["3"]["inputs"]["steps"] = max(steps, 8)
         workflow["3"]["inputs"]["cfg"] = max(cfg, 1)
-        workflow["6"]["inputs"]["prompt"] = prompt
+        workflow["6"]["inputs"]["text"] = prompt
 
     return workflow
 
