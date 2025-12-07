@@ -87,7 +87,7 @@ def create_workflow(
         工作流配置字典
     """
     if checkpoint not in WORKFLOWS:
-        checkpoint = "flux"
+        checkpoint = "zimage"
 
     if seed is None:
         seed = random.randint(*DEFAULT_SEED_RANGE)
@@ -97,13 +97,11 @@ def create_workflow(
     if checkpoint == "flux":
         workflow["6"]["inputs"]["text"] = prompt
         workflow["17"]["inputs"]["steps"] = steps
-        # workflow["27"]["inputs"]["width"] = width
-        # workflow["27"]["inputs"]["height"] = height
-        # workflow["30"]["inputs"]["width"] = width
-        # workflow["30"]["inputs"]["height"] = height
-        # workflow["27"]["inputs"]["batch_size"] = 1
-        # workflow["27"]["inputs"]["noise_seed"] = seed
-        # workflow["26"]["inputs"]["guidance"] = cfg
+    elif checkpoint == "zimage":
+        workflow["3"]["inputs"]["seed"] = seed
+        workflow["3"]["inputs"]["steps"] = max(steps, 8)
+        workflow["3"]["inputs"]["cfg"] = max(cfg, 1)
+        workflow["6"]["inputs"]["prompt"] = prompt
 
     return workflow
 

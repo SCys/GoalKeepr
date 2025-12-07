@@ -145,5 +145,95 @@ WORKFLOWS = {
             "class_type": "NunchakuFluxLoraLoader",
             "_meta": {"title": "Nunchaku FLUX LoRA Loader"},
         },
-    }
+    },
+    "zimage": {
+        {
+            "3": {
+                "inputs": {
+                    "seed": 234578258190155,
+                    "steps": 8,
+                    "cfg": 1,
+                    "sampler_name": "euler_ancestral",
+                    "scheduler": "sgm_uniform",
+                    "denoise": 1,
+                    "model": ["28", 0],
+                    "positive": ["6", 0],
+                    "negative": ["7", 0],
+                    "latent_image": ["13", 0],
+                },
+                "class_type": "KSampler",
+                "_meta": {"title": "KSampler"},
+            },
+            "6": {
+                "inputs": {"text": "sex chinese girl", "clip": ["33", 0]},
+                "class_type": "CLIPTextEncode",
+                "_meta": {"title": "CLIP Text Encode (Positive Prompt)"},
+            },
+            "7": {
+                "inputs": {"text": "", "clip": ["33", 0]},
+                "class_type": "CLIPTextEncode",
+                "_meta": {"title": "CLIP Text Encode (Negative Prompt)"},
+            },
+            "8": {
+                "inputs": {"samples": ["3", 0], "vae": ["17", 0]},
+                "class_type": "VAEDecode",
+                "_meta": {"title": "VAE Decode"},
+            },
+            "13": {
+                "inputs": {"width": ["29", 0], "height": ["29", 1], "batch_size": 1},
+                "class_type": "EmptySD3LatentImage",
+                "_meta": {"title": "EmptySD3LatentImage"},
+            },
+            "16": {
+                "inputs": {"unet_name": "zimage/z-image-turbo-fp8-e5m2.safetensors", "weight_dtype": "fp8_e5m2"},
+                "class_type": "UNETLoader",
+                "_meta": {"title": "Load Diffusion Model"},
+            },
+            "17": {"inputs": {"vae_name": "ae.safetensors"}, "class_type": "VAELoader", "_meta": {"title": "Load VAE"}},
+            "28": {
+                "inputs": {"sage_attention": "auto", "allow_compile": False, "model": ["16", 0]},
+                "class_type": "PathchSageAttentionKJ",
+                "_meta": {"title": "Patch Sage Attention KJ"},
+            },
+            "29": {
+                "inputs": {
+                    "megapixel": "1.0",
+                    "aspect_ratio": "3:4 (Golden Ratio)",
+                    "divisible_by": "64",
+                    "custom_ratio": False,
+                    "custom_aspect_ratio": "1:1",
+                },
+                "class_type": "FluxResolutionNode",
+                "_meta": {"title": "Flux Resolution Calc"},
+            },
+            "32": {
+                "inputs": {"clip_name": "Qwen_3_4b-Q8_0.gguf", "type": "lumina2"},
+                "class_type": "CLIPLoaderGGUF",
+                "_meta": {"title": "CLIPLoader (GGUF)"},
+            },
+            "33": {
+                "inputs": {"clip_name": "qwen3_4b_fp8_scaled.safetensors", "type": "lumina2", "device": "default"},
+                "class_type": "CLIPLoader",
+                "_meta": {"title": "Load CLIP"},
+            },
+            "37": {
+                "inputs": {
+                    "filename": "%time_%basemodelname_%seed",
+                    "path": "api/",
+                    "extension": "webp",
+                    "lossless_webp": True,
+                    "quality_jpeg_or_webp": 90,
+                    "optimize_png": False,
+                    "embed_workflow": True,
+                    "save_workflow_as_json": False,
+                    "counter": 0,
+                    "time_format": "%Y-%m-%d-%H%M%S",
+                    "show_preview": True,
+                    "images": ["8", 0],
+                },
+                "class_type": "Image Saver Simple",
+                "_meta": {"title": "Image Saver Simple"},
+            },
+        }
+    },
 }
