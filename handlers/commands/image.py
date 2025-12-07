@@ -565,8 +565,9 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
             await task.dequeue_task(rdb)
             return
 
+        # TODO 37 number is fixed, todo get all images
         # outputs first key, like 48/50/other number ? is outputs
-        images = info.get("outputs", {}).get("50", {}).get("images", [])
+        images = info.get("outputs", {}).get("37", {}).get("images", [])
         if not images:
             logger.warning(f"{prefix} completed task {task.task_id} has no image, ignored: {info['outputs']}")
             await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: empty image result", prefix)
