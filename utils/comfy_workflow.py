@@ -147,7 +147,6 @@ WORKFLOWS = {
         },
     },
     "zimage": {
-        {
             "3": {
                 "inputs": {
                     "seed": 234578258190155,
@@ -165,7 +164,7 @@ WORKFLOWS = {
                 "_meta": {"title": "KSampler"},
             },
             "6": {
-                "inputs": {"text": "sex chinese girl", "clip": ["33", 0]},
+                "inputs": {"text": "", "clip": ["33", 0]},
                 "class_type": "CLIPTextEncode",
                 "_meta": {"title": "CLIP Text Encode (Positive Prompt)"},
             },
@@ -234,6 +233,5 @@ WORKFLOWS = {
                 "class_type": "Image Saver Simple",
                 "_meta": {"title": "Image Saver Simple"},
             },
-        }
     },
 }
