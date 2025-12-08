@@ -192,7 +192,7 @@ WORKFLOWS = {
         },
         "29": {
             "inputs": {
-                "megapixel": "0.8",
+                "megapixel": "0.4",
                 "aspect_ratio": "3:4 (Golden Ratio)",
                 "divisible_by": "64",
                 "custom_ratio": False,
