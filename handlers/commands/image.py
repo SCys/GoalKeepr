@@ -1,9 +1,17 @@
 import asyncio
+import base64
+import hmac
+import hashlib
+import os
 from configparser import ConfigParser
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
+from urllib.parse import urlparse
 import uuid
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 
 from aiogram import types
 from aiogram.exceptions import TelegramBadRequest
@@ -17,6 +25,152 @@ from utils import comfy_api
 from ..utils import strip_text_prefix, chat_completions
 
 logger = manager.logger
+
+
+def encrypt_url_for_imgproxy(url: str, encryption_key: str) -> str:
+    """
+    使用 AES-256-CBC 加密 URL 用于 imgproxy
+    
+    Args:
+        url: 要加密的原始 URL
+        encryption_key: imgproxy 源 URL 加密密钥（base64 编码或原始字符串）
+    
+    Returns:
+        base64url 编码的加密 URL（包含 IV + 密文）
+    """
+    try:
+        # 尝试将密钥作为 base64 解码（imgproxy 标准格式）
+        try:
+            key_bytes = base64.b64decode(encryption_key)
+        except Exception:
+            # 如果解码失败，作为普通字符串使用，并确保是32字节
+            key_bytes = encryption_key.encode('utf-8')
+            if len(key_bytes) != 32:
+                # 如果长度不对，使用 SHA256 哈希
+                key_bytes = hashlib.sha256(key_bytes).digest()
+        
+        # 确保密钥是32字节（AES-256需要32字节密钥）
+        if len(key_bytes) != 32:
+            raise ValueError(f"加密密钥必须是32字节，当前为{len(key_bytes)}字节")
+        
+        # 生成16字节的随机IV（AES-CBC需要16字节IV）
+        iv = os.urandom(16)
+        
+        # 创建加密器
+        cipher = Cipher(algorithms.AES(key_bytes), modes.CBC(iv), backend=default_backend())
+        encryptor = cipher.encryptor()
+        
+        # 对URL进行PKCS7填充
+        url_bytes = url.encode('utf-8')
+        pad_length = 16 - (len(url_bytes) % 16)
+        padded_url = url_bytes + bytes([pad_length] * pad_length)
+        
+        # 加密
+        ciphertext = encryptor.update(padded_url) + encryptor.finalize()
+        
+        # 组合 IV + 密文，然后使用 base64url 编码
+        encrypted_data = iv + ciphertext
+        encrypted_url = base64.urlsafe_b64encode(encrypted_data).decode('utf-8').rstrip('=')
+        
+        return encrypted_url
+    except Exception as e:
+        logger.error(f"URL加密失败: {e}")
+        raise
+
+
+def generate_imgproxy_url(original_url: str, domain: str, key: str, salt: str = "", encryption_key: Optional[str] = None) -> str:
+    """
+    使用 imgproxy 生成签名 URL 或加密 URL
+    
+    Args:
+        original_url: 原始图片 URL (如 local://comfy/subfolder/filename)
+        domain: imgproxy 域名（如 https://img.iscys.com）
+        key: imgproxy 签名密钥（加密模式下不使用）
+        salt: imgproxy 签名盐值（可选，加密模式下不使用）
+        encryption_key: imgproxy 源 URL 加密密钥（如果提供，将使用加密模式）
+    
+    Returns:
+        签名或加密后的 imgproxy URL
+    """
+    if not domain:
+        # 如果配置缺失，返回原始 URL
+        return original_url
+    
+    # 如果提供了加密密钥，使用加密模式
+    if encryption_key:
+        try:
+            encrypted_url = encrypt_url_for_imgproxy(original_url, encryption_key)
+            domain = domain.rstrip('/')
+            # 加密URL格式: {domain}/{encrypted_url}
+            imgproxy_url = f"{domain}/{encrypted_url}"
+            return imgproxy_url
+        except Exception as e:
+            logger.warning(f"URL加密失败，回退到签名模式: {e}")
+            # 如果加密失败，回退到签名模式
+    
+    # 使用签名模式（原有逻辑）
+    if not key:
+        # 如果配置缺失，返回原始 URL
+        return original_url
+    
+    # 处理 local:// 协议的 URL
+    # local://comfy/subfolder/filename -> /local://comfy/subfolder/filename
+    # imgproxy 需要将完整 URL 作为路径的一部分
+    if original_url.startswith("local://"):
+        # 对于 local:// 协议，将整个 URL 作为路径
+        path = f"/{original_url}"
+    else:
+        # 对于其他协议，提取路径部分
+        try:
+            parsed = urlparse(original_url)
+            path = parsed.path
+            if not path.startswith("/"):
+                path = f"/{path}"
+        except Exception:
+            # 如果解析失败，尝试简单提取
+            if "://" in original_url:
+                parts = original_url.split("://", 1)[1].split("/", 1)
+                path = f"/{parts[1]}" if len(parts) > 1 else "/"
+            else:
+                path = original_url if original_url.startswith("/") else f"/{original_url}"
+    
+    # 使用 HMAC-SHA256 生成签名
+    # imgproxy 标准：key 和 salt 通常是 base64 编码的二进制数据
+    try:
+        # 尝试将 key 作为 base64 解码（imgproxy 标准格式）
+        key_bytes = base64.b64decode(key)
+    except Exception:
+        # 如果解码失败，作为普通字符串使用
+        key_bytes = key.encode('utf-8')
+    
+    salt_bytes = b''
+    if salt:
+        try:
+            # 尝试将 salt 作为 base64 解码（imgproxy 标准格式）
+            salt_bytes = base64.b64decode(salt)
+        except Exception:
+            # 如果解码失败，作为普通字符串使用
+            salt_bytes = salt.encode('utf-8')
+    
+    # imgproxy 标准签名算法
+    if salt_bytes:
+        # 如果提供了 salt：HMAC-SHA256(key, HMAC-SHA256(salt, path))
+        inner_hash = hmac.new(salt_bytes, path.encode('utf-8'), hashlib.sha256).digest()
+        signature = hmac.new(key_bytes, inner_hash, hashlib.sha256).digest()
+    else:
+        # 如果没有 salt，直接使用 key 签名
+        signature = hmac.new(key_bytes, path.encode('utf-8'), hashlib.sha256).digest()
+    
+    # 使用 base64url 编码（URL-safe base64，去掉填充的 =）
+    signature_b64 = base64.urlsafe_b64encode(signature).decode('utf-8').rstrip('=')
+    
+    # 构建 imgproxy URL: {domain}/{signature}{path}
+    # 确保 domain 不以 / 结尾，path 以 / 开头
+    domain = domain.rstrip('/')
+    imgproxy_url = f"{domain}/{signature_b64}{path}"
+    
+    return imgproxy_url
+
 
 # 常量定义
 GLOBAL_TASK_LIMIT = 3
@@ -600,7 +754,32 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
         size = task.options.get("size", DEFAULT_SIZE)
         step = task.options.get("step", DEFAULT_STEP)
 
-        image_url = f"https://one.iscys.com/Comfy/{subfolder}/{filename}"
+        reply_markup = None
+
+        # 使用 imgproxy 处理 URL
+        try:
+            # 生成原始图片 URL (格式: local://comfy/subfolder/filename)
+            original_url = f"local://comfy/{subfolder}/{filename}"
+            
+            # 从配置读取 imgproxy 参数
+            imgproxy_domain = manager.config["imgproxy"]["domain"]
+            imgproxy_key = manager.config["imgproxy"].get("imgproxy_key", "")
+            imgproxy_salt = manager.config["imgproxy"].get("imgproxy_salt", "")
+            imgproxy_encryption_key = manager.config["imgproxy"].get("imgproxy_source_url_encryption_key", "")
+            
+            # 生成 imgproxy URL（如果提供了加密密钥，将使用加密模式）
+            image_url = generate_imgproxy_url(
+                original_url, 
+                imgproxy_domain, 
+                imgproxy_key, 
+                imgproxy_salt,
+                imgproxy_encryption_key if imgproxy_encryption_key else None
+            )
+            reply_markup = types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="Original|原始图片", url=image_url)]])
+        except (KeyError, ValueError) as e:
+            # 如果配置不存在，不使用按钮
+            logger.warning(f"{prefix} imgproxy config error: {e}, skipping imgproxy URL")
+            reply_markup = None
 
         if task.msg.reply_message_id != -1:
             await manager.bot.edit_message_text(
@@ -618,7 +797,7 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
                 photo=input_file,
                 reply_to_message_id=task.msg.message_id,
                 caption=caption,
-                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="Original|原始图片", url=image_url)]]),
+                reply_markup=reply_markup,
             )
         else:
             await manager.bot.send_photo(

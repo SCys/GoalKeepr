@@ -216,7 +216,7 @@ WORKFLOWS = {
                 "save_workflow_as_json": False,
                 "counter": 0,
                 "time_format": "%Y-%m-%d-%H%M%S",
-                "show_preview": False,
+                "show_preview": True,
                 "images": ["46", 0],
             },
             "class_type": "Image Saver Simple",

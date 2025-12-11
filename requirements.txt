@@ -12,6 +12,7 @@ edge-tts==6.1.8
 aiosqlite==0.20.0
 
 beautifulsoup4==4.12.3
+cryptography
 
 # testing
 pytest
