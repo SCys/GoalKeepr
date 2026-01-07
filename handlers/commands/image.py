@@ -16,6 +16,7 @@ from cryptography.hazmat.backends import default_backend
 from aiogram import types
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
+from aiogram.types import ReplyParameters
 from orjson import dumps, loads
 
 
@@ -755,6 +756,7 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
         step = task.options.get("step", DEFAULT_STEP)
 
         reply_markup = None
+        image_url = None
 
         # 使用 imgproxy 处理 URL
         try:
@@ -795,17 +797,23 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
             await manager.bot.send_photo(
                 chat_id=task.msg.chat_id,
                 photo=input_file,
-                reply_to_message_id=task.msg.message_id,
+                reply_parameters=types.ReplyParameters(message_id=task.msg.message_id),
                 caption=caption,
                 reply_markup=reply_markup,
             )
         else:
+            photo_reply_markup = None
+            if image_url:
+                photo_reply_markup = types.InlineKeyboardMarkup(inline_keyboard=[
+                    [types.InlineKeyboardButton(text="Original|原始图片", url=image_url)]
+                ])
+            
             await manager.bot.send_photo(
                 chat_id=task.msg.chat_id,
                 photo=input_file,
-                reply_to_message_id=task.msg.message_id,
+                reply_parameters=types.ReplyParameters(message_id=task.msg.message_id),
                 caption=f"Size: {size} Step: {step} Cost: {cost.total_seconds():.1f}s\n\n{task.msg.reply_content}"[:1023],
-                reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="Original|原始图片", url=image_url)]]),
+                reply_markup=photo_reply_markup,
             )
 
         logger.info(f"{prefix} completed task {task.task_id} image is sent, cost: {cost.total_seconds():.1f}s")

@@ -324,7 +324,13 @@ class Manager:
                 args = args[1:]
 
         try:
-            resp = await msg.reply(content, *args, **kwargs)
+            resp = await self.bot.send_message(
+                chat_id=msg.chat.id,
+                text=content,
+                reply_parameters=types.ReplyParameters(message_id=msg.message_id),
+                *args,
+                **kwargs
+            )
             logger.info(f"chat {msg.chat.id} message {msg.message_id} replied")
         except:
             logger.exception(f"chat {msg.chat.id} message {msg.message_id} reply error")
