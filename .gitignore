@@ -141,3 +141,8 @@ cython_debug/
 /.vscode
 
 /main.ini
+
+# ai commands
+.gemini/
+gha-creds-*.json
+.qwen/
