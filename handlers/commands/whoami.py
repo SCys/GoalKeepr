@@ -1,28 +1,40 @@
 from datetime import timedelta
 
-from aiogram import types
-from aiogram.filters import Command
-from aiogram.enums import ParseMode
+from telethon import events, utils, types
 from manager import manager
 
 logger = manager.logger
 
 
-@manager.register("message", Command("id", ignore_case=True, ignore_mention=True))
-async def whoami(msg: types.Message):
+@manager.register("message", pattern="/id")
+async def whoami(event: events.NewMessage.Event):
     """我的信息"""
-    if msg.reply_to_message:
-        user = msg.reply_to_message.from_user
+    if event.is_reply:
+        reply = await event.get_reply_message()
+        user = await reply.get_sender()
     else:
-        user = msg.from_user
+        user = await event.get_sender()
 
-    if not user or not user.id:
+    if not user:
         return
 
-    content = f"""ID：\t{user.id}\n完整名：\t{user.full_name}\n分享URL：{user.url}"""
-    msg_reply = await msg.reply(content, disable_notification=True, parse_mode=ParseMode.HTML)
-    logger.info(f"[id]chat {msg.chat.id}({msg.chat.title}) msg {msg.message_id} user {user.id}({user.first_name})")
+    # Telethon user: id, first_name, last_name, username
+    full_name = utils.get_display_name(user)
+    user_url = f"https://t.me/{user.username}" if getattr(user, 'username', None) else "N/A"
+
+    content = f"""ID：\t{user.id}\n完整名：\t{full_name}\n分享URL：{user_url}"""
+    
+    # Send reply
+    # reply() returns the Message object
+    msg_reply = await event.reply(content, parse_mode='html')
+    
+    chat_title = "Private"
+    if event.chat:
+        chat_title = getattr(event.chat, 'title', 'Private')
+
+    logger.info(f"[id]chat {event.chat_id}({chat_title}) msg {event.id} user {user.id}({getattr(user, 'first_name', '')})")
 
     # auto delete after 5s at (super)group
-    if msg.chat.type in ["supergroup", "group"]:
-        await manager.delete_message(msg.chat, msg_reply, msg.date + timedelta(seconds=15))
+    if event.is_group or event.is_channel:
+        # manager.delete_message expects (chat_id, msg_id, time)
+        await manager.delete_message(event.chat_id, msg_reply.id, event.date + timedelta(seconds=15))

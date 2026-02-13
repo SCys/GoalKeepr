@@ -10,10 +10,10 @@ Member captcha module
 - 多种验证模式（静默、验证码等）
 """
 
-from .member_captcha import member_captcha, new_member_callback
+# from .member_captcha import member_captcha, new_member_callback
 
 # 导出主要功能
 __all__ = [
-    'member_captcha',
-    'new_member_callback',
+#    'member_captcha',
+#    'new_member_callback',
 ]

@@ -1,9 +1,7 @@
 from datetime import timedelta
 from typing import Union
 
-from aiogram import types
-from aiogram.filters import Command
-
+from telethon import events, types
 from manager import manager
 
 DELETED_AFTER = 3
@@ -11,48 +9,53 @@ DELETED_AFTER = 3
 logger = manager.logger
 
 
-@manager.register("message", Command("sb", ignore_case=True, ignore_mention=True))
-async def sb(msg: types.Message):
+@manager.register("message", pattern=r"(?i)^/sb$")
+async def sb(event: events.NewMessage.Event):
     """将用户放入黑名单"""
-    chat = msg.chat
-    user = msg.from_user
-    prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+    chat = await event.get_chat()
+    sender = await event.get_sender()
+    prefix = f"chat {event.chat_id} msg {event.id}"
 
-    if not user:
+    if not sender:
         logger.warning(f"{prefix} message without user, ignored")
         return
 
     # check permission
-    if not await manager.is_admin(chat, user):
-        logger.warning(f"{prefix} user {user.id}({user.first_name}) is not admin")
+    if not await manager.is_admin(event.chat_id, sender.id):
+        logger.warning(f"{prefix} user {sender.id} is not admin")
         return
 
-    msg_reply = msg.reply_to_message
-    if not msg_reply:
+    reply = await event.get_reply_message()
+    if not reply:
         logger.info(f"{prefix} no reply message")
         return
 
-    await manager.delete_message(chat, msg_reply, msg.date + timedelta(seconds=DELETED_AFTER))
+    await manager.delete_message(event.chat_id, reply.id, event.date + timedelta(seconds=DELETED_AFTER))
 
     # 如果回复的是一个新加入信息，则直接踢掉用户
-    if msg_reply.new_chat_members:
-        for member in msg_reply.new_chat_members:
-            resp = await ban_member(chat, msg, user, member)
-            await manager.delete_message(chat, resp, msg.date + timedelta(seconds=DELETED_AFTER))
-
+    if isinstance(reply.action, types.MessageActionChatAddUser):
+        for user_id in reply.action.users:
+            try:
+                user = await manager.client.get_entity(user_id)
+                resp = await ban_member(chat, event, sender, user)
+                await manager.delete_message(event.chat_id, resp, event.date + timedelta(seconds=DELETED_AFTER))
+            except Exception as e:
+                logger.error(f"Failed to ban user {user_id}: {e}")
         return
 
     # ignore
-    elif msg_reply.left_chat_member:
+    elif isinstance(reply.action, types.MessageActionChatDeleteUser):
         logger.info(f"{prefix} is left chat member message, ignored")
         return
 
-    if resp := await ban_member(chat, msg, user, msg_reply.from_user):
-        await manager.delete_message(chat, resp, msg.date + timedelta(seconds=DELETED_AFTER))
-    await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER))
+    reply_sender = await reply.get_sender()
+    if resp := await ban_member(chat, event, sender, reply_sender):
+        await manager.delete_message(event.chat_id, resp, event.date + timedelta(seconds=DELETED_AFTER))
+    
+    await manager.delete_message(event.chat_id, event.id, event.date + timedelta(seconds=DELETED_AFTER))
 
 
-async def ban_member(chat: types.Chat, msg: types.Message, administrator: types.User, member: Union[types.User, None]):
+async def ban_member(chat, event, administrator, member):
     """
     将用户放入黑名单
     """
@@ -60,17 +63,22 @@ async def ban_member(chat: types.Chat, msg: types.Message, administrator: types.
         return
 
     id = member.id
-
-    prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+    prefix = f"chat {chat.id} msg {event.id}"
 
     # 剔除以后就在黑名单中
-    if not await chat.ban(id, revoke_messages=True):
-        logger.warning(f"{prefix} user {id}({member.first_name}) ban is failed")
+    try:
+        # edit_permissions(view_messages=False) bans the user.
+        await manager.client.edit_permissions(chat, member, view_messages=False)
+    except Exception as e:
+        logger.warning(f"{prefix} user {id} ban is failed: {e}")
         return
 
-    logger.info(f"{prefix} user {id}({member.first_name}) is baned")
-    return await msg.answer(
-        f"{manager.username(member)} 进入黑名单/is Baned by {manager.username(administrator)}",
-        disable_web_page_preview=True,
-        disable_notification=True,
+    logger.info(f"{prefix} user {id} is baned")
+    
+    member_name = manager.username(member)
+    admin_name = manager.username(administrator)
+
+    return await event.reply(
+        f"{member_name} 进入黑名单/is Baned by {admin_name}",
+        link_preview=False
     )

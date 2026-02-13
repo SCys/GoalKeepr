@@ -1,54 +1,46 @@
 from datetime import datetime, timedelta
 
-from aiogram import Bot, types
-
+from telethon import types
 from manager import manager
 
 logger = manager.logger
 
 
 @manager.register_event("new_member_check")
-async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: int):
+async def new_member_check(client, chat_id: int, message_id: int, member_id: int):
     try:
-        chat = await bot.get_chat(chat_id)
+        chat = await client.get_entity(chat_id)
     except Exception as e:
         logger.warning(f"bot get chat {chat_id} failed: {e}")
         return
 
-    member = await manager.chat_member(chat, member_id)
-    if member is None:
-        logger.warning(f"bot get chat {chat_id} failed: member is not found")
+    try:
+        # get_permissions returns the effective permissions of the user in the chat
+        perms = await client.get_permissions(chat, member_id)
+    except Exception as e:
+        logger.warning(f"bot get member {member_id} in chat {chat_id} failed: {e}")
         return
 
-    prefix = f"chat {chat_id}({chat.title}) msg {message_id}"
+    prefix = f"chat {chat_id} msg {message_id}"
 
-    # status = member.status
-    if isinstance(member, types.ChatMemberAdministrator):
-        logger.info(f"{prefix} member {member_id} is admin")
+    if perms.is_admin or perms.is_creator:
+        logger.info(f"{prefix} member {member_id} is admin/creator")
         return
-    elif isinstance(member, types.ChatMemberOwner):
-        logger.info(f"{prefix} member {member_id} is owner")
-        return
-    elif isinstance(member, types.ChatMemberLeft):
-        logger.info(f"{prefix} member {member_id} is left")
-        return
-    elif isinstance(member, types.ChatMemberBanned):
-        logger.info(f"{prefix} member {member_id} is kicked")
-        return
-    elif isinstance(member, types.ChatMemberMember):
-        logger.info(f"{prefix} member {member_id} is member")
-        return
-    elif isinstance(member, types.ChatMemberRestricted) and member.can_send_messages:
+    
+    if perms.send_messages:
+        # User can send messages, so they are likely verified or normal member
         logger.info(f"{prefix} member {member_id} can send messages")
         return
 
-    logger.info(f"{prefix} member {member_id} status is {member.status}")
+    logger.info(f"{prefix} member {member_id} has restricted rights (timeout)")
 
     try:
-        await chat.ban(member_id, revoke_messages=True, until_date=timedelta(seconds=60))
+        # Kick (Ban temporarily)
+        # view_messages=False hides the chat (ban)
+        await client.edit_permissions(chat, member_id, view_messages=False, until_date=timedelta(seconds=60))
 
-        # 45秒后解除禁言
-        await manager.lazy_session(chat.id, message_id, member_id, "unban_member", datetime.now() + timedelta(seconds=45))
+        # 45秒后解除禁言 (Schedule unban)
+        await manager.lazy_session(chat_id, message_id, member_id, "unban_member", datetime.now() + timedelta(seconds=45))
 
         logger.info(f"{prefix} member {member_id} is kicked by timeout")
     except Exception as e:
@@ -56,18 +48,31 @@ async def new_member_check(bot: Bot, chat_id: int, message_id: int, member_id: i
 
 
 @manager.register_event("unban_member")
-async def unban_member(bot: Bot, chat_id: int, message_id: int, member_id: int):
+async def unban_member(client, chat_id: int, message_id: int, member_id: int):
     try:
-        chat = await bot.get_chat(chat_id)
-        # member = await manager.chat_member(chat, member_id)
+        chat = await client.get_entity(chat_id)
     except Exception as e:
         logger.warning(f"bot get chat {chat_id} failed: {e}")
         return
 
-    prefix = f"chat {chat_id}({chat.title}) msg {message_id}"
+    prefix = f"chat {chat_id} msg {message_id}"
 
     try:
-        await bot.unban_chat_member(chat_id, member_id, only_if_banned=True)
+        # Unban: Grant default permissions (View/Send)
+        # Setting rights to True explicitly
+        await client.edit_permissions(
+            chat, 
+            member_id, 
+            view_messages=True, 
+            send_messages=True,
+            send_media=True,
+            send_stickers=True,
+            send_gifs=True,
+            send_games=True,
+            send_inline=True,
+            embed_links=True,
+            until_date=0
+        )
         logger.info(f"{prefix} member {member_id} is unbanned")
     except Exception as e:
         logger.warning(f"{prefix} member {member_id} unbanned error {e}")

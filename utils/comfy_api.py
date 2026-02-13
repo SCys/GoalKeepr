@@ -159,13 +159,13 @@ async def get_job_info(endpoint: str, job_id: str) -> Dict[str, Any]:
         任务信息字典
     """
     try:
-        async with ClientSession(timeout=DEFAULT_TIMEOUT) as session:
-            async with session.get(f"{endpoint}/history/{job_id}") as response:
-                if response.status != 200:
-                    raise Exception(f"API请求失败: HTTP {response.status}")
+        session = await manager.create_session()
+        async with session.get(f"{endpoint}/history/{job_id}", timeout=DEFAULT_TIMEOUT) as response:
+            if response.status != 200:
+                raise Exception(f"API请求失败: HTTP {response.status}")
 
-                info = await response.json()
-                return info.get(job_id, {})
+            info = await response.json()
+            return info.get(job_id, {})
 
     except ClientError as e:
         raise Exception(f"网络请求失败: {e}")
@@ -193,16 +193,16 @@ async def download_image(endpoint: str, filename: str, subfolder: str) -> bytes:
     url = f"{endpoint}/view?filename={filename}&subfolder={subfolder}&type=output"
 
     try:
-        async with ClientSession(timeout=DEFAULT_TIMEOUT) as session:
-            async with session.get(url) as response:
-                if response.status != 200:
-                    raise ImageDownloadError(
-                        f"下载图片失败: HTTP {response.status}, url: {url}"
-                    )
+        session = await manager.create_session()
+        async with session.get(url, timeout=DEFAULT_TIMEOUT) as response:
+            if response.status != 200:
+                raise ImageDownloadError(
+                    f"下载图片失败: HTTP {response.status}, url: {url}"
+                )
 
-                image_data = await response.read()
-                logger.info(f" 图片下载成功，大小: {len(image_data)} bytes, url:{url}")
-                return image_data
+            image_data = await response.read()
+            logger.info(f" 图片下载成功，大小: {len(image_data)} bytes, url:{url}")
+            return image_data
 
     except ClientError as e:
         raise ImageDownloadError(f"下载图片时网络错误: {e}")
@@ -246,9 +246,9 @@ async def generate_image(
         logger.info(f"开始生成图片: [{size}] {prompt}")
 
         # 创建 HTTP 会话
-        async with ClientSession(timeout=DEFAULT_TIMEOUT) as session:
-            # 提交工作流
-            return await _submit_workflow(session, endpoint, workflow)
+        session = await manager.create_session()
+        # 提交工作流
+        return await _submit_workflow(session, endpoint, workflow)
 
     except (ComfyAPIError, ValueError):
         # 重新抛出已知的异常类型
@@ -274,36 +274,36 @@ async def job_status(endpoint: str, job_id: str) -> Optional[Dict[str, Any]]:
         ComfyAPIError: API 调用相关错误
     """
     try:
-        async with ClientSession(timeout=DEFAULT_TIMEOUT) as session:
-            # 检查历史记录中是否已完成
-            async with session.get(f"{endpoint}/history/{job_id}") as response:
-                if response.status == 200:
-                    history = await response.json()
-                    if job_id in history:
-                        logger.info(f"任务 {job_id} 已完成。")
-                        return {"status": "completed", "data": history[job_id]}
-                elif response.status != 404:
-                    logger.warning(f"获取历史记录失败: HTTP {response.status}")
+        session = await manager.create_session()
+        # 检查历史记录中是否已完成
+        async with session.get(f"{endpoint}/history/{job_id}", timeout=DEFAULT_TIMEOUT) as response:
+            if response.status == 200:
+                history = await response.json()
+                if job_id in history:
+                    logger.info(f"任务 {job_id} 已完成。")
+                    return {"status": "completed", "data": history[job_id]}
+            elif response.status != 404:
+                logger.warning(f"获取历史记录失败: HTTP {response.status}")
 
-            # 如果不在历史记录中，检查队列
-            async with session.get(f"{endpoint}/queue") as response:
-                if response.status == 200:
-                    queue_data = await response.json()
+        # 如果不在历史记录中，检查队列
+        async with session.get(f"{endpoint}/queue", timeout=DEFAULT_TIMEOUT) as response:
+            if response.status == 200:
+                queue_data = await response.json()
 
-                    # 检查正在运行的队列
-                    # item format: [prompt_number, prompt_id, prompt, extra_prompt_data, client_id]
-                    for item in queue_data.get("queue_running", []):
-                        if len(item) > 1 and item[1] == job_id:
-                            logger.info(f"任务 {job_id} 正在运行。")
-                            return {"status": "running", "data": item}
+                # 检查正在运行的队列
+                # item format: [prompt_number, prompt_id, prompt, extra_prompt_data, client_id]
+                for item in queue_data.get("queue_running", []):
+                    if len(item) > 1 and item[1] == job_id:
+                        logger.info(f"任务 {job_id} 正在运行。")
+                        return {"status": "running", "data": item}
 
-                    # 检查待处理的队列
-                    for item in queue_data.get("queue_pending", []):
-                        if len(item) > 1 and item[1] == job_id:
-                            logger.info(f"任务 {job_id} 正在等待。")
-                            return {"status": "pending", "data": item}
-                else:
-                    logger.warning(f"获取队列状态失败: HTTP {response.status}")
+                # 检查待处理的队列
+                for item in queue_data.get("queue_pending", []):
+                    if len(item) > 1 and item[1] == job_id:
+                        logger.info(f"任务 {job_id} 正在等待。")
+                        return {"status": "pending", "data": item}
+            else:
+                logger.warning(f"获取队列状态失败: HTTP {response.status}")
 
             logger.info(f"任务 {job_id} 在历史记录或当前队列中未找到。")
             return {"status": "not_found", "data": {}}
@@ -323,13 +323,13 @@ async def job_cancel(endpoint: str, job_id: str) -> bool:
         job_id: 任务 ID
     """
     try:
-        async with ClientSession(timeout=DEFAULT_TIMEOUT) as session:
-            async with session.post(f"{endpoint}/cancel/{job_id}") as response:
-                if response.status == 200:
-                    logger.info(f"任务 {job_id} 已取消。")
-                    return True
-                else:
-                    logger.warning(f"取消任务失败: HTTP {response.status}")
-                    return False
+        session = await manager.create_session()
+        async with session.post(f"{endpoint}/cancel/{job_id}", timeout=DEFAULT_TIMEOUT) as response:
+            if response.status == 200:
+                logger.info(f"任务 {job_id} 已取消。")
+                return True
+            else:
+                logger.warning(f"取消任务失败: HTTP {response.status}")
+                return False
     except ClientError as e:
         raise ComfyAPIError(f"取消任务时网络错误: {e}") from e

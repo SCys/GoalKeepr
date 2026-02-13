@@ -1,10 +1,9 @@
 import re
 from datetime import timedelta
 
-from aiohttp import ClientTimeout, ClientSession
-from aiogram.filters import Command
-from asyncio.exceptions import TimeoutError
-from aiogram import types
+from aiohttp import ClientTimeout, ClientError
+from asyncio import TimeoutError
+from telethon import events
 from manager import manager
 from typing import Optional
 
@@ -17,51 +16,65 @@ URL_API = "https://api.iscys.com/api/shorturl"
 logger = manager.logger
 
 
-@manager.register("message", Command("shorturl", ignore_case=True, ignore_mention=True))
-async def shorturl(msg: types.Message):
-    user = msg.from_user
-    content = msg.text
-    if msg.reply_to_message:
-        content = msg.reply_to_message.text
+@manager.register("message", pattern=r"(?i)^/shorturl(?:\s+.*)?$")
+async def shorturl_command(event: events.NewMessage.Event):
+    sender = await event.get_sender()
+    content = None
+    reply = await event.get_reply_message()
+    if reply and reply.text:
+        content = reply.text
+    if not content:
+        content = event.raw_text or event.text
+        if content:
+            content = re.sub(r"(?i)^/shorturl(?:@\w+)?\s*", "", content).strip()
+    if not content:
+        msg_reply = await event.reply("没有匹配到任何URL，稍后自动删除")
+        await manager.delete_message(event.chat_id, msg_reply, event.date + timedelta(seconds=5))
+        return
 
     matched = re.search(RE_URL, content)
     if not matched:
-        msg_reply = await msg.reply("没有匹配到任何URL，稍后自动删除")
-        await manager.delete_message(msg.chat, msg_reply, msg.date + timedelta(seconds=5))
+        msg_reply = await event.reply("没有匹配到任何URL，稍后自动删除")
+        await manager.delete_message(event.chat_id, msg_reply, event.date + timedelta(seconds=5))
         return
 
     for i in matched.groups():
+        if not i:
+            continue
         url_shorted = await shorturl(i)
         if url_shorted is None:
             continue
 
-        logger.info(f"user {user.id} shorturl {i} to {url_shorted}")
-        await msg.reply(url_shorted, disable_web_page_preview=True, disable_notification=True)
+        sender_id = sender.id if sender else "unknown"
+        logger.info(f"user {sender_id} shorturl {i} to {url_shorted}")
+        await event.reply(url_shorted, link_preview=False)
 
 
 async def shorturl(origin) -> Optional[str]:
-    timeout = ClientTimeout(total=10)
-
     try:
-        async with ClientSession(timeout=timeout) as session:
-            async with session.post(URL_API, json={"params": {"url": origin}}) as resp:
-                if resp.status != 200:
-                    logger.warning(f"shorturl service failed {resp.status} {resp.reason}")
-                    return
+        timeout = ClientTimeout(total=10)
+        session = await manager.create_session()
+        async with session.post(URL_API, json={"params": {"url": origin}}, timeout=timeout) as resp:
+            if resp.status != 200:
+                logger.warning(f"shorturl service failed {resp.status} {resp.reason}")
+                return
 
-                data = await resp.json()
-                if "error" in data:
-                    err = data["error"]
-                    logger.warning(f"shorturl service failed {err['code']} {err['message']}")
-                    return
+            data = await resp.json()
+            if "error" in data:
+                err = data["error"]
+                logger.warning(f"shorturl service failed {err['code']} {err['message']}")
+                return
 
-                code = data["data"]["code"]
-                expired = data["data"]["expired"]
-                logger.info(f"url {origin} is shorted {code} {expired}")
-                return data["data"]["url"]
+            code = data["data"]["code"]
+            expired = data["data"]["expired"]
+            logger.info(f"url {origin} is shorted {code} {expired}")
+            return data["data"]["url"]
 
     except TimeoutError:
         logger.error("shorturl service timeout")
 
-    except:
-        logger.exception(f"shorturl service error with exception")
+    except ClientError as e:
+        logger.error(f"shorturl service client error: {e}")
+
+    except Exception as e:
+        logger.exception(f"shorturl service error: {e}")

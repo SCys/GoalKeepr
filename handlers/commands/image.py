@@ -3,6 +3,7 @@ import base64
 import hmac
 import hashlib
 import os
+import re
 from configparser import ConfigParser
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -13,15 +14,12 @@ import uuid
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 
-from aiogram import types
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command
-from aiogram.types import ReplyParameters
+from telethon import events, types, Button, errors
 from orjson import dumps, loads
-
 
 from manager import manager
 from utils import comfy_api
+from utils.comfy_workflow import WORKFLOWS
 
 from ..utils import strip_text_prefix, chat_completions
 
@@ -31,45 +29,29 @@ logger = manager.logger
 def encrypt_url_for_imgproxy(url: str, encryption_key: str) -> str:
     """
     使用 AES-256-CBC 加密 URL 用于 imgproxy
-    
-    Args:
-        url: 要加密的原始 URL
-        encryption_key: imgproxy 源 URL 加密密钥（base64 编码或原始字符串）
-    
-    Returns:
-        base64url 编码的加密 URL（包含 IV + 密文）
     """
     try:
-        # 尝试将密钥作为 base64 解码（imgproxy 标准格式）
         try:
             key_bytes = base64.b64decode(encryption_key)
         except Exception:
-            # 如果解码失败，作为普通字符串使用，并确保是32字节
             key_bytes = encryption_key.encode('utf-8')
             if len(key_bytes) != 32:
-                # 如果长度不对，使用 SHA256 哈希
                 key_bytes = hashlib.sha256(key_bytes).digest()
         
-        # 确保密钥是32字节（AES-256需要32字节密钥）
         if len(key_bytes) != 32:
             raise ValueError(f"加密密钥必须是32字节，当前为{len(key_bytes)}字节")
         
-        # 生成16字节的随机IV（AES-CBC需要16字节IV）
         iv = os.urandom(16)
         
-        # 创建加密器
         cipher = Cipher(algorithms.AES(key_bytes), modes.CBC(iv), backend=default_backend())
         encryptor = cipher.encryptor()
         
-        # 对URL进行PKCS7填充
         url_bytes = url.encode('utf-8')
         pad_length = 16 - (len(url_bytes) % 16)
         padded_url = url_bytes + bytes([pad_length] * pad_length)
         
-        # 加密
         ciphertext = encryptor.update(padded_url) + encryptor.finalize()
         
-        # 组合 IV + 密文，然后使用 base64url 编码
         encrypted_data = iv + ciphertext
         encrypted_url = base64.urlsafe_b64encode(encrypted_data).decode('utf-8').rstrip('=')
         
@@ -82,91 +64,57 @@ def encrypt_url_for_imgproxy(url: str, encryption_key: str) -> str:
 def generate_imgproxy_url(original_url: str, domain: str, key: str, salt: str = "", encryption_key: Optional[str] = None) -> str:
     """
     使用 imgproxy 生成签名 URL 或加密 URL
-    
-    Args:
-        original_url: 原始图片 URL (如 local://comfy/subfolder/filename)
-        domain: imgproxy 域名（如 https://img.iscys.com）
-        key: imgproxy 签名密钥（加密模式下不使用）
-        salt: imgproxy 签名盐值（可选，加密模式下不使用）
-        encryption_key: imgproxy 源 URL 加密密钥（如果提供，将使用加密模式）
-    
-    Returns:
-        签名或加密后的 imgproxy URL
     """
     if not domain:
-        # 如果配置缺失，返回原始 URL
         return original_url
     
-    # 如果提供了加密密钥，使用加密模式
     if encryption_key:
         try:
             encrypted_url = encrypt_url_for_imgproxy(original_url, encryption_key)
             domain = domain.rstrip('/')
-            # 加密URL格式: {domain}/{encrypted_url}
             imgproxy_url = f"{domain}/{encrypted_url}"
             return imgproxy_url
         except Exception as e:
             logger.warning(f"URL加密失败，回退到签名模式: {e}")
-            # 如果加密失败，回退到签名模式
     
-    # 使用签名模式（原有逻辑）
     if not key:
-        # 如果配置缺失，返回原始 URL
         return original_url
     
-    # 处理 local:// 协议的 URL
-    # local://comfy/subfolder/filename -> /local://comfy/subfolder/filename
-    # imgproxy 需要将完整 URL 作为路径的一部分
     if original_url.startswith("local://"):
-        # 对于 local:// 协议，将整个 URL 作为路径
         path = f"/{original_url}"
     else:
-        # 对于其他协议，提取路径部分
         try:
             parsed = urlparse(original_url)
             path = parsed.path
             if not path.startswith("/"):
                 path = f"/{path}"
         except Exception:
-            # 如果解析失败，尝试简单提取
             if "://" in original_url:
                 parts = original_url.split("://", 1)[1].split("/", 1)
                 path = f"/{parts[1]}" if len(parts) > 1 else "/"
             else:
                 path = original_url if original_url.startswith("/") else f"/{original_url}"
     
-    # 使用 HMAC-SHA256 生成签名
-    # imgproxy 标准：key 和 salt 通常是 base64 编码的二进制数据
     try:
-        # 尝试将 key 作为 base64 解码（imgproxy 标准格式）
         key_bytes = base64.b64decode(key)
     except Exception:
-        # 如果解码失败，作为普通字符串使用
         key_bytes = key.encode('utf-8')
     
     salt_bytes = b''
     if salt:
         try:
-            # 尝试将 salt 作为 base64 解码（imgproxy 标准格式）
             salt_bytes = base64.b64decode(salt)
         except Exception:
-            # 如果解码失败，作为普通字符串使用
             salt_bytes = salt.encode('utf-8')
     
-    # imgproxy 标准签名算法
     if salt_bytes:
-        # 如果提供了 salt：HMAC-SHA256(key, HMAC-SHA256(salt, path))
         inner_hash = hmac.new(salt_bytes, path.encode('utf-8'), hashlib.sha256).digest()
         signature = hmac.new(key_bytes, inner_hash, hashlib.sha256).digest()
     else:
-        # 如果没有 salt，直接使用 key 签名
         signature = hmac.new(key_bytes, path.encode('utf-8'), hashlib.sha256).digest()
     
-    # 使用 base64url 编码（URL-safe base64，去掉填充的 =）
     signature_b64 = base64.urlsafe_b64encode(signature).decode('utf-8').rstrip('=')
     
-    # 构建 imgproxy URL: {domain}/{signature}{path}
-    # 确保 domain 不以 / 结尾，path 以 / 开头
     domain = domain.rstrip('/')
     imgproxy_url = f"{domain}/{signature_b64}{path}"
     
@@ -181,8 +129,10 @@ DEFAULT_TASK_TIMEOUT = 300  # 5 minutes
 DEFAULT_GENERATION_TIMEOUT = 300  # 5 minutes
 WORKER_SLEEP_INTERVAL = 1  # 1s
 WORKER_POLL_INTERVAL = 0.1  # 0.1s
+WORKER_IDLE_INTERVAL = 2  # 2s
 REDIS_RETRY_INTERVAL = 2  # 2s
 REDIS_KEY_PREFIX = "image:"
+TASK_LOCK_TTL = 180  # 3分钟，避免任务并发重复处理
 
 # 图像生成配置
 IMAGE_OPTIMIZE_MODELS = ["deepseek-r1", "gemini-flash"]
@@ -190,6 +140,11 @@ DEFAULT_SIZE = "836x1216"
 DEFAULT_STEP = 16
 DEFAULT_MODEL = "zimage"
 DEFAULT_CFG = 1
+MAX_CFG = 20.0
+MAX_STEPS = 50
+MIN_STEPS = 2
+MAX_SIZE_EDGE = 4096
+MIN_SIZE_EDGE = 64
 
 # 尺寸映射
 SIZE_MAPPING = {
@@ -217,6 +172,22 @@ IMAGE_OPTIMIZE_PROMPT = """你是一个专为Flux.1 Dev模型设计的提示词�
 5. 仅输出英文的 Prompt，不要输出任何其他内容。
 
 **输出格式**：仅输出优化后的提示词。"""
+
+
+def _is_valid_size(size: str) -> bool:
+    if not re.match(r"^\d{2,4}x\d{2,4}$", size):
+        return False
+    width, height = size.lower().split("x")
+    try:
+        w = int(width)
+        h = int(height)
+    except ValueError:
+        return False
+    return MIN_SIZE_EDGE <= w <= MAX_SIZE_EDGE and MIN_SIZE_EDGE <= h <= MAX_SIZE_EDGE
+
+
+def _allowed_models() -> set:
+    return set(WORKFLOWS.keys())
 
 
 @dataclass
@@ -287,38 +258,55 @@ class Task:
     async def all_tasks(rdb) -> List["Task"]:
         """从队列中获取任务"""
         try:
-            keys = await rdb.keys(f"{REDIS_KEY_PREFIX}:*")
-            if keys:
-                tasks = []
-                for key in keys:
-                    task_data = loads(await rdb.get(key))
-                    # Reconstruct TaskMessage object
-                    msg_data = task_data["msg"]
-                    task_msg = TaskMessage(
-                        chat_id=msg_data["chat_id"],
-                        chat_name=msg_data["chat_name"],
-                        user_id=msg_data["user_id"],
-                        user_name=msg_data["user_name"],
-                        message_id=msg_data["message_id"],
-                        reply_message_id=msg_data["reply_message_id"],
-                        reply_content=msg_data["reply_content"],
-                    )
-                    # Reconstruct Task object
-                    task = Task(
-                        msg=task_msg,
-                        prompt=task_data["prompt"],
-                        options=task_data["options"],
-                        created_at=task_data["created_at"],
-                        status=task_data["status"],
-                        job_id=task_data["job_id"],
-                        task_id=task_data["task_id"],
-                    )
-                    tasks.append(task)
-                return tasks
-            return []
+            tasks: List["Task"] = []
+            batch: List[bytes] = []
+            async for key in rdb.scan_iter(f"{REDIS_KEY_PREFIX}:*"):
+                batch.append(key)
+                if len(batch) >= 100:
+                    tasks.extend(await Task._load_tasks(rdb, batch))
+                    batch = []
+            if batch:
+                tasks.extend(await Task._load_tasks(rdb, batch))
+            return tasks
         except Exception as e:
             logger.error(f"Failed to get all tasks: {e}")
             raise ImageGenerationError("Failed to get all tasks")
+
+    @staticmethod
+    async def _load_tasks(rdb, keys: List[bytes]) -> List["Task"]:
+        tasks: List["Task"] = []
+        if not keys:
+            return tasks
+        values = await rdb.mget(*keys)
+        for key, task_raw in zip(keys, values):
+            if not task_raw:
+                continue
+            try:
+                task_data = loads(task_raw)
+            except Exception as e:
+                logger.warning(f"Invalid task data {key}: {e}")
+                continue
+            msg_data = task_data["msg"]
+            task_msg = TaskMessage(
+                chat_id=msg_data["chat_id"],
+                chat_name=msg_data["chat_name"],
+                user_id=msg_data["user_id"],
+                user_name=msg_data["user_name"],
+                message_id=msg_data["message_id"],
+                reply_message_id=msg_data["reply_message_id"],
+                reply_content=msg_data["reply_content"],
+            )
+            task = Task(
+                msg=task_msg,
+                prompt=task_data["prompt"],
+                options=task_data["options"],
+                created_at=task_data["created_at"],
+                status=task_data["status"],
+                job_id=task_data["job_id"],
+                task_id=task_data["task_id"],
+            )
+            tasks.append(task)
+        return tasks
 
 
 class ImageGenerationError(Exception):
@@ -358,16 +346,30 @@ class PermissionManager:
     def parse_user_groups_config(config: ConfigParser) -> Tuple[List[int], List[int]]:
         """解析用户和群组权限配置"""
         try:
-            users = [int(i) for i in config["image"]["users"].split(",") if i.strip()]
-            groups = [int(i) for i in config["image"]["groups"].split(",") if i.strip()]
+            users_val = config["image"].get("users", "")
+            groups_val = config["image"].get("groups", "")
+            users = (
+                [int(i) for i in users_val] if isinstance(users_val, (list, tuple)) else
+                [int(i) for i in str(users_val).split(",") if str(i).strip()]
+            )
+            groups = (
+                [int(i) for i in groups_val] if isinstance(groups_val, (list, tuple)) else
+                [int(i) for i in str(groups_val).split(",") if str(i).strip()]
+            )
+            # 过滤无效值
+            users = [i for i in users if i > 0]
+            groups = [i for i in groups if i > 0]
             return users, groups
         except (KeyError, ValueError) as e:
             logger.error(f"Invalid image users or groups config: {e}")
-            raise ImageGenerationError("Invalid permission configuration")
+            # Raise or return empty to allow defaults?
+            return [], []
 
     @staticmethod
     def check_permission(user_id: int, chat_id: int, users: List[int], groups: List[int]) -> bool:
         """检查用户或群组是否有权限"""
+        if not users and not groups:
+            return False
         return user_id in users or chat_id in groups
 
 
@@ -375,12 +377,13 @@ class PromptProcessor:
     """提示词处理类"""
 
     @staticmethod
-    def extract_prompt_from_message(msg: types.Message) -> str:
+    async def extract_prompt_from_message(event: events.NewMessage.Event) -> str:
         """从消息中提取提示词"""
         prompt = ""
-        if msg.reply_to_message and msg.reply_to_message.text:
-            prompt = strip_text_prefix(msg.reply_to_message.text) + "\n"
-        prompt += strip_text_prefix(msg.text)
+        reply = await event.get_reply_message()
+        if reply and reply.text:
+            prompt = strip_text_prefix(reply.text) + "\n"
+        prompt += strip_text_prefix(event.text)
         return prompt.strip()
 
     @staticmethod
@@ -405,15 +408,29 @@ class PromptProcessor:
                 opt = opt.lower().strip()
 
                 if opt.startswith("size:"):
-                    size = opt[5:]
-                    options["size"] = SIZE_MAPPING.get(size, size)
+                    size = SIZE_MAPPING.get(opt[5:], opt[5:])
+                    if _is_valid_size(size):
+                        options["size"] = size
+                    else:
+                        logger.warning(f"Invalid size option: {size}")
                 elif opt.startswith("step:"):
-                    step = max(2, min(50, int(opt[5:])))  # 限制在2-50之间
-                    options["step"] = step
+                    try:
+                        step = int(opt[5:])
+                        options["step"] = max(MIN_STEPS, min(MAX_STEPS, step))
+                    except ValueError:
+                        logger.warning(f"Invalid step option: {opt}")
                 elif opt.startswith("model:"):
-                    options["model"] = opt[6:]
+                    model = opt[6:]
+                    if model in _allowed_models():
+                        options["model"] = model
+                    else:
+                        logger.warning(f"Invalid model option: {model}")
                 elif opt.startswith("cfg:"):
-                    options["cfg"] = int(opt[4:])
+                    try:
+                        cfg = float(opt[4:])
+                        options["cfg"] = max(1.0, min(MAX_CFG, cfg))
+                    except ValueError:
+                        logger.warning(f"Invalid cfg option: {opt}")
 
             logger.info(f"Parsed options: {options}, prompt: {prompt}")
             return prompt, options
@@ -452,68 +469,75 @@ class PromptProcessor:
         return prompt, reply_content
 
 
-@manager.register("message", Command("image", ignore_case=True, ignore_mention=True))
-async def image(msg: types.Message):
+@manager.register("message", pattern=r"(?i)^/image(?: .*)?$")
+async def image(event: events.NewMessage.Event):
     """处理图像生成命令"""
-    chat = msg.chat
-    user = msg.from_user
-    prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+    chat = await event.get_chat()
+    sender = await event.get_sender()
+    
+    # Prefix for logging
+    chat_title = getattr(chat, 'title', 'Private')
+    sender_name = manager.username(sender)
+    prefix = f"chat {event.chat_id}({chat_title}) msg {event.id}"
     now = datetime.now()
 
-    if not user:
+    if not sender:
         logger.warning(f"{prefix} message without user, ignored")
         return
 
     try:
         # 检查权限
         users, groups = PermissionManager.parse_user_groups_config(manager.config)
-        if not PermissionManager.check_permission(user.id, chat.id, users, groups):
-            logger.warning(f"{prefix} user {user.full_name} or group {chat.id} is not allowed")
-            await manager.reply(msg, "you are not allowed to use this command", now + timedelta(seconds=DELETED_AFTER))
+        # If config is missing/error, we might want to fail safe.
+        if not PermissionManager.check_permission(sender.id, event.chat_id, users, groups):
+            logger.warning(f"{prefix} user {sender_name} or group {event.chat_id} is not allowed")
+            await manager.reply(event, "you are not allowed to use this command", auto_deleted_at=now + timedelta(seconds=DELETED_AFTER))
             return
 
-        prefix += f" user {user.full_name}"
+        prefix += f" user {sender_name}"
         logger.info(f"{prefix} is using image func")
 
         # 获取Redis连接并检查队列容量
         rdb = await manager.get_redis()
         if not rdb:
             logger.warning(f"{prefix} redis is not ready, ignored")
-            await manager.reply(msg, "internal error", now + timedelta(seconds=DELETED_AFTER))
+            await manager.reply(event, "internal error", auto_deleted_at=now + timedelta(seconds=DELETED_AFTER))
             return
 
         tasks = await Task.all_tasks(rdb)
         task_size = len(tasks)
         if task_size >= GLOBAL_TASK_LIMIT:
             logger.warning(f"{prefix} task queue is full, ignored")
-            await manager.reply(msg, "task queue is full, please try again later", now + timedelta(seconds=DELETED_AFTER))
+            await manager.reply(event, "task queue is full, please try again later", auto_deleted_at=now + timedelta(seconds=DELETED_AFTER))
             return
 
         # 处理提示词
-        raw_prompt = PromptProcessor.extract_prompt_from_message(msg)
+        raw_prompt = await PromptProcessor.extract_prompt_from_message(event)
         if not raw_prompt:
             logger.warning(f"{prefix} invalid prompt, ignored")
-            await manager.reply(msg, "invalid prompt, please send a valid prompt", now + timedelta(seconds=DELETED_AFTER))
+            await manager.reply(event, "invalid prompt, please send a valid prompt", auto_deleted_at=now + timedelta(seconds=DELETED_AFTER))
             return
 
         # 解析选项和优化提示词
         prompt, options = PromptProcessor.parse_options(raw_prompt)
 
         if options.get("model", DEFAULT_MODEL) == "zimage":
-            prompt = prompt
             reply_content = prompt
         else:
             prompt, reply_content = await PromptProcessor.optimize_prompt(prompt)
 
         # 创建任务
+        reply_msg = await event.get_reply_message()
+        reply_id = reply_msg.id if reply_msg else -1
+
         task = Task(
             msg=TaskMessage(
-                chat_id=chat.id,
-                chat_name=chat.full_name,
-                user_id=user.id,
-                user_name=user.full_name,
-                message_id=msg.message_id,
-                reply_message_id=msg.reply_to_message.message_id if msg.reply_to_message else -1,
+                chat_id=event.chat_id,
+                chat_name=chat_title,
+                user_id=sender.id,
+                user_name=sender_name,
+                message_id=event.id,
+                reply_message_id=reply_id,
                 reply_content=reply_content,
             ),
             prompt=prompt,
@@ -529,8 +553,8 @@ async def image(msg: types.Message):
 
         # 发送通知并更新任务
         message = f"Task is queued, please wait(~{task_size * 35}s)."
-        reply = await msg.reply(message)
-        task.msg.reply_message_id = reply.message_id
+        reply = await event.reply(message)
+        task.msg.reply_message_id = reply.id
 
         # 更新任务到Redis，确保reply_message_id被保存
         await task.enqueue_task(rdb)
@@ -539,13 +563,13 @@ async def image(msg: types.Message):
     except ImageGenerationError as e:
         logger.warning(f"{prefix} {str(e)}")
         await manager.reply(
-            msg,
+            event,
             f"task is failed: {str(e)}",
-            now + timedelta(seconds=DELETED_AFTER),
+            auto_deleted_at=now + timedelta(seconds=DELETED_AFTER),
         )
     except Exception as e:
         logger.exception(f"{prefix} task is failed:{str(e)}")
-        await manager.reply(msg, f"task is failed:{str(e)}", now + timedelta(seconds=DELETED_AFTER))
+        await manager.reply(event, f"task is failed:{str(e)}", auto_deleted_at=now + timedelta(seconds=DELETED_AFTER))
 
 
 async def process_task(task: Task):
@@ -567,45 +591,50 @@ async def process_task(task: Task):
         await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: redis is not ready", prefix)
         return
 
-    # logger.info(f"{prefix} task {task.task_id} status: {task.status}")
-
+    lock_key = f"{REDIS_KEY_PREFIX}:lock:{task.task_id}"
     try:
-        # 根据任务状态进行分类处理
-        if task.status == "queued":
-            await handle_queued_task(task, endpoint, prefix)
-        elif task.status == "submitted":
-            await handle_submitted_task(task, endpoint, prefix)
-        elif task.status in ["running", "pending"]:
-            await handle_processing_task(task, endpoint, prefix)
-        elif task.status == "not_found":
-            await handle_not_found_task(task, prefix)
-        elif task.status == "completed":
-            pass
-        else:
-            # 未知状态，标记为完成
-            logger.warning(f"{prefix} unknown task status: {task.status}, and force set to completed")
+        locked = await rdb.set(lock_key, "1", nx=True, ex=TASK_LOCK_TTL)
+        if not locked:
+            logger.debug(f"{prefix} task {task.task_id} is locked, skip")
+            return
+
+        try:
+            # 根据任务状态进行分类处理
+            if task.status == "queued":
+                await handle_queued_task(task, endpoint, prefix)
+            elif task.status == "submitted":
+                await handle_submitted_task(task, endpoint, prefix)
+            elif task.status in ["running", "pending"]:
+                await handle_processing_task(task, endpoint, prefix)
+            elif task.status == "not_found":
+                await handle_not_found_task(task, prefix)
+            elif task.status == "completed":
+                pass
+            else:
+                logger.warning(f"{prefix} unknown task status: {task.status}, and force set to completed")
+                task.status = "completed"
+
+            await rdb.set(f"{REDIS_KEY_PREFIX}:{task.task_id}", dumps(task))
+
+        except Exception as e:
+            cost = datetime.now() - datetime.fromtimestamp(task.created_at)
+            logger.exception(f"{prefix} process task error: {e}")
+            await safe_edit_text(
+                task.msg.chat_id, task.msg.reply_message_id, f"Task is failed(cost {cost.total_seconds():.1f}s), please try again later.\n\n{str(e)}", prefix
+            )
             task.status = "completed"
+            await rdb.set(f"{REDIS_KEY_PREFIX}:{task.task_id}", dumps(task))
 
-        # 更新任务状态到 Redis
-        await rdb.set(f"{REDIS_KEY_PREFIX}:{task.task_id}", dumps(task))
-
-    except Exception as e:
-        # 处理任何异常，标记任务为完成
-        cost = datetime.now() - datetime.fromtimestamp(task.created_at)
-        logger.exception(f"{prefix} process task error: {e}")
-        await safe_edit_text(
-            task.msg.chat_id, task.msg.reply_message_id, f"Task is failed(cost {cost.total_seconds():.1f}s), please try again later.\n\n{str(e)}", prefix
-        )
-        task.status = "completed"
-        await rdb.set(f"{REDIS_KEY_PREFIX}:{task.task_id}", dumps(task))
-
-    if task.status == "completed":
-        await handle_completed_task(task, endpoint, prefix, rdb)
+        if task.status == "completed":
+            await handle_completed_task(task, endpoint, prefix, rdb)
+    finally:
+        try:
+            await rdb.delete(lock_key)
+        except Exception as e:
+            logger.debug(f"{prefix} unlock failed: {e}")
 
 
 async def handle_queued_task(task: Task, endpoint: str, prefix: str):
-    """处理队列中的任务"""
-    # 检查任务是否过期
     created_at = datetime.fromtimestamp(task.created_at)
     cost = datetime.now() - created_at
 
@@ -615,12 +644,10 @@ async def handle_queued_task(task: Task, endpoint: str, prefix: str):
         task.status = "completed"
         return
 
-    # 更新任务状态
     await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, f"Task is started(cost {cost.total_seconds():.1f}s)", prefix)
 
     logger.info(f"{prefix} is processing task(cost {cost.total_seconds():.1f}s)")
 
-    # 获取任务参数
     prompt = task.prompt.strip()
     size = task.options.get("size", DEFAULT_SIZE)
     step = task.options.get("step", DEFAULT_STEP)
@@ -628,7 +655,6 @@ async def handle_queued_task(task: Task, endpoint: str, prefix: str):
     cfg = task.options.get("cfg", DEFAULT_CFG)
 
     try:
-        # 尝试生成图片，获得 job_id
         job_id = await asyncio.wait_for(
             comfy_api.generate_image(endpoint, model, prompt, size, step, cfg),
             timeout=DEFAULT_GENERATION_TIMEOUT,
@@ -658,14 +684,12 @@ async def handle_queued_task(task: Task, endpoint: str, prefix: str):
 
 
 async def handle_submitted_task(task: Task, endpoint: str, prefix: str):
-    """处理已提交的任务"""
     if not task.job_id:
         logger.warning(f"{prefix} submitted task has no job_id")
         task.status = "completed"
         return
 
     try:
-        # 获取任务状态
         status_info = await comfy_api.job_status(endpoint, task.job_id)
         if status_info:
             task.status = status_info.get("status", "not_found")
@@ -680,14 +704,12 @@ async def handle_submitted_task(task: Task, endpoint: str, prefix: str):
 
 
 async def handle_processing_task(task: Task, endpoint: str, prefix: str):
-    """处理正在运行或等待中的任务"""
     if not task.job_id:
         logger.warning(f"{prefix} processing task has no job_id")
         task.status = "completed"
         return
 
     try:
-        # 获取任务状态
         status_info = await comfy_api.job_status(endpoint, task.job_id)
         if status_info:
             old_status = task.status
@@ -695,8 +717,6 @@ async def handle_processing_task(task: Task, endpoint: str, prefix: str):
 
             if old_status != task.status:
                 logger.info(f"{prefix} task status changed from {old_status} to {task.status}")
-
-                # 更新用户界面
                 cost = datetime.now() - datetime.fromtimestamp(task.created_at)
                 await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, f"Task is {task.status}(cost {cost.total_seconds():.1f}s)", prefix)
         else:
@@ -709,7 +729,6 @@ async def handle_processing_task(task: Task, endpoint: str, prefix: str):
 
 
 async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
-    """处理完成的任务"""
     if not task.job_id:
         logger.warning(f"{prefix} completed task {task.task_id} has no job_id")
         await task.dequeue_task(rdb)
@@ -717,7 +736,6 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
 
     try:
         info = await comfy_api.get_job_info(endpoint, task.job_id)
-        # status is completed
         status_str = info.get("status", {}).get("status_str", "")
         if status_str == "error":
             logger.warning(f"{prefix} completed task {task.task_id} status is error, ignored")
@@ -725,8 +743,6 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
             await task.dequeue_task(rdb)
             return
 
-        # TODO 37 number is fixed, todo get all images
-        # outputs first key, like 48/50/other number ? is outputs
         images = info.get("outputs", {}).get("37", {}).get("images", [])
         if not images:
             logger.warning(f"{prefix} completed task {task.task_id} has no image, ignored: {info['outputs']}")
@@ -737,7 +753,6 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
         filename = images[0].get("filename")
         subfolder = images[0].get("subfolder")
 
-        # 获取生成的图片
         img_raw = await task.download_image(filename, subfolder)
 
         if not img_raw:
@@ -746,30 +761,22 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
             await task.dequeue_task(rdb)
             return
 
-        # 计算耗时
         cost = datetime.now() - datetime.fromtimestamp(task.created_at)
-
-        # 准备发送图像
-        input_file = types.BufferedInputFile(img_raw, filename=filename)
 
         size = task.options.get("size", DEFAULT_SIZE)
         step = task.options.get("step", DEFAULT_STEP)
 
-        reply_markup = None
+        reply_buttons = None
         image_url = None
 
-        # 使用 imgproxy 处理 URL
         try:
-            # 生成原始图片 URL (格式: local://comfy/subfolder/filename)
             original_url = f"local://comfy/{subfolder}/{filename}"
             
-            # 从配置读取 imgproxy 参数
             imgproxy_domain = manager.config["imgproxy"]["domain"]
             imgproxy_key = manager.config["imgproxy"].get("imgproxy_key", "")
             imgproxy_salt = manager.config["imgproxy"].get("imgproxy_salt", "")
             imgproxy_encryption_key = manager.config["imgproxy"].get("imgproxy_source_url_encryption_key", "")
             
-            # 生成 imgproxy URL（如果提供了加密密钥，将使用加密模式）
             image_url = generate_imgproxy_url(
                 original_url, 
                 imgproxy_domain, 
@@ -777,60 +784,39 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
                 imgproxy_salt,
                 imgproxy_encryption_key if imgproxy_encryption_key else None
             )
-            reply_markup = types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="Original|原始图片", url=image_url)]])
-        except (KeyError, ValueError) as e:
-            # 如果配置不存在，不使用按钮
-            logger.warning(f"{prefix} imgproxy config error: {e}, skipping imgproxy URL")
-            reply_markup = None
-
-        if task.msg.reply_message_id != -1:
-            await manager.bot.edit_message_text(
-                chat_id=task.msg.chat_id,
-                message_id=task.msg.reply_message_id,
-                text=f"Size: {size} Step: {step} Cost: {cost.total_seconds():.1f}s",
-            )
-
-            caption = ""
-            if task.msg.reply_content:
-                caption = task.msg.reply_content[:1023]
-
-            await manager.bot.send_photo(
-                chat_id=task.msg.chat_id,
-                photo=input_file,
-                reply_parameters=types.ReplyParameters(message_id=task.msg.message_id),
-                caption=caption,
-                reply_markup=reply_markup,
-            )
-        else:
-            photo_reply_markup = None
+            # Telethon Buttons
             if image_url:
-                photo_reply_markup = types.InlineKeyboardMarkup(inline_keyboard=[
-                    [types.InlineKeyboardButton(text="Original|原始图片", url=image_url)]
-                ])
-            
-            await manager.bot.send_photo(
-                chat_id=task.msg.chat_id,
-                photo=input_file,
-                reply_parameters=types.ReplyParameters(message_id=task.msg.message_id),
-                caption=f"Size: {size} Step: {step} Cost: {cost.total_seconds():.1f}s\n\n{task.msg.reply_content}"[:1023],
-                reply_markup=photo_reply_markup,
-            )
+                reply_buttons = [Button.url("Original|原始图片", image_url)]
+        except Exception as e:
+            logger.warning(f"{prefix} imgproxy config error: {e}, skipping imgproxy URL")
+            reply_buttons = None
+
+        caption = f"Size: {size} Step: {step} Cost: {cost.total_seconds():.1f}s\n\n{task.msg.reply_content}"[:1023]
+        
+        # Send Photo
+        # Telethon send_file(entity, file, caption=..., buttons=...)
+        await manager.client.send_file(
+            task.msg.chat_id,
+            file=img_raw,
+            caption=caption,
+            buttons=reply_buttons,
+            reply_to=task.msg.message_id
+        )
 
         logger.info(f"{prefix} completed task {task.task_id} image is sent, cost: {cost.total_seconds():.1f}s")
+        
+        # Delete the progress message if we can
+        if task.msg.reply_message_id > 0:
+            await manager.delete_message(task.msg.chat_id, task.msg.reply_message_id)
 
-    except TelegramBadRequest as e:
+    except Exception as e:
         logger.error(f"{prefix} completed task {task.task_id} send photo error: {e}")
         await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, f"Task is failed: failed to send image. {str(e)}", prefix)
-    except comfy_api.ComfyAPIError as e:
-        logger.warning(f"{prefix} completed task {task.task_id} comfy api error: {e}")
-        await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, f"Task is failed: {str(e)}", prefix)
 
-    # 无论成功失败，都从队列中删除任务
     await task.dequeue_task(rdb)
 
 
 async def handle_not_found_task(task: Task, prefix: str):
-    """处理未找到的任务"""
     logger.warning(f"{prefix} task {task.task_id} not found on remote service")
     await safe_edit_text(task.msg.chat_id, task.msg.reply_message_id, "Task is failed: task not found on remote service", prefix)
     task.status = "completed"
@@ -842,8 +828,6 @@ async def worker():
         logger.info("image worker is started")
 
         while True:
-            await asyncio.sleep(WORKER_POLL_INTERVAL)
-
             try:
                 rdb = await manager.get_redis()
                 if not rdb:
@@ -852,14 +836,15 @@ async def worker():
                     continue
 
                 tasks = await Task.all_tasks(rdb)
-                if tasks:
-                    # logger.info(f"image worker is processing {len(tasks)} tasks")
-                    for task in tasks:
-                        await process_task(task)
-                        await asyncio.sleep(WORKER_SLEEP_INTERVAL)
+                if not tasks:
+                    await asyncio.sleep(WORKER_IDLE_INTERVAL)
+                    continue
 
-                # 工作循环间隔
-                await asyncio.sleep(WORKER_SLEEP_INTERVAL)
+                for task in tasks:
+                    await process_task(task)
+                    await asyncio.sleep(WORKER_SLEEP_INTERVAL)
+
+                await asyncio.sleep(WORKER_POLL_INTERVAL)
 
             except Exception as e:
                 logger.exception(f"worker loop error: {e}")

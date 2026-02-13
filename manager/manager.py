@@ -3,16 +3,14 @@ import sys
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
-from typing import Callable, List, Optional, Union
+from typing import Optional, Union
 
 import aiohttp
-import aioredis
-import loguru
-from aiogram import Bot, Dispatcher, types
-from aiogram.exceptions import TelegramBadRequest
-from bs4 import BeautifulSoup, Tag
-
 import database
+import redis.asyncio as aioredis
+import loguru
+from telethon import TelegramClient, events, types, errors
+from bs4 import BeautifulSoup, Tag
 
 from .settings import SETTINGS_TEMPLATE
 
@@ -22,12 +20,14 @@ logger = loguru.logger
 class Manager:
     """管理模块"""
 
-    # aiogram instance
-    bot: Bot
-    dp: Dispatcher = Dispatcher()  # static dispatcher
-
+    # Telethon instance
+    client: TelegramClient
+    
     # redis connection
-    rdb: Optional["aioredis.Redis"] = None
+    rdb: Optional[aioredis.Redis] = None
+    
+    # http session
+    http_session: Optional[aiohttp.ClientSession] = None
 
     # global config
     config = ConfigParser()
@@ -35,8 +35,7 @@ class Manager:
     # routes
     handlers = []
     events = {}
-    callback_handlers: List[Callable] = []
-
+    
     # running status
     is_running = False
 
@@ -48,17 +47,24 @@ class Manager:
         self.setup_logger()
 
         token = self.config["telegram"]["token"]
+        api_id = self.config["telegram"].get("api_id")
+        api_hash = self.config["telegram"].get("api_hash")
+
         if not token:
             logger.error("telegram token is missing")
             sys.exit(1)
+            
+        if not api_id or not api_hash:
+            logger.error("telegram api_id or api_hash is missing in main.ini [telegram]")
+            # allow continue if user wants to set it up later or it crashes
+            # sys.exit(1) 
 
-        self.bot = Bot(token)
-        # DEBUG PROXY
-        # self.bot.session.proxy = 'http://10.1.3.16:3002'
-        logger.info("bot is setup")
+        # Initialize Telethon Client (session name 'bot')
+        self.client = TelegramClient('bot', int(api_id) if api_id else 0, api_hash or '')
+        
+        logger.info("telethon client is setup")
 
         self.setup_handlers()
-        self.setup_callback()
 
     def load_config(self):
         """加载 main.ini，默认会配置相关代码"""
@@ -95,39 +101,29 @@ class Manager:
     def setup_handlers(self):
         """
         设置事件处理
+        Registers handlers stored in self.handlers to the client.
         """
-        for func, type_name, args, kwargs in self.handlers:
-            observer = self.dp.observers.get(type_name, None)
-            if not observer or not hasattr(observer, "register"):
-                logger.warning(f"dispatcher:unknown type {type_name}")
-                continue
-
-            method = observer.register
-            method(func, *args, **kwargs)
-            logger.info(
-                f"dispatcher {func.__name__}:{observer.event_name}.{method.__name__}({args}, {kwargs})"
-            )
-
-    def setup_callback(self):
-        # list callback handler
-        for func in self.callback_handlers:
-            logger.info(f"dispatcher callback_query {func.__name__} is registered")
-
-        self.dp.callback_query.register(self._callback_handler)
-        logger.info("dispatcher callback_query is setup")
+        pass
 
     def register(self, type_name, *args, **kwargs):
         """
-        延迟注册到 Dispatcher
+        Decorator to register handlers.
+        type_name: "message", "callback_query"
+        kwargs: passed to event filter (e.g. pattern, outgoing)
         """
 
         def wrapper(func):
-            if type_name == "callback_query":
-                self.callback_handlers.append(func)
-                logger.info(f"dispatcher callback_query {func.__name__} is registered")
+            event_cls = None
+            if type_name == "message":
+                event_cls = events.NewMessage
+            elif type_name == "callback_query":
+                event_cls = events.CallbackQuery
+            
+            if event_cls:
+                self.handlers.append((func, event_cls, args, kwargs))
+                logger.info(f"registered {func.__name__} for {type_name}")
             else:
-                self.handlers.append((func, type_name, args, kwargs))
-                logger.info(f"dispatcher {func.__name__}:{type_name}({args}, {kwargs})")
+                logger.warning(f"Unknown event type {type_name}")
 
             @wraps(func)
             async def _wrapper(*args, **kwargs):
@@ -136,14 +132,16 @@ class Manager:
             return _wrapper
 
         return wrapper
+    
+    def _apply_handlers(self):
+        """Actually register handlers to client"""
+        for func, event_cls, args, kwargs in self.handlers:
+            self.client.add_event_handler(func, event_cls(*args, **kwargs))
+            logger.info(f"handler {func.__name__} added to client")
 
     def register_event(self, type_name: str):
         """
-        将函数添加到事件处理内
-
-        type_name: 对应 lazy_session 函数的类型
-
-        函数会这样 await func(bot, chat_id, message_id, user_id) 调用
+        将函数添加到事件处理内 (Internal events like lazy_session)
         """
 
         def wrapper(func):
@@ -159,81 +157,89 @@ class Manager:
 
     async def start(self):
         self.is_running = True
+        
+        # Apply handlers before starting
+        self._apply_handlers()
+
+        token = self.config["telegram"]["token"]
+        
+        await self.client.start(bot_token=token)
+        
+        me = await self.client.get_me(input_peer=False)
+        logger.info(f"bot started as {self.username(me)}")
 
         if "admin" in self.config["telegram"]:
             admin = self.config["telegram"]["admin"]
-            await self.bot.send_message(admin, "bot is started")
-
-        await self.dp.start_polling(self.bot)
+            try:
+                await self.client.send_message(admin, "bot is started")
+            except Exception as e:
+                logger.debug(f"admin notification failed: {e}")
+        
+        return self.client
 
     async def stop(self):
         self.is_running = False
+        if self.http_session and not self.http_session.closed:
+            await self.http_session.close()
+        await database.close()
+        await self.client.disconnect()
 
-        await self.dp.stop_polling()
-
-    def username(self, _user: Union[types.ChatMember, types.User]):
+    def username(self, user: Union[types.User, types.Chat]):
         """获取用户名"""
+        if hasattr(user, 'username') and user.username:
+            return f"@{user.username}"
+        
+        if hasattr(user, 'first_name'):
+             full_name = user.first_name
+             if user.last_name:
+                 full_name += f" {user.last_name}"
+             return full_name
+        
+        return "Unknown"
 
-        if isinstance(_user, types.ChatMember):
-            return _user.user.full_name  # type: ignore
-
-        return _user.full_name
-
-    async def is_admin(self, chat: types.Chat, member: types.User):
+    async def is_admin(self, chat: Union[types.Chat, types.Channel, int], member: Union[types.User, int]):
         try:
-            admins = await self.bot.get_chat_administrators(chat.id)
-            return len([i for i in admins if i.user.id == member.id]) > 0
-        except Exception as e:
-            logger.error(f"chat {chat.id} member {member.id} check failed:{e}")
+            if isinstance(chat, int):
+                chat_id = chat
+            else:
+                chat_id = chat.id
+            
+            if isinstance(member, int):
+                user_id = member
+            else:
+                user_id = member.id
 
+            perms = await self.client.get_permissions(chat_id, user_id)
+            return perms.is_admin or perms.is_creator
+        except Exception as e:
+            logger.error(f"check admin failed: {e}")
         return False
 
-    async def chat_member(self, chat: types.Chat, member_id: int):
+    async def chat_member(self, chat, member_id: int):
         try:
-            return await self.bot.get_chat_member(chat.id, member_id)
-        except:
-            logger.exception(f"chat {chat.id} member {member_id} check exception")
+            return await self.client.get_permissions(chat, member_id)
+        except Exception as e:
+            logger.exception(f"chat member check exception: {e}")
 
     async def get_user_extra_info(self, username: str):
-        """
-        通过解析 Telegram 用户页面的 HTML，获取头像 URL 和 bio 信息
-        :param username: Telegram 用户名（不带@）
-        :return: 用户的头像 URL 和 bio 信息
-        """
         url = f"https://t.me/{username}"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0"
         }
-
         try:
             session = await self.create_session()
-            async with session.get(
-                url,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=15, sock_read=12),
-            ) as response:
+            async with session.get(url, headers=headers, timeout=15) as response:
                 if response.status != 200:
-                    return {
-                        "error": f"Failed to fetch page for {username}, status: {response.status}"
-                    }
-
+                    return {"error": f"status {response.status}"}
                 page_content = await response.text()
                 soup = BeautifulSoup(page_content, "html.parser")
-
-                # 提取头像 URL
                 image_tag = soup.find("img", {"class": "tgme_page_photo_image"})
-                if isinstance(image_tag, Tag):
-                    image_url = image_tag.get("src")
-                else:
-                    image_url = None
-
-                # 提取 bio 信息
+                image_url = image_tag.get("src") if isinstance(image_tag, Tag) else None
                 bio_tag = soup.find("div", {"class": "tgme_page_description"})
                 bio = bio_tag.text.strip() if bio_tag else None
-
                 return {"bio": bio, "image_url": image_url}
         except Exception as e:
-            logger.error(f"Failed to fetch page for {username}: {e}")
+            logger.error(f"Failed to fetch page: {e}")
             return
 
     async def delete_message(
@@ -242,66 +248,99 @@ class Manager:
         msg: Union[int, types.Message, None],
         deleted_at: Union[datetime, None] = None,
     ):
-        """
-        延缓删除消息
-        chat: chat with msg
-        msg: msg will be deleted
-        deleted_at: message deleted after the timestamp
-        """
         if msg is None:
             return True
 
-        id_chat: int = chat.id if isinstance(chat, types.Chat) else chat
-        id_message: int = msg.message_id if isinstance(msg, types.Message) else msg
+        # Resolve ID
+        id_chat = chat
+        if isinstance(chat, types.Chat):
+            id_chat = chat.id
+            
+        id_message = msg
+        if isinstance(msg, types.Message):
+            id_message = msg.id
+        
+        if id_message is None:
+            return False
 
         if deleted_at is not None:
-            await database.execute(
-                "insert into lazy_delete_messages(chat,msg,deleted_at) values($1,$2,$3)",
-                (id_chat, id_message, deleted_at),
-            )
-            logger.debug(f"chat {id_chat} message {id_message} delete at {deleted_at}")
+            rdb = await self.get_redis()
+            if rdb:
+                try:
+                    await rdb.zadd(
+                        "lazy_delete_messages", {f"{id_chat}:{id_message}": deleted_at.timestamp()}
+                    )
+                    logger.debug(f"chat {id_chat} message {id_message} delete at {deleted_at} (redis)")
+                    return True
+                except Exception as e:
+                    logger.error(f"lazy delete schedule failed (redis): {e}")
+                    return False
+            else:
+                try:
+                    await database.execute(
+                        "insert into lazy_delete_messages(chat, msg, deleted_at) values(?,?,?)",
+                        (id_chat, id_message, self._format_sqlite_datetime(deleted_at)),
+                    )
+                    logger.debug(f"chat {id_chat} message {id_message} delete at {deleted_at} (sqlite)")
+                    return True
+                except Exception as e:
+                    logger.error(f"lazy delete schedule failed (sqlite): {e}")
+                    return False
         else:
             try:
-                await self.bot.delete_message(id_chat, id_message)
+                await self.client.delete_messages(id_chat, id_message)
                 logger.info(f"chat {id_chat} message {id_message} deleted")
-            except TelegramBadRequest:
-                logger.warning(f"chat {id_chat} message {id_message} not found")
+                return True
             except Exception as e:
-                logger.exception(f"chat {id_chat} message {id_message} delete failed")
-
-        return True
+                logger.error(f"chat {id_chat} message {id_message} delete failed: {e}")
+                return False
 
     async def lazy_session(
         self, chat: int, msg: int, member: int, type: str, deleted_at: datetime
     ):
-        await database.execute(
-            "insert into lazy_sessions(chat,msg,member,type,checkout_at) values($1,$2,$3,$4,$5)",
-            (chat, msg, member, type, deleted_at),
-        )
-
-        logger.debug(f"chat {chat} message {msg} member {member} after {deleted_at}")
+        rdb = await self.get_redis()
+        if rdb:
+            try:
+                val = f"{chat}:{member}:{type}:{msg}"
+                await rdb.zadd("lazy_sessions", {val: deleted_at.timestamp()})
+                logger.debug(f"chat {chat} message {msg} member {member} after {deleted_at} (redis)")
+            except Exception as e:
+                logger.error(f"lazy session schedule failed (redis): {e}")
+        else:
+            try:
+                await database.execute(
+                    "insert into lazy_sessions(chat, msg, member, type, checkout_at) values(?,?,?,?,?)",
+                    (chat, msg, member, type, self._format_sqlite_datetime(deleted_at)),
+                )
+                logger.debug(f"chat {chat} message {msg} member {member} after {deleted_at} (sqlite)")
+            except Exception as e:
+                logger.error(f"lazy session schedule failed (sqlite): {e}")
 
     async def lazy_session_delete(self, chat: int, member: int, type: str):
-        await database.execute(
-            "delete from lazy_sessions where chat=$1 and member=$2 and type=$3",
-            (chat, member, type),
-        )
-
-        logger.debug(f"chat {chat} member {member} lazy session {type} is deleted")
+        rdb = await self.get_redis()
+        if rdb:
+            pattern = f"{chat}:{member}:{type}:*"
+            async for member_val, _ in rdb.zscan_iter("lazy_sessions", match=pattern):
+                await rdb.zrem("lazy_sessions", member_val)
+            logger.debug(f"chat {chat} member {member} lazy session {type} is deleted (redis)")
+        else:
+            try:
+                await database.execute(
+                    "delete from lazy_sessions where chat=? and member=? and type=?",
+                    (chat, member, type),
+                )
+                logger.debug(f"chat {chat} member {member} lazy session {type} is deleted (sqlite)")
+            except Exception as e:
+                logger.error(f"lazy session delete failed (sqlite): {e}")
 
     async def send(self, chat: int, msg: str, **kwargs):
-        """
-        发送消息
-        chat: chat with msg
-        msg: msg will be sent
-        """
         auto_deleted_at = kwargs.pop("auto_deleted_at", None)
 
         try:
-            resp = await self.bot.send_message(chat, msg, **kwargs)
+            resp = await self.client.send_message(chat, msg, **kwargs)
             logger.info(f"chat {chat} message {msg} sent")
-        except:
-            logger.exception(f"chat {chat} message {msg} send error")
+        except Exception as e:
+            logger.exception(f"chat {chat} message {msg} send error: {e}")
             return False
 
         if auto_deleted_at is not None:
@@ -309,59 +348,32 @@ class Manager:
 
         return True
 
-    async def reply(self, msg: types.Message, content: str, *args, **kwargs):
-        """
-        回复消息
-        msg: reply to message
-        content: reply content
-        auto_deleted_at: message deleted after the timestamp
-        """
+    async def reply(self, msg, content: str, *args, **kwargs):
         auto_deleted_at = kwargs.pop("auto_deleted_at", None)
-        if auto_deleted_at is None:
-            # first arg is datetime, set it as auto_deleted_at
-            if len(args) > 0 and isinstance(args[0], datetime):
-                auto_deleted_at = args[0]
-                args = args[1:]
+        if auto_deleted_at is None and len(args) > 0 and isinstance(args[0], datetime):
+            auto_deleted_at = args[0]
+            args = args[1:]
 
         try:
-            resp = await self.bot.send_message(
-                chat_id=msg.chat.id,
-                text=content,
-                reply_parameters=types.ReplyParameters(message_id=msg.message_id),
-                *args,
-                **kwargs
-            )
-            logger.info(f"chat {msg.chat.id} message {msg.message_id} replied")
-        except:
-            logger.exception(f"chat {msg.chat.id} message {msg.message_id} reply error")
+            resp = await msg.reply(content, *args, **kwargs)
+            logger.info(f"replied to message {msg.id}")
+        except Exception as e:
+            logger.exception(f"reply error: {e}")
             return False
 
         if auto_deleted_at is not None:
-            await self.delete_message(msg.chat, resp, auto_deleted_at)
+            await self.delete_message(msg.chat_id, resp, auto_deleted_at)
 
         return True
 
     async def edit_text(self, chat: int, msg: int, content: str, *args, **kwargs):
-        """
-        编辑消息
-        chat: chat with msg
-        msg: msg will be edited
-        content: new content
-        """
         auto_deleted_at = kwargs.pop("auto_deleted_at", None)
-        if auto_deleted_at is None:
-            # first arg is datetime, set it as auto_deleted_at
-            if len(args) > 0 and isinstance(args[0], datetime):
-                auto_deleted_at = args[0]
-                args = args[1:]
-
+        
         try:
-            await self.bot.edit_message_text(
-                content, chat_id=chat, message_id=msg, *args, **kwargs
-            )
+            await self.client.edit_message(chat, msg, content, *args, **kwargs)
             logger.info(f"chat {chat} message {msg} edited")
-        except:
-            logger.exception(f"chat {chat} message {msg} edit error")
+        except Exception as e:
+            logger.exception(f"edit error: {e}")
             return False
 
         if auto_deleted_at is not None:
@@ -372,10 +384,9 @@ class Manager:
     async def notification(self, content: str):
         if "admin" in self.config["telegram"]:
             admin = self.config["telegram"]["admin"]
-            await self.bot.send_message(admin, content)
+            await self.client.send_message(admin, content)
 
     async def get_redis(self):
-        """setup redis connections"""
         if "redis" not in self.config:
             return None
 
@@ -385,16 +396,19 @@ class Manager:
 
         return self.rdb
 
-    async def create_session(self):
-        return await self.bot.session.create_session()  # type: ignore
-
-    async def _callback_handler(self, query: types.CallbackQuery):
+    @staticmethod
+    def _format_sqlite_datetime(dt: datetime) -> str:
         """
-        默认回调处理程序
+        格式化 datetime 为 SQLite 可比较的字符串
         """
+        if dt.tzinfo is not None:
+            dt = dt.astimezone()
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
 
-        for func in self.callback_handlers:
-            try:
-                await func(query)
-            except Exception as e:
-                logger.exception(f"callback_query {query.id} handler {func.__name__} error: {e}")
+    async def create_session(self) -> aiohttp.ClientSession:
+        """
+        创建或复用 HTTP 会话
+        """
+        if self.http_session is None or self.http_session.closed:
+            self.http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
+        return self.http_session

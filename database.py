@@ -1,16 +1,25 @@
+import asyncio
 import aiosqlite
 import os
+from typing import Optional
 
 # Ensure data directory exists
 os.makedirs("./data", exist_ok=True)
 
-async def connection():
+_conn: Optional[aiosqlite.Connection] = None
+_conn_lock = asyncio.Lock()
+_conn_use_lock = asyncio.Lock()
+
+async def connection() -> aiosqlite.Connection:
     """
-    Create a new connection each time, explicitly returning the raw connection.
-    This avoids any thread reuse issues with aiosqlite.
+    复用单个连接，避免频繁创建开销。
     """
-    conn = await aiosqlite.connect("./data/main.db", timeout=30.0)
-    return conn
+    global _conn
+    if _conn is None:
+        async with _conn_lock:
+            if _conn is None:
+                _conn = await aiosqlite.connect("./data/main.db", timeout=30.0)
+    return _conn
 
 
 async def execute(query: str, *args, **kwargs):
@@ -18,12 +27,10 @@ async def execute(query: str, *args, **kwargs):
     Execute a query and commit the changes.
     Creates a new connection for each call to avoid thread reuse issues.
     """
-    conn = await connection()
-    try:
+    async with _conn_use_lock:
+        conn = await connection()
         await conn.execute(query, *args, **kwargs)
         await conn.commit()
-    finally:
-        await conn.close()
 
 
 async def execute_fetch(query: str, *args, **kwargs):
@@ -31,11 +38,17 @@ async def execute_fetch(query: str, *args, **kwargs):
     Execute a query and return the results.
     Creates a new connection for each call to avoid thread reuse issues.
     """
-    conn = await connection()
-    try:
+    async with _conn_use_lock:
+        conn = await connection()
         cursor = await conn.execute(query, *args, **kwargs)
         rows = await cursor.fetchall()
         await cursor.close()
         return rows
-    finally:
-        await conn.close()
+
+
+async def close() -> None:
+    """关闭数据库连接"""
+    global _conn
+    if _conn is not None:
+        await _conn.close()
+        _conn = None
