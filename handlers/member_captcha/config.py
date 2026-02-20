@@ -4,10 +4,21 @@ Member captcha module configuration and constants
 """
 
 import re
-from typing import List
+from typing import List, Any
 
 # 支持的群组类型
 SUPPORT_GROUP_TYPES: List[str] = ["supergroup", "group"]
+
+
+def get_chat_type(chat: Any) -> str:
+    """从 Telethon 实体得到聊天类型：private / group / supergroup / channel。"""
+    if getattr(chat, "broadcast", False):
+        return "channel"
+    if getattr(chat, "megagroup", False):
+        return "supergroup"
+    if getattr(chat, "title", None) is not None:
+        return "group"
+    return "private"
 
 # 时间配置 (秒)
 DELETED_AFTER = 30  # 消息自动删除时间

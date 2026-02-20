@@ -27,7 +27,7 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
         logger.info(f"{prefix} member {member_id} is admin/creator")
         return
     
-    if perms.send_messages:
+    if not perms.is_banned:
         # User can send messages, so they are likely verified or normal member
         logger.info(f"{prefix} member {member_id} can send messages")
         return
@@ -61,17 +61,17 @@ async def unban_member(client, chat_id: int, message_id: int, member_id: int):
         # Unban: Grant default permissions (View/Send)
         # Setting rights to True explicitly
         await client.edit_permissions(
-            chat, 
-            member_id, 
-            view_messages=True, 
+            chat,
+            member_id,
+            view_messages=True,
             send_messages=True,
             send_media=True,
             send_stickers=True,
             send_gifs=True,
             send_games=True,
             send_inline=True,
-            embed_links=True,
-            until_date=0
+            embed_link_previews=True,
+            until_date=0,
         )
         logger.info(f"{prefix} member {member_id} is unbanned")
     except Exception as e:

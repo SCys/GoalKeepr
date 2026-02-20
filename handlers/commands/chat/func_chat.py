@@ -1,8 +1,7 @@
 import re
 from datetime import timedelta
 
-from aiogram import exceptions, types
-from aiogram.filters import Command
+from telethon import events
 
 from manager import manager
 
@@ -11,10 +10,9 @@ from .func_user import check_user_permission, increase_user_count
 from ...utils import count_tokens, tg_generate_text
 
 """
-user info as hash in redis, key prefix is chat:user:{{ user_id }}. 
+user info as hash in redis, key prefix is chat:user:{{ user_id }}.
 
 include hash:
-
 - disabled: bool (default False)
 - count: integer (default 0)
 - quota: integer (default -1, means no limit)
@@ -22,35 +20,30 @@ include hash:
 """
 
 DELETED_AFTER = 5
-BAN_MEMBER = 300  # 300s
-OUTPUT_MAX_LENGTH = 3500  # Telegram's max message length for text
-RE_CLEAR = re.compile(r"/chat(@[a-zA-Z0-9]+\s?)?")
+OUTPUT_MAX_LENGTH = 3500
+RE_CLEAR = re.compile(r"(?i)/chat(@[a-zA-Z0-9]+\s?)?")
 
 logger = manager.logger
 
 
-@manager.register("message", Command("chat", ignore_case=True, ignore_mention=True))
-async def chat(msg: types.Message):
-    chat = msg.chat
-    user = msg.from_user
+@manager.register("message", pattern=r"(?i)^/chat(\s|$)|^/chat@\w+")
+async def chat(event: events.NewMessage.Event):
+    chat_entity = await event.get_chat()
+    user = await event.get_sender()
 
-    if chat.title is None:
-        prefix = f"chat {chat.id} msg {msg.message_id}"
-    else:
-        prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
+    prefix = f"chat {event.chat_id}({getattr(chat_entity, 'title', '')}) msg {event.id}"
 
     if not user:
         logger.warning(f"{prefix} message without user, ignored")
         return
 
-    text = msg.text
-    if text and text.startswith("/chat"):
+    text = event.text or ""
+    if text.startswith("/chat"):
         text = RE_CLEAR.sub("", text, 1).strip()
 
-    if msg.reply_to_message:
-        replied_msg = msg.reply_to_message
-        text = f"{replied_msg.text}\n{text}"
-
+    reply_msg = await event.get_reply_message()
+    if reply_msg and reply_msg.text:
+        text = f"{reply_msg.text}\n{text}"
         if text.startswith("/chat"):
             text = RE_CLEAR.sub("", text, 1).strip()
 
@@ -61,34 +54,31 @@ async def chat(msg: types.Message):
     rdb = await manager.get_redis()
     if not rdb:
         logger.error(f"{prefix} redis not connected")
-        # reply system error with redis is missed
-        await msg.reply("System error: Redis is missed.")
+        await event.reply("System error: Redis is missed.")
         return
 
-    if not await check_user_permission(rdb, chat.id, user.id):
-        logger.warning(f"{prefix} user {user.id} in chat {chat.id} has no permission")
+    if not await check_user_permission(rdb, event.chat_id, user.id):
+        logger.warning(f"{prefix} user {user.id} in chat {event.chat_id} has no permission")
         await manager.reply(
-            msg,
+            event,
             "你还没有权限使用这个功能。| You don't have permission to use this feature.",
-            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
+            auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
         )
-        await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER * 2))
+        await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER * 2))
         return
 
     try:
-        # split the text into prompt and message
         parts = text.split(" ", 1)
         subcommand = parts[0]
 
-        if await operations_person(rdb, chat, msg, user, subcommand, parts):
-            await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER))
+        if await operations_person(rdb, chat_entity, event, user, subcommand, parts):
+            await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
             return
 
-        # administrator operations
-        if await operations_admin(rdb, chat, msg, user, subcommand, parts):
-            await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER))
+        if await operations_admin(rdb, chat_entity, event, user, subcommand, parts):
+            await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
             return
-    except:
+    except Exception:
         logger.exception(f"{prefix} operations error")
 
     if len(text) < 3:
@@ -96,7 +86,7 @@ async def chat(msg: types.Message):
         return
 
     try:
-        text_resp = await tg_generate_text(chat, user, text)
+        text_resp = await tg_generate_text(chat_entity.id if hasattr(chat_entity, "id") else event.chat_id, user.id, text)
         if not text_resp:
             logger.warning(f"{prefix} generate text error, ignored")
             return
@@ -104,44 +94,35 @@ async def chat(msg: types.Message):
         logger.exception(f"{prefix} generate text failed")
         text_resp = f"生成回复失败，请稍后再试。| Failed to generate response, please try again later.\n ```{e}```"
 
-    # if success is False, the message will be deleted
     success = False
-
     try:
-        # text_resp = escape(text_resp)
-
         if len(text_resp) > OUTPUT_MAX_LENGTH:
-            parts = [text_resp[i : i + OUTPUT_MAX_LENGTH] for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH)]
-            for part in parts:
-                await msg.reply(part, parse_mode="MarkdownV2")
-
+            for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH):
+                part = text_resp[i : i + OUTPUT_MAX_LENGTH]
+                await event.reply(part, parse_mode="md")
         else:
-            await msg.reply(text_resp, parse_mode="MarkdownV2")
-
+            await event.reply(text_resp, parse_mode="md")
         success = True
-
-    except exceptions.TelegramBadRequest as e:
-        logger.exception(f"{prefix} invalid text format \n{text_resp}\n")
-
-        if len(text_resp) > OUTPUT_MAX_LENGTH:
-            parts = [text_resp[i : i + OUTPUT_MAX_LENGTH] for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH)]
-            for part in parts:
-                await msg.reply(part, disable_web_page_preview=True)
-
-        else:
-            await msg.reply(text_resp, disable_web_page_preview=True)
-
-        success = True
-
-    except Exception as e:
-        logger.exception(f"{prefix} reply failed")
-        await msg.reply(
-            f"生成回复失败，请稍后再试。| Failed to generate response, please try again later.",
-            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
-        )
+    except Exception:
+        logger.exception(f"{prefix} invalid text format (markdown), fallback to plain")
+        try:
+            if len(text_resp) > OUTPUT_MAX_LENGTH:
+                for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH):
+                    part = text_resp[i : i + OUTPUT_MAX_LENGTH]
+                    await event.reply(part, link_preview=False)
+            else:
+                await event.reply(text_resp, link_preview=False)
+            success = True
+        except Exception as e2:
+            logger.exception(f"{prefix} reply failed")
+            await manager.reply(
+                event,
+                "生成回复失败，请稍后再试。| Failed to generate response, please try again later.",
+                auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
+            )
 
     if not success:
-        await manager.delete_message(chat, msg, msg.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
         return
 
     await increase_user_count(rdb, user.id)

@@ -3,8 +3,7 @@
 Member captcha module exceptions
 """
 
-from typing import Optional
-from aiogram import types
+from typing import Optional, Any
 
 
 class MemberVerificationError(Exception):
@@ -33,11 +32,11 @@ class SecurityCheckError(MemberVerificationError):
 
 
 class LogContext:
-    """日志上下文管理器"""
-    
-    def __init__(self, chat: types.Chat, member_id: int, 
-                 member_name: Optional[str] = None, 
-                 member_fullname: Optional[str] = None, 
+    """日志上下文管理器。chat 为任意具 .id / .title 的对象（如 Telethon Chat/Channel）。"""
+
+    def __init__(self, chat: Any, member_id: int,
+                 member_name: Optional[str] = None,
+                 member_fullname: Optional[str] = None,
                  prefix: str = "[验证]"):
         self.chat = chat
         self.member_id = member_id
@@ -45,12 +44,14 @@ class LogContext:
         self.member_fullname = member_fullname
         self.prefix = prefix
         self._log_prefix = None
-    
+
     @property
     def log_prefix(self) -> str:
         """获取格式化的日志前缀"""
         if self._log_prefix is None:
-            self._log_prefix = f"{self.prefix} 群组:{self.chat.id}({self.chat.title}) 成员:{self.member_id}"
+            cid = getattr(self.chat, "id", "")
+            ctitle = getattr(self.chat, "title", "")
+            self._log_prefix = f"{self.prefix} 群组:{cid}({ctitle}) 成员:{self.member_id}"
             if self.member_name:
                 self._log_prefix += f"(@{self.member_name})"
             if self.member_fullname:

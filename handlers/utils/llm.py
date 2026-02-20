@@ -1,10 +1,7 @@
 import asyncio
-from datetime import timedelta
-from typing import List, Tuple, Union
-from urllib import response
+from typing import Any, List, Tuple
 
 import orjson as json
-from aiogram import types
 from loguru import logger
 
 from ..utils import chat_completions
@@ -12,22 +9,19 @@ from ..utils import chat_completions
 SPAM_MODELS = ["gemini-flash-lite", "gemma3"]
 
 
+def _user_fullname(user: Any) -> str:
+    first = getattr(user, "first_name", None) or ""
+    last = getattr(user, "last_name", None) or ""
+    return f"{first} {last}".strip() or ""
+
+
 async def check_spams_with_llm(
-    members: List[
-        Union[
-            types.ChatMemberOwner,
-            types.ChatMemberAdministrator,
-            types.ChatMemberMember,
-            types.ChatMemberRestricted,
-            types.ChatMemberLeft,
-            types.ChatMemberBanned,
-            types.User,
-        ]
-    ],
+    members: List[Any],
     session=None,
     additional_strings=None,
     now=None,
 ) -> List[Tuple[int, str]]:
+    """members 为具 .user 的对象或 User，兼容 Telethon。"""
     try:
         members_data = []
         for member in members:
@@ -41,7 +35,7 @@ async def check_spams_with_llm(
                 "username": getattr(user, "username", None),
                 "first_name": getattr(user, "first_name", None),
                 "last_name": getattr(user, "last_name", None),
-                "fullname": user.full_name,
+                "fullname": _user_fullname(user),
             }
 
             if session and hasattr(session, "member_bio") and session.member_bio:

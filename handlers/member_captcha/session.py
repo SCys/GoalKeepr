@@ -1,14 +1,11 @@
 from datetime import datetime
 from orjson import dumps, loads
-from typing import Optional, Union
-
-from aiogram import types
-
+from typing import Optional, Any
+from telethon import types
 from manager import manager
 
 # 7天缓冲会话TTL, unit: seconds
 TTL_SESSION = 60 * 60 * 24 * 7
-
 
 class Session:
     id: str  # member_captcha:chat_id:member_id
@@ -39,28 +36,19 @@ class Session:
         await rdb.set(self.id, dumps(self.__dict__), TTL_SESSION)
 
     @staticmethod
-    async def get(
-        chat: Optional[types.Chat],
-        member: Union[types.ChatMemberMember, types.ChatMemberRestricted],
-        event: types.ChatMemberUpdated,
-        now: datetime,
-    ):
-        if not chat:
-            return
-        
-        # 创建会话
+    async def create(chat: types.Chat, user: types.User, now: datetime) -> "Session":
+        """member 需有 .user (id, username, first_name, last_name)。event 仅用于兼容，ts_create 用 now。"""
         session = Session(**{
-            "id": f"member_captcha:{chat.id}:{member.user.id}",
-            "chat": chat.title,
+            "id": f"member_captcha:{chat.id}:{user.id}",
+            "chat": getattr(chat, "title", str(chat.id)),
             "chat_id": chat.id,
-            "member": member.user.full_name,
-            "member_id": member.user.id,
-            "member_username": member.user.username,
+            "member": f"{user.first_name} {user.last_name}".strip(),
+            "member_id": user.id,
+            "member_username": user.username,
             "member_bio": None,
-            "ts_create": event.date,
+            "ts_create": now,
             "ts_update": now,
-            "cost_captcha": 0,  # uint: seconds
-            # flags
+            "cost_captcha": 0,
             "accepted": False,
             "timeout": False,
             "banned": False,
@@ -71,10 +59,10 @@ class Session:
             if await rdb.exists(session.id):
                 old_data = loads(await rdb.get(session.id))
                 old_data["ts_update"] = now
-                # 2025-03-15T11:17:05+00:00
-                ts_create = datetime.strptime(old_data["ts_create"], "%Y-%m-%dT%H:%M:%S%z")
+                # orjson 序列化的 datetime 可能带微秒，用 fromisoformat 解析
+                ts_create_raw = old_data["ts_create"]
+                ts_create = datetime.fromisoformat(ts_create_raw) if isinstance(ts_create_raw, str) else ts_create_raw
                 old_data["cost_captcha"] = (now - ts_create).total_seconds()
 
             await rdb.set(session.id, dumps(session.__dict__), TTL_SESSION)
-
         return session

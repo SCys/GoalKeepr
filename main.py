@@ -122,7 +122,7 @@ async def lazy_sessions() -> int:
         rows = await database.execute_fetch(SQL_FETCH_SESSIONS)
         
         if not rows:
-            return
+            return processed
 
         for row in rows:
             id = row[0]
@@ -171,18 +171,19 @@ async def main():
     # Start tasks
     asyncio.create_task(txt2img_worker())
     asyncio.create_task(worker_loop())
-
-    # Start client
-    # start() connects and returns client, we need to wait until disconnected
-    await manager.start()
     
-    logger.info("Main loop running")
+    logger.info("主进程开始运行")
     try:
+        await manager.start()
         await manager.client.run_until_disconnected()
+    except KeyboardInterrupt:
+        logger.info("主进程收到退出信号，正在断开连接…")
+    except asyncio.CancelledError:
+        logger.info("主进程收到退出信号，正在断开连接…")
     except Exception as e:
-        logger.error(f"Client disconnected with error: {e}")
-    finally:
-        manager.is_running = False
+        logger.error(f"主进程断开连接时发生错误: {e}")
+
+    await manager.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())

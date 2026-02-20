@@ -3,18 +3,48 @@ import sys
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
-from typing import Optional, Union
+from typing import Optional, Union, Tuple, Any
+from urllib.parse import urlparse
 
 import aiohttp
 import database
 import redis.asyncio as aioredis
 import loguru
-from telethon import TelegramClient, events, types, errors
+from telethon import TelegramClient, events, types, hints
 from bs4 import BeautifulSoup, Tag
 
 from .settings import SETTINGS_TEMPLATE
 
 logger = loguru.logger
+
+
+def _parse_proxy(proxy_url: str) -> Optional[Tuple[Any, ...]]:
+    """
+    将代理 URL 解析为 Telethon/PySocks 所需的 (scheme, host, port) 或 (scheme, host, port, username, password)。
+    支持 socks5://host:port、socks5://user:pass@host:port、http://host:port 等格式。
+    """
+    proxy_url = (proxy_url or "").strip()
+    if not proxy_url:
+        return None
+    try:
+        r = urlparse(proxy_url)
+        if not r.scheme or not r.hostname:
+            return None
+        scheme = r.scheme.lower()
+        if scheme not in ("socks5", "http"):
+            logger.warning(f"telegram proxy 仅支持 socks5/socks4/http，当前为 {scheme}，将按 socks5 使用")
+            if scheme == "https":
+                scheme = "http"
+            else:
+                scheme = "socks5"
+        host = r.hostname
+        port = r.port or (1080 if "socks" in scheme else 80)
+        if r.username is not None:
+            return (scheme, host, port, r.username, r.password or "")
+        return (scheme, host, port)
+    except Exception as e:
+        logger.warning(f"解析 telegram proxy 失败: {proxy_url}, {e}")
+        return None
 
 
 class Manager:
@@ -55,14 +85,24 @@ class Manager:
             sys.exit(1)
             
         if not api_id or not api_hash:
-            logger.error("telegram api_id or api_hash is missing in main.ini [telegram]")
-            # allow continue if user wants to set it up later or it crashes
-            # sys.exit(1) 
+            logger.error("telegram api_id 或 api_hash 未配置，请在 main.ini [telegram] 中填写（从 https://my.telegram.org 获取）")
+            sys.exit(1)
+
+        # 解析代理（可选），格式如 socks5://127.0.0.1:1080 或 socks5://user:pass@host:port
+        proxy = _parse_proxy(self.config["telegram"].get("proxy", ""))
 
         # Initialize Telethon Client (session name 'bot')
-        self.client = TelegramClient('bot', int(api_id) if api_id else 0, api_hash or '')
-        
-        logger.info("telethon client is setup")
+        self.client = TelegramClient(
+            "bot",
+            int(api_id) if api_id else 0,
+            api_hash or "",
+            proxy=proxy,
+        )
+
+        if proxy:
+            logger.info("telethon client is setup (with proxy)")
+        else:
+            logger.info("telethon client is setup")
 
         self.setup_handlers()
 
@@ -108,7 +148,7 @@ class Manager:
     def register(self, type_name, *args, **kwargs):
         """
         Decorator to register handlers.
-        type_name: "message", "callback_query"
+        type_name: "message", "callback_query", "chat_member"
         kwargs: passed to event filter (e.g. pattern, outgoing)
         """
 
@@ -118,7 +158,11 @@ class Manager:
                 event_cls = events.NewMessage
             elif type_name == "callback_query":
                 event_cls = events.CallbackQuery
-            
+            elif type_name == "chat_member":
+                event_cls = events.ChatAction
+                # 只处理新成员加入（自己加入或被邀请）
+                kwargs.setdefault("func", lambda e: e.user_joined or e.user_added)
+
             if event_cls:
                 self.handlers.append((func, event_cls, args, kwargs))
                 logger.info(f"registered {func.__name__} for {type_name}")
@@ -169,13 +213,13 @@ class Manager:
         logger.info(f"bot started as {self.username(me)}")
 
         if "admin" in self.config["telegram"]:
-            admin = self.config["telegram"]["admin"]
+            admin = int(self.config["telegram"]["admin"])
             try:
-                await self.client.send_message(admin, "bot is started")
+                await self.send(admin, "bot is started")
             except Exception as e:
                 logger.debug(f"admin notification failed: {e}")
-        
-        return self.client
+            
+        await self.client.run_until_disconnected()
 
     async def stop(self):
         self.is_running = False
@@ -184,18 +228,9 @@ class Manager:
         await database.close()
         await self.client.disconnect()
 
-    def username(self, user: Union[types.User, types.Chat]):
+    def username(self, user: hints.EntityLike):
         """获取用户名"""
-        if hasattr(user, 'username') and user.username:
-            return f"@{user.username}"
-        
-        if hasattr(user, 'first_name'):
-             full_name = user.first_name
-             if user.last_name:
-                 full_name += f" {user.last_name}"
-             return full_name
-        
-        return "Unknown"
+        return user.username if isinstance(user, types.User) else user.title if isinstance(user, types.Chat) else str(user)
 
     async def is_admin(self, chat: Union[types.Chat, types.Channel, int], member: Union[types.User, int]):
         try:
@@ -215,11 +250,12 @@ class Manager:
             logger.error(f"check admin failed: {e}")
         return False
 
-    async def chat_member(self, chat, member_id: int):
+    async def chat_member_permissions(self, chat, member_id: int):
         try:
             return await self.client.get_permissions(chat, member_id)
         except Exception as e:
-            logger.exception(f"chat member check exception: {e}")
+            logger.exception(f"chat member permissions check exception: {e}")
+            return None
 
     async def get_user_extra_info(self, username: str):
         url = f"https://t.me/{username}"
@@ -333,12 +369,12 @@ class Manager:
             except Exception as e:
                 logger.error(f"lazy session delete failed (sqlite): {e}")
 
-    async def send(self, chat: int, msg: str, **kwargs):
+    async def send(self, chat: hints.EntityLike, msg: str, **kwargs):
         auto_deleted_at = kwargs.pop("auto_deleted_at", None)
 
         try:
             resp = await self.client.send_message(chat, msg, **kwargs)
-            logger.info(f"chat {chat} message {msg} sent")
+            logger.info(f"message {resp.id} sent to {self.username(chat)}")
         except Exception as e:
             logger.exception(f"chat {chat} message {msg} send error: {e}")
             return False

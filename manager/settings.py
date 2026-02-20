@@ -1,15 +1,10 @@
 SETTINGS_TEMPLATE = {
     "default": {"debug": False},
-    "telegram": {"token": ""},  # telegram robot token
-    "captcha": {
-        "cloudflare_turnstile": False,  # enable cloudflare turnstile detector
-        "cloudflare_turnstile_token": "",
-        "google_recaptcha": False,  # enable google recaptcha detector
-        "google_recaptcha_token": "",
+    "telegram": {
+        "token": "",  # telegram robot token
+        "proxy": "",  # 可选，Telegram 连接代理，如 socks5://127.0.0.1:1080
     },
     "ai": {
-        "google_gemini_host": "",
-        "google_gemini_token": "",
         "proxy_host": "",
         "proxy_token": "",
         "administrator": 0,  # admin user id

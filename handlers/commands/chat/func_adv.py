@@ -1,8 +1,8 @@
 from datetime import timedelta
-from typing import List
+from typing import Any, List
 
-import aioredis
-from aiogram import types
+from redis.asyncio import Redis
+from telethon import Button, events
 from orjson import dumps, loads
 
 from manager import manager
@@ -41,17 +41,13 @@ ADMIN_HELPER_TEXT = """
 
 
 async def operations_person(
-    rdb: "aioredis.Redis", chat: types.Chat, msg: types.Message, user: types.User, subcommand: str, arguments: List[str]
+    rdb: Redis, chat: Any, msg: Any, user: Any, subcommand: str, arguments: List[str]
 ):
     """
     Operations for normal users.
 
-    This function provides a variety of operations for normal users,
-    such as resetting the conversation, viewing the conversation details,
-    viewing the supported models, and setting the model for the conversation.
-
     Parameters:
-        rdb (aioredis.Redis): The Redis client.
+        rdb: redis.asyncio Redis 客户端
         chat (types.Chat): The chat where the command is sent.
         msg (types.Message): The message that contains the command.
         user (types.User): The user who sent the command.
@@ -62,7 +58,7 @@ async def operations_person(
         bool: Whether the command is handled successfully.
     """
     if subcommand == "help":
-        await msg.reply(HELPER_TEXT)
+        await msg.respond(HELPER_TEXT)
         return True
 
     # simple commands
@@ -182,27 +178,9 @@ async def operations_person(
 
 
 async def operations_admin(
-    rdb: "aioredis.Redis", chat: types.Chat, msg: types.Message, user: types.User, subcommand: str, arguments: List[str]
+    rdb: Redis, chat: Any, msg: Any, user: Any, subcommand: str, arguments: List[str]
 ) -> bool:
-    """
-    Operations for administrators.
-
-    This function provides a variety of operations for administrators,
-    such as banning or allowing users, setting user quotas, and getting
-    user and global statistics.
-
-    Parameters:
-        rdb (aioredis.Redis): The Redis client.
-        chat (types.Chat): The chat where the command is sent.
-        msg (types.Message): The message that contains the command.
-        user (types.User): The user who sent the command.
-        subcommand (str): The subcommand of the command.
-        arguments (List[str]): The arguments of the command.
-
-    Returns:
-        bool: Whether the command is handled successfully.
-
-    """
+    """管理员相关子命令。"""
     administrator = manager.config["ai"]["administrator"]
     if not administrator or user.id != int(administrator):
         return False
@@ -221,7 +199,7 @@ async def operations_admin(
         return True
 
     elif subcommand == "admin:ban":
-        target_user_id = get_user_id(msg, arguments)
+        target_user_id = await get_user_id(msg, arguments)
         if not target_user_id:
             await manager.reply(
                 msg,
@@ -240,7 +218,7 @@ async def operations_admin(
         return True
 
     elif subcommand == "admin:allow":
-        target_user_id = get_user_id(msg, arguments)
+        target_user_id = await get_user_id(msg, arguments)
         if not target_user_id:
             await manager.reply(
                 msg,
@@ -259,7 +237,7 @@ async def operations_admin(
         return True
 
     elif subcommand == "admin:quota":
-        target_user_id = get_user_id(msg, arguments)
+        target_user_id = await get_user_id(msg, arguments)
         if not target_user_id:
             await manager.reply(
                 msg,
@@ -292,7 +270,7 @@ async def operations_admin(
 
     # get user stats from redis
     elif subcommand == "admin:stats_user":
-        target_user_id = get_user_id(msg, arguments)
+        target_user_id = await get_user_id(msg, arguments)
         if not target_user_id:
             await manager.reply(
                 msg,
@@ -360,67 +338,65 @@ async def operations_admin(
 
     # admin:settings:models
     elif subcommand == "admin:settings:models":
-        # 获得支持的模型按钮列表，并且通过选择来设定为默认模型
         model_default = settings.get("model", DEFAULT_MODEL)
         models_buttons = [
-            types.InlineKeyboardButton(
-                text=f"{value.name} ({key})",
-                callback_data=f"admin:settings:model:{key}"
-            )
+            Button.inline(f"{value.name} ({key})", f"admin:settings:model:{key}".encode("utf-8"))
             for key, value in SUPPORTED_MODELS.items()
         ]
-        # 将按钮按行排列，每行最多2个按钮
-        button_rows = []
-        for i in range(0, len(models_buttons), 2):
-            button_rows.append(models_buttons[i:i+2])
-        
+        button_rows = [models_buttons[i : i + 2] for i in range(0, len(models_buttons), 2)]
+
         await manager.reply(
             msg,
             f"现在默认模型：{model_default}，请选择要设置的模型",
-            reply_markup=types.InlineKeyboardMarkup(inline_keyboard=button_rows),
+            buttons=button_rows,
             auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER * 2),
         )
-
         return True
 
     return False
 
 
-def get_user_id(msg: types.Message, arguments: List[str]):
+async def get_user_id(msg: Any, arguments: List[str]):
     target_user_id = None
-    pre_msg = msg.reply_to_message
-    if pre_msg and pre_msg.from_user:
-        target_user_id = pre_msg.from_user.id
+    pre_msg = await msg.get_reply_message() if hasattr(msg, "get_reply_message") else None
+    if pre_msg and getattr(pre_msg, "sender_id", None):
+        target_user_id = pre_msg.sender_id
 
     elif len(arguments) > 1:
         try:
             target_user_id = int(arguments[1])
         except ValueError:
-            return
-
+            return None
         arguments.pop(1)
 
     return target_user_id
 
+
 @manager.register("callback_query")
-async def chat_admin_settings_callback(query: types.CallbackQuery):
-    if not query.data or not query.data.startswith("admin:settings"):
+async def chat_admin_settings_callback(event: events.CallbackQuery.Event):
+    data = event.data
+    if isinstance(data, bytes):
+        data = data.decode("utf-8", errors="replace")
+    if not data or not data.startswith("admin:settings"):
         return
-    
+
+    user = await event.get_sender()
     administrator = manager.config["ai"]["administrator"]
-    if not administrator or query.from_user.id != int(administrator):
-        logger.warning(f"chat  user {query.from_user.id} is not administrator")
+    if not administrator or user.id != int(administrator):
+        logger.warning(f"chat user {user.id} is not administrator")
+        await event.answer()
         return
-    
+
     rdb = await manager.get_redis()
     if not rdb:
         logger.error("redis connection failed")
+        await event.answer()
         return
 
-    # 使用':'分隔解析callback_data，例如 "admin:settings:models"
-    parts = query.data.split(":")
-    if len(parts) < 2:
-        logger.warning(f"{query.data} is invalid callback_data")
+    parts = data.split(":")
+    if len(parts) < 3:
+        logger.warning(f"{data} is invalid callback_data")
+        await event.answer()
         return
 
     subcommand = parts[2]
@@ -429,25 +405,23 @@ async def chat_admin_settings_callback(query: types.CallbackQuery):
     settings = await rdb.get(f"chat:settings:global")
     settings = loads(settings) if settings else {}
 
-    # handle admin:settings:models
     if subcommand == "model":
-        # set default model
-        model = arguments[0]
-        if model not in SUPPORTED_MODELS:
+        model = arguments[0] if arguments else None
+        if not model or model not in SUPPORTED_MODELS:
             logger.warning(f"model {model} is not supported")
+            await event.answer()
             return
 
         settings["model"] = model
         await rdb.set(f"chat:settings:global", dumps(settings))
+        msg = event.message
         await manager.reply(
-            query.message,
+            msg,
             f"全局默认模型已设置为{model}",
-            auto_deleted_at=query.message.date + timedelta(seconds=DELETED_AFTER),
+            auto_deleted_at=msg.date + timedelta(seconds=DELETED_AFTER),
         )
         logger.info(f"admin:settings:models setup default model to {model}")
-
     else:
-        # subcommand is not support
         logger.warning(f"subcommand {subcommand} is not supported")
 
-    await query.answer()
+    await event.answer()

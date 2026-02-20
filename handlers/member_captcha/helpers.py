@@ -1,12 +1,19 @@
 import random
-from datetime import datetime, timedelta
-from typing import Tuple, Union
+from datetime import datetime, timedelta, timezone
+from typing import Tuple, List, Any
 
-from aiogram import types
+from telethon import Button
 
 from manager import manager
 from .config import DELETED_AFTER
 from .security import restore_member_permissions
+
+
+def _user_full_name(user: Any) -> str:
+    first = getattr(user, "first_name", None) or ""
+    last = getattr(user, "last_name", None) or ""
+    return f"{first} {last}".strip() or ""
+
 
 WELCOME_TEXT = (
     "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 *%(icon)s* 按钮后才能发言。\n\n *30秒* 内不操作即会被送走。\n\n"
@@ -71,52 +78,48 @@ logger = manager.logger
 
 
 async def build_captcha_message(
-    member: Union[types.ChatMember, types.User],
+    member: Any,
     msg_timestamp: datetime,
-) -> Tuple[str, types.InlineKeyboardMarkup]:
+) -> Tuple[str, List[List[Any]]]:
     """
-    构建新用户验证信息的按钮和文字内容
+    构建新用户验证信息的文字与 Telethon 内联按钮（二维列表，供 send_message(buttons=) 使用）。
+    member 需有 .user (id, first_name, last_name) 或自身为 User。
     """
-    if isinstance(member, (types.ChatMemberRestricted, types.ChatMemberMember)):
+    if getattr(member, "user", None):
         member_id = member.user.id
-        member_name = member.user.full_name
-    elif isinstance(member, types.User):
+        member_name = _user_full_name(member.user)
+    elif hasattr(member, "id"):
         member_id = member.id
-        member_name = member.full_name
+        member_name = _user_full_name(member)
     else:
         raise ValueError(f"Unknown member type {type(member)}")
 
-    # 用户组
+    ts_str = str(msg_timestamp)
     items = random.sample(list(ICONS.items()), k=5)
     button_user_ok, _ = random.choice(items)
-    buttons_user = [
-        types.InlineKeyboardButton(
-            text=i[1], callback_data="__".join([str(member_id), str(msg_timestamp), "!" if button_user_ok == i[0] else "?"])
-        )
+    row_user = [
+        Button.inline(i[1], ("__".join([str(member_id), ts_str, "!" if button_user_ok == i[0] else "?"])).encode("utf-8"))
         for i in items
     ]
-    random.shuffle(buttons_user)
+    random.shuffle(row_user)
 
-    # 管理组
-    buttons_admin = [
-        types.InlineKeyboardButton(text="✔", callback_data="__".join([str(member_id), str(msg_timestamp), "O"])),
-        types.InlineKeyboardButton(text="❌", callback_data="__".join([str(member_id), str(msg_timestamp), "X"])),
+    row_admin = [
+        Button.inline("✔", "__".join([str(member_id), ts_str, "O"]).encode("utf-8")),
+        Button.inline("❌", "__".join([str(member_id), ts_str, "X"]).encode("utf-8")),
     ]
 
-    # 文字
     content = WELCOME_TEXT % {"title": member_name, "user_id": member_id, "icon": button_user_ok}
+    buttons = [row_user, row_admin]
+    return content, buttons
 
-    return content, types.InlineKeyboardMarkup(inline_keyboard=[buttons_user, buttons_admin])
 
+async def accepted_member(chat: Any, msg: Any, user: Any):
+    """接受新成员，恢复其权限并发送欢迎消息。"""
+    chat_id = chat.id if hasattr(chat, "id") else chat
+    msg_id = msg.id if hasattr(msg, "id") else msg
+    prefix = f"chat {chat_id}({getattr(chat, 'title', '')}) msg {msg_id}"
 
-async def accepted_member(chat: types.Chat, msg: types.Message, user: types.User):
-    """
-    接受新成员，恢复其权限并发送欢迎消息
-    """
-    prefix = f"chat {chat.id}({chat.title}) msg {msg.message_id}"
-
-    # 恢复成员权限
-    if not await restore_member_permissions(chat, user.id):
+    if not await restore_member_permissions(chat, user):
         logger.error(f"{prefix} 恢复成员 {user.id} 权限失败")
         return
 
@@ -131,17 +134,17 @@ async def accepted_member(chat: types.Chat, msg: types.Message, user: types.User
     )
 
     try:
-        photos = await user.get_profile_photos(0, 1)
-        if photos.total_count == 0:
+        photos = await manager.client.get_profile_photos(user, limit=1)
+        if not photos:
             content += (
                 "\n\n请设置头像或显示头像，能够更好体现个性。\n\n"
                 "Please choose your appropriate fancy profile photo and set it available in public. "
                 "It would improve your experience in communicate with everyone here and knowing you faster and better."
             )
-    except:
+    except Exception:
         logger.exception("get profile photos error")
 
-    await manager.delete_message(
-        chat, await msg.answer(content, parse_mode="markdown"), msg.date + timedelta(seconds=DELETED_AFTER)
-    )
-    await manager.lazy_session_delete(chat.id, user.id, "new_member_check")
+    reply = await manager.client.send_message(chat, content, parse_mode="md")
+    msg_date = getattr(msg, "date", None) or datetime.now(timezone.utc)
+    await manager.delete_message(chat, reply, msg_date + timedelta(seconds=DELETED_AFTER))
+    await manager.lazy_session_delete(chat_id, user.id, "new_member_check")

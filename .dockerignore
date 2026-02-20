@@ -1,0 +1,28 @@
+# Git 与 IDE
+.git
+.gitignore
+.cursor
+*.md
+!README.md
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+.venv
+venv
+env
+*.egg-info
+.pytest_cache
+.mypy_cache
+
+# 本地配置与数据（部署时单独挂载）
+main.ini
+data/
+log/
+*.db
+
+# 文档与杂项
+GEMINI.md
+QWEN.md
+example/

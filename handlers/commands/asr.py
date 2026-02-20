@@ -1,37 +1,34 @@
 from datetime import datetime, timedelta
 
-from aiogram import types
-from aiogram.filters import Command
+from telethon import events
 
 from manager import manager
 from utils.asr import openai_whisper
+from handlers.member_captcha.config import get_chat_type
 
 logger = manager.logger
-
 
 SUPPORT_GROUP_TYPES = ["supergroup", "group", "private"]
 
 
-@manager.register("message", Command("asr", ignore_case=True, ignore_mention=True))
-async def asr(msg: types.Message):
-    chat = msg.chat
-    if chat.type not in SUPPORT_GROUP_TYPES:
+@manager.register("message", pattern=r"(?i)^/asr(\s|$)|^/asr@\w+")
+async def asr(event: events.NewMessage.Event):
+    chat = await event.get_chat()
+    if get_chat_type(chat) not in SUPPORT_GROUP_TYPES:
         return
 
-    user = msg.from_user
+    user = await event.get_sender()
     if not user:
         return
 
-    target = msg.reply_to_message
-    if not target:
+    reply_msg = await event.get_reply_message()
+    if not reply_msg:
         return
 
-    voice = target.voice
-    if not voice:
+    if not reply_msg.voice and not reply_msg.media:
         return
 
-    # download file from telegram server
-    raw = await manager.bot.download(voice)
+    raw = await manager.client.download_media(reply_msg, bytes)
     if not raw:
         return
 
@@ -41,8 +38,11 @@ async def asr(msg: types.Message):
             return
     except Exception as e:
         logger.exception("asr failed")
-        await manager.reply(target, "asr failed", datetime.now() + timedelta(seconds=5))
+        await manager.reply(reply_msg, "asr failed", datetime.now() + timedelta(seconds=5))
         return
 
-    await manager.reply(target, text)
-    logger.info(f"chat {chat.id} user {user.full_name} is using asr")
+    await manager.reply(reply_msg, text)
+    name = getattr(user, "first_name", "") or ""
+    if getattr(user, "last_name", None):
+        name = f"{name} {user.last_name}".strip()
+    logger.info(f"chat {chat.id} user {name} is using asr")
