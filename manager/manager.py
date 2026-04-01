@@ -18,6 +18,14 @@ from .settings import SETTINGS_TEMPLATE
 logger = loguru.logger
 
 
+class RedisUnavailableError(RuntimeError):
+    """Redis 未配置或不可用，依赖 Redis 的功能将无法使用。"""
+
+
+def _redis_configured(config: ConfigParser) -> bool:
+    return "redis" in config and config["redis"].get("dsn")
+
+
 def _parse_proxy(proxy_url: str) -> Optional[Tuple[Any, ...]]:
     """
     将代理 URL 解析为 Telethon/PySocks 所需的 (scheme, host, port) 或 (scheme, host, port, username, password)。
@@ -32,7 +40,9 @@ def _parse_proxy(proxy_url: str) -> Optional[Tuple[Any, ...]]:
             return None
         scheme = r.scheme.lower()
         if scheme not in ("socks5", "http"):
-            logger.warning(f"telegram proxy 仅支持 socks5/socks4/http，当前为 {scheme}，将按 socks5 使用")
+            logger.warning(
+                f"telegram proxy 仅支持 socks5/socks4/http，当前为 {scheme}，将按 socks5 使用"
+            )
             if scheme == "https":
                 scheme = "http"
             else:
@@ -52,10 +62,10 @@ class Manager:
 
     # Telethon instance
     client: TelegramClient
-    
+
     # redis connection
     rdb: Optional[aioredis.Redis] = None
-    
+
     # http session
     http_session: Optional[aiohttp.ClientSession] = None
 
@@ -65,7 +75,7 @@ class Manager:
     # routes
     handlers = []
     events = {}
-    
+
     # running status
     is_running = False
 
@@ -83,9 +93,11 @@ class Manager:
         if not token:
             logger.error("telegram token is missing")
             sys.exit(1)
-            
+
         if not api_id or not api_hash:
-            logger.error("telegram api_id 或 api_hash 未配置，请在 main.ini [telegram] 中填写（从 https://my.telegram.org 获取）")
+            logger.error(
+                "telegram api_id 或 api_hash 未配置，请在 main.ini [telegram] 中填写（从 https://my.telegram.org 获取）"
+            )
             sys.exit(1)
 
         # 解析代理（可选），格式如 socks5://127.0.0.1:1080 或 socks5://user:pass@host:port
@@ -143,7 +155,9 @@ class Manager:
         设置事件处理
         Registers handlers stored in self.handlers to the client.
         """
-        pass
+        logger.debug(f"setup_handlers: {len(self.handlers)} handlers registered")
+        if not self.handlers:
+            logger.warning("setup_handlers: no handlers found")
 
     def register(self, type_name, *args, **kwargs):
         """
@@ -165,23 +179,16 @@ class Manager:
 
             if event_cls:
                 self.handlers.append((func, event_cls, args, kwargs))
-                logger.info(f"registered {func.__name__} for {type_name}")
+                logger.debug(
+                    f"handler {func.__name__} registered to client event {event_cls.__name__}"
+                )
+                return func
             else:
                 logger.warning(f"Unknown event type {type_name}")
-
-            @wraps(func)
-            async def _wrapper(*args, **kwargs):
-                return await func(*args, **kwargs)
-
-            return _wrapper
+                # empty wrapper to avoid error
+                return lambda x: x
 
         return wrapper
-    
-    def _apply_handlers(self):
-        """Actually register handlers to client"""
-        for func, event_cls, args, kwargs in self.handlers:
-            self.client.add_event_handler(func, event_cls(*args, **kwargs))
-            logger.info(f"handler {func.__name__} added to client")
 
     def register_event(self, type_name: str):
         """
@@ -201,16 +208,22 @@ class Manager:
 
     async def start(self):
         self.is_running = True
-        
-        # Apply handlers before starting
-        self._apply_handlers()
+
+        # Actually register handlers to client
+        for func, event_cls, args, kwargs in self.handlers:
+            self.client.add_event_handler(func, event_cls(*args, **kwargs))
+            logger.debug(
+                f"handler {func.__name__} registered to client event {event_cls.__name__}"
+            )
 
         token = self.config["telegram"]["token"]
-        
+
         await self.client.start(bot_token=token)
-        
+
         me = await self.client.get_me(input_peer=False)
         logger.info(f"bot started as {self.username(me)}")
+
+        await self.check_redis()
 
         if "admin" in self.config["telegram"]:
             admin = int(self.config["telegram"]["admin"])
@@ -218,8 +231,6 @@ class Manager:
                 await self.send(admin, "bot is started")
             except Exception as e:
                 logger.debug(f"admin notification failed: {e}")
-            
-        await self.client.run_until_disconnected()
 
     async def stop(self):
         self.is_running = False
@@ -230,15 +241,25 @@ class Manager:
 
     def username(self, user: hints.EntityLike):
         """获取用户名"""
-        return user.username if isinstance(user, types.User) else user.title if isinstance(user, types.Chat) else str(user)
+        return (
+            user.username
+            if isinstance(user, types.User)
+            else user.title
+            if isinstance(user, types.Chat)
+            else str(user)
+        )
 
-    async def is_admin(self, chat: Union[types.Chat, types.Channel, int], member: Union[types.User, int]):
+    async def is_admin(
+        self,
+        chat: Union[types.Chat, types.Channel, int],
+        member: Union[types.User, int],
+    ):
         try:
             if isinstance(chat, int):
                 chat_id = chat
             else:
                 chat_id = chat.id
-            
+
             if isinstance(member, int):
                 user_id = member
             else:
@@ -259,9 +280,7 @@ class Manager:
 
     async def get_user_extra_info(self, username: str):
         url = f"https://t.me/{username}"
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
+        headers = {"User-Agent": "Mozilla/5.0"}
         try:
             session = await self.create_session()
             async with session.get(url, headers=headers, timeout=15) as response:
@@ -280,22 +299,22 @@ class Manager:
 
     async def delete_message(
         self,
-        chat: Union[int, types.Chat],
+        chat: Union[int, types.Chat, types.Channel],
         msg: Union[int, types.Message, None],
         deleted_at: Union[datetime, None] = None,
     ):
         if msg is None:
             return True
 
-        # Resolve ID
+        # Resolve ID（Chat=普通群，Channel=超级组/频道）
         id_chat = chat
-        if isinstance(chat, types.Chat):
+        if isinstance(chat, (types.Chat, types.Channel)):
             id_chat = chat.id
-            
+
         id_message = msg
         if isinstance(msg, types.Message):
             id_message = msg.id
-        
+
         if id_message is None:
             return False
 
@@ -304,24 +323,27 @@ class Manager:
             if rdb:
                 try:
                     await rdb.zadd(
-                        "lazy_delete_messages", {f"{id_chat}:{id_message}": deleted_at.timestamp()}
+                        "lazy_delete_messages",
+                        {f"{id_chat}:{id_message}": deleted_at.timestamp()},
                     )
-                    logger.debug(f"chat {id_chat} message {id_message} delete at {deleted_at} (redis)")
+                    logger.debug(
+                        f"chat {id_chat} message {id_message} delete at {deleted_at} (redis)"
+                    )
                     return True
                 except Exception as e:
                     logger.error(f"lazy delete schedule failed (redis): {e}")
-                    return False
-            else:
-                try:
-                    await database.execute(
-                        "insert into lazy_delete_messages(chat, msg, deleted_at) values(?,?,?)",
-                        (id_chat, id_message, self._format_sqlite_datetime(deleted_at)),
-                    )
-                    logger.debug(f"chat {id_chat} message {id_message} delete at {deleted_at} (sqlite)")
-                    return True
-                except Exception as e:
-                    logger.error(f"lazy delete schedule failed (sqlite): {e}")
-                    return False
+            try:
+                await database.execute(
+                    "insert into lazy_delete_messages(chat, msg, deleted_at) values(?,?,?)",
+                    (id_chat, id_message, self._format_sqlite_datetime(deleted_at)),
+                )
+                logger.debug(
+                    f"chat {id_chat} message {id_message} delete at {deleted_at} (sqlite)"
+                )
+                return True
+            except Exception as e:
+                logger.error(f"lazy delete schedule failed (sqlite): {e}")
+                return False
         else:
             try:
                 await self.client.delete_messages(id_chat, id_message)
@@ -339,18 +361,22 @@ class Manager:
             try:
                 val = f"{chat}:{member}:{type}:{msg}"
                 await rdb.zadd("lazy_sessions", {val: deleted_at.timestamp()})
-                logger.debug(f"chat {chat} message {msg} member {member} after {deleted_at} (redis)")
+                logger.debug(
+                    f"chat {chat} message {msg} member {member} after {deleted_at} (redis)"
+                )
+                return
             except Exception as e:
                 logger.error(f"lazy session schedule failed (redis): {e}")
-        else:
-            try:
-                await database.execute(
-                    "insert into lazy_sessions(chat, msg, member, type, checkout_at) values(?,?,?,?,?)",
-                    (chat, msg, member, type, self._format_sqlite_datetime(deleted_at)),
-                )
-                logger.debug(f"chat {chat} message {msg} member {member} after {deleted_at} (sqlite)")
-            except Exception as e:
-                logger.error(f"lazy session schedule failed (sqlite): {e}")
+        try:
+            await database.execute(
+                "insert into lazy_sessions(chat, msg, member, type, checkout_at) values(?,?,?,?,?)",
+                (chat, msg, member, type, self._format_sqlite_datetime(deleted_at)),
+            )
+            logger.debug(
+                f"chat {chat} message {msg} member {member} after {deleted_at} (sqlite)"
+            )
+        except Exception as e:
+            logger.error(f"lazy session schedule failed (sqlite): {e}")
 
     async def lazy_session_delete(self, chat: int, member: int, type: str):
         rdb = await self.get_redis()
@@ -358,14 +384,18 @@ class Manager:
             pattern = f"{chat}:{member}:{type}:*"
             async for member_val, _ in rdb.zscan_iter("lazy_sessions", match=pattern):
                 await rdb.zrem("lazy_sessions", member_val)
-            logger.debug(f"chat {chat} member {member} lazy session {type} is deleted (redis)")
+            logger.debug(
+                f"chat {chat} member {member} lazy session {type} is deleted (redis)"
+            )
         else:
             try:
                 await database.execute(
                     "delete from lazy_sessions where chat=? and member=? and type=?",
                     (chat, member, type),
                 )
-                logger.debug(f"chat {chat} member {member} lazy session {type} is deleted (sqlite)")
+                logger.debug(
+                    f"chat {chat} member {member} lazy session {type} is deleted (sqlite)"
+                )
             except Exception as e:
                 logger.error(f"lazy session delete failed (sqlite): {e}")
 
@@ -404,7 +434,7 @@ class Manager:
 
     async def edit_text(self, chat: int, msg: int, content: str, *args, **kwargs):
         auto_deleted_at = kwargs.pop("auto_deleted_at", None)
-        
+
         try:
             await self.client.edit_message(chat, msg, content, *args, **kwargs)
             logger.info(f"chat {chat} message {msg} edited")
@@ -422,15 +452,47 @@ class Manager:
             admin = self.config["telegram"]["admin"]
             await self.client.send_message(admin, content)
 
-    async def get_redis(self):
-        if "redis" not in self.config:
-            return None
+    def redis_configured(self) -> bool:
+        """是否配置了 Redis（main.ini 中有 [redis] dsn）。"""
+        return _redis_configured(self.config)
 
+    async def get_redis(self):
+        """
+        获取 Redis 连接。未配置或连接失败时返回 None，调用方需做降级（如 SQLite）。
+        """
+        if not self.redis_configured():
+            return None
         if self.rdb is None:
             redis_dsn = self.config["redis"]["dsn"]
             self.rdb = await aioredis.from_url(redis_dsn)
-
         return self.rdb
+
+    async def require_redis(self):
+        """
+        获取 Redis 连接，供强依赖 Redis 的功能使用。
+        未配置或不可用时抛出 RedisUnavailableError，由调用方统一处理（如提示用户或打日志后 return）。
+        """
+        rdb = await self.get_redis()
+        if rdb is None:
+            raise RedisUnavailableError("Redis 未配置或不可用")
+        return rdb
+
+    async def check_redis(self) -> bool:
+        """
+        启动时调用：尝试连接并 ping Redis，日志记录结果。不抛异常。
+        """
+        if not self.redis_configured():
+            logger.debug("Redis 未配置，将使用 SQLite 等降级方案")
+            return False
+        try:
+            rdb = await self.get_redis()
+            if rdb:
+                await rdb.ping()
+                logger.info("Redis 连接正常 (startup check)")
+                return True
+        except Exception as e:
+            logger.warning(f"Redis 启动检查失败: {e}")
+        return False
 
     @staticmethod
     def _format_sqlite_datetime(dt: datetime) -> str:
@@ -446,5 +508,7 @@ class Manager:
         创建或复用 HTTP 会话
         """
         if self.http_session is None or self.http_session.closed:
-            self.http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
+            self.http_session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=30)
+            )
         return self.http_session

@@ -1,5 +1,5 @@
-from .manager import Manager
+from .manager import Manager, RedisUnavailableError
 
-__all__ = ['manager']
+__all__ = ["manager", "RedisUnavailableError"]
 
 manager = Manager()
