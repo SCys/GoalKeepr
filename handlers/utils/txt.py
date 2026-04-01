@@ -1,12 +1,10 @@
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any, Union
-import asyncio
-import time
+from typing import Any, Dict, List, Optional
 
-import telegramify_markdown
-from aiohttp import ClientTimeout, ClientResponse, ClientError, ServerTimeoutError, ClientConnectorError
-from aiohttp.client_exceptions import ClientResponseError, ClientPayloadError, ServerDisconnectedError
+import httpx
+from openai import APIError, APIStatusError, AsyncOpenAI
 from orjson import dumps, loads
+import telegramify_markdown
 
 from manager import manager
 
@@ -87,197 +85,67 @@ SUPPORTED_MODELS = {
 }
 
 
-async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict[str, Any]:
+def _openai_error_to_message(e: APIError) -> str:
+    """将 OpenAI 库异常转换为对用户友好的中文错误信息。"""
+    if isinstance(e, APIStatusError):
+        code = e.status_code
+        if code == 400:
+            return "请求参数错误，请检查输入内容"
+        if code == 401:
+            return "AI服务认证失败，请检查配置"
+        if code == 403:
+            return "无权访问AI服务，请检查权限配置"
+        if code == 429:
+            return "请求过于频繁，请稍后重试"
+        if code in (502, 503, 504):
+            return f"AI服务暂时不可用 ({code})，请稍后重试"
+        return f"服务器错误 ({code})，请稍后重试"
+    # 超时、连接错误等
+    err = str(e).lower()
+    if "timeout" in err or "timed out" in err:
+        return "请求超时，请稍后重试"
+    if "connection" in err or "connect" in err:
+        return "无法连接到AI服务，请检查网络连接或服务地址"
+    return f"请求失败: {str(e)}"
+
+
+async def _chat_completion_request(
+    host: str,
+    proxy_token: str,
+    model: str,
+    messages: List[Dict[str, Any]],
+    **kwargs: Any,
+) -> str:
     """
-    发送API请求到LLM提供商并处理常见错误情况
-    包含重试机制和详细的错误处理
+    使用 OpenAI 兼容客户端请求 chat/completions，自动重试与统一异常处理。
     """
-    session = await manager.create_session()
-    
-    # 根据模型类型设置不同的超时时间
-    model_name = data.get("model", DEFAULT_MODEL)
-    
-    # 默认超时设置
-    timeout_config = ClientTimeout(
-        total=180,  # 3分钟总超时
-        connect=15,
-        sock_read=170,  # 2分50秒读取超时
-        sock_connect=20,
-    )
-    
-    # 重试配置
-    max_retries = 3
-    retry_delay = 1  # 初始重试延迟（秒）
-    
-    # 可重试的HTTP状态码
-    retryable_status_codes = {502, 503, 504, 429}
-    
-    try:
-        for attempt in range(max_retries):
-            try:
-                start_time = time.time()
-                
-                async with session.post(
-                    url,
-                    json=data,
-                    headers={"Authorization": f"Bearer {proxy_token}"},
-                    timeout=timeout_config,
-                ) as response:
-                    
-                    request_time = time.time() - start_time
-                    
-                    # 记录请求信息
-                    logger.info(f"API请求 - 模型: {model_name}, 状态码: {response.status}, "
-                               f"用时: {request_time:.2f}s, 尝试: {attempt + 1}/{max_retries}")
-                    
-                    # 处理不同的HTTP状态码
-                    if response.status == 200:
-                        try:
-                            response_data = await response.json()
-                            
-                            # 检查响应中的错误
-                            if "error" in response_data:
-                                error_info = response_data["error"]
-                                error_code = error_info.get("code", "unknown")
-                                error_message = error_info.get("message", "Unknown error")
-                                
-                                logger.error(f"API响应错误 - 模型: {model_name}, 错误代码: {error_code}, "
-                                           f"错误信息: {error_message}")
-                                
-                                # 根据错误代码决定是否重试
-                                if error_code in ["rate_limit_exceeded", "server_error"] and attempt < max_retries - 1:
-                                    await asyncio.sleep(retry_delay * (2 ** attempt))
-                                    continue
-                                    
-                                raise ValueError(f"AI服务返回错误: {error_message}")
-                            
-                            return response_data
-                            
-                        except Exception as json_error:
-                            logger.error(f"解析响应JSON失败 - 模型: {model_name}, 错误: {str(json_error)}")
-                            if attempt < max_retries - 1:
-                                await asyncio.sleep(retry_delay * (2 ** attempt))
-                                continue
-                            raise ValueError("响应格式错误，请稍后重试")
-                    
-                    # 处理特定的HTTP错误状态码
-                    elif response.status == 400:
-                        error_text = await response.text()
-                        logger.error(f"请求参数错误 - 模型: {model_name}, 状态码: 400, 详情: {error_text}")
-                        raise ValueError("请求参数错误，请检查输入内容")
-                    
-                    elif response.status == 401:
-                        logger.error(f"认证失败 - 模型: {model_name}, 状态码: 401")
-                        raise ValueError("AI服务认证失败，请检查配置")
-                    
-                    elif response.status == 403:
-                        logger.error(f"权限不足 - 模型: {model_name}, 状态码: 403")
-                        raise ValueError("无权访问AI服务，请检查权限配置")
-                    
-                    elif response.status == 429:
-                        error_text = await response.text()
-                        logger.warning(f"请求频率限制 - 模型: {model_name}, 状态码: 429, 尝试: {attempt + 1}")
-                        
-                        if attempt < max_retries - 1:
-                            # 对于429错误，使用更长的重试延迟
-                            retry_wait = retry_delay * (3 ** attempt)
-                            logger.info(f"等待 {retry_wait}s 后重试...")
-                            await asyncio.sleep(retry_wait)
-                            continue
-                        
-                        raise ValueError("请求过于频繁，请稍后重试")
-                    
-                    elif response.status in retryable_status_codes:
-                        error_text = await response.text()
-                        logger.warning(f"服务器临时错误 - 模型: {model_name}, 状态码: {response.status}, "
-                                     f"尝试: {attempt + 1}, 详情: {error_text}")
-                        
-                        if attempt < max_retries - 1:
-                            await asyncio.sleep(retry_delay * (2 ** attempt))
-                            continue
-                        
-                        raise ValueError(f"AI服务暂时不可用 ({response.status})，请稍后重试")
-                    
-                    else:
-                        # 其他HTTP错误
-                        error_text = await response.text()
-                        logger.error(f"HTTP错误 - 模型: {model_name}, 状态码: {response.status}, "
-                                   f"详情: {error_text}")
-                        raise ValueError(f"服务器错误 ({response.status})，请稍后重试")
-            
-            # 处理网络异常
-            except ClientConnectorError as e:
-                logger.error(f"连接错误 - 模型: {model_name}, 尝试: {attempt + 1}, 错误: {str(e)}")
-                
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (2 ** attempt))
-                    continue
-                
-                raise ValueError("无法连接到AI服务，请检查网络连接或服务地址")
-            
-            except ServerTimeoutError as e:
-                logger.error(f"服务器超时 - 模型: {model_name}, 尝试: {attempt + 1}, 错误: {str(e)}")
-                
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (2 ** attempt))
-                    continue
-                
-                raise ValueError("服务器响应超时，请稍后重试")
-            
-            except asyncio.TimeoutError as e:
-                logger.error(f"请求超时 - 模型: {model_name}, 尝试: {attempt + 1}, 错误: {str(e)}")
-                
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (2 ** attempt))
-                    continue
-                
-                raise ValueError("请求超时，请稍后重试")
-            
-            except ClientPayloadError as e:
-                logger.error(f"请求负载错误 - 模型: {model_name}, 尝试: {attempt + 1}, 错误: {str(e)}")
-                
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (2 ** attempt))
-                    continue
-                
-                raise ValueError("请求数据格式错误，请重试")
-            
-            except ServerDisconnectedError as e:
-                logger.error(f"服务器断开连接 - 模型: {model_name}, 尝试: {attempt + 1}, 错误: {str(e)}")
-                
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (2 ** attempt))
-                    continue
-                
-                raise ValueError("服务器连接中断，请稍后重试")
-            
-            except ClientError as e:
-                logger.error(f"客户端错误 - 模型: {model_name}, 尝试: {attempt + 1}, 错误: {str(e)}")
-                
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (2 ** attempt))
-                    continue
-                
-                raise ValueError("网络请求失败，请稍后重试")
-            
-            except ValueError:
-                # ValueError是我们自定义的错误，不需要重试
-                raise
-            
-            except Exception as e:
-                logger.exception(f"未预期的错误 - 模型: {model_name}, 尝试: {attempt + 1}, 错误: {str(e)}")
-                
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(retry_delay * (2 ** attempt))
-                    continue
-                
-                raise ValueError(f"请求失败: {str(e)}")
-    finally:
-        if not session.closed:
-            await session.close()
-    
-    # 如果所有重试都失败了，抛出最终错误
-    raise ValueError("所有重试都失败了，请稍后重试")
+    base_url = f"{host.rstrip('/')}/v1"
+    timeout = httpx.Timeout(180.0, connect=15.0, read=170.0)
+
+    async with AsyncOpenAI(
+        base_url=base_url,
+        api_key=proxy_token,
+        timeout=timeout,
+        max_retries=3,
+    ) as client:
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=messages,
+                **kwargs,
+            )
+            content = response.choices[0].message.content
+            if content is None:
+                raise ValueError("AI服务返回空内容，请稍后重试")
+            return content
+        except APIError as e:
+            logger.warning(f"API请求异常 - 模型: {model}, 错误: {e}")
+            raise ValueError(_openai_error_to_message(e)) from e
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.exception(f"未预期的错误 - 模型: {model}, 错误: {e}")
+            raise ValueError(f"请求失败: {str(e)}") from e
 
 
 async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optional[str]:
@@ -353,20 +221,17 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
     if prompt_system:
         chat_history.insert(0, {"role": "system", "content": prompt_system})
 
-    # API request preparation
-    url = f"{host}/v1/chat/completions"
-    data = {
-        "model": model_name,
-        "max_tokens": 4096,  # 设置一个合理的固定输出token限制
-        "messages": chat_history,
-    }
-
     # Log model usage information
     logger.info(f"chat {chat_id} user {member_id} generate txt use model {model_name}({SUPPORTED_MODELS[model_name].name})")
 
     try:
-        response_data = await _api_request(url, data, proxy_token)
-        text = response_data["choices"][0]["message"]["content"]
+        text = await _chat_completion_request(
+            host,
+            proxy_token,
+            model_name,
+            chat_history,
+            max_tokens=4096,
+        )
 
         if rdb:
             # 保存到Redis，确保保存对话历史
@@ -391,14 +256,5 @@ async def chat_completions(messages: List[Dict[str, Any]], model_name: Optional[
 
     proxy_token = config["ai"]["proxy_token"]
 
-    # API request preparation
-    url = f"{host}/v1/chat/completions"
-    data = {
-        "model": model_name,
-        "messages": messages,  # [{"role": "user", "content": prompt}],
-        **kwargs,
-    }
-
-    response_data = await _api_request(url, data, proxy_token)
     logger.info(f"generate txt use model {model_name}")
-    return response_data["choices"][0]["message"]["content"]
+    return await _chat_completion_request(host, proxy_token, model_name, messages, **kwargs)
