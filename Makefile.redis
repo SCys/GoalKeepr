@@ -1,0 +1,61 @@
+.PHONY: redis-up redis-down redis-status redis-logs redis-backup redis-restore
+
+# 启动 Redis
+redis-up:
+	docker compose -f docker-compose.redis.yml up -d
+
+# 停止 Redis
+redis-down:
+	docker compose -f docker-compose.redis.yml down
+
+# 重启 Redis
+redis-restart:
+	docker compose -f docker-compose.redis.yml restart
+
+# 查看 Redis 状态
+redis-status:
+	docker compose -f docker-compose.redis.yml ps
+
+# 查看 Redis 日志
+redis-logs:
+	docker compose -f docker-compose.redis.yml logs -f redis
+
+# 备份 Redis 数据
+redis-backup:
+	@mkdir -p ./backup/redis/$(shell date +%Y%m%d_%H%M%S)
+	docker cp goal_keepr_redis:/data/dump.rdb ./backup/redis/$(shell date +%Y%m%d_%H%M%S)/
+	docker cp goal_keepr_redis:/data/appendonly.aof ./backup/redis/$(shell date +%Y%m%d_%H%M%S)/
+	tar -czf ./backup/redis_$(shell date +%Y%m%d_%H%M%S).tar.gz ./backup/redis/$(shell date +%Y%m%d_%H%M%S)
+	rm -rf ./backup/redis/$(shell date +%Y%m%d_%H%M%S)
+	@echo "Backup saved to: ./backup/redis_$(shell date +%Y%m%d_%H%M%S).tar.gz"
+
+# 恢复 Redis 数据（需要先停止 Redis）
+redis-restore:
+	@if [ -z "$(FILE)" ]; then echo "Usage: make redis-restore FILE=./backup/redis_20240101.tar.gz"; exit 1; fi
+	docker compose -f docker-compose.redis.yml down
+	tar -xzf $(FILE) -C ./backup/
+	BACKUP_DIR=$$(tar -tzf $(FILE) | head -1 | cut -f1 -d"/")
+	docker cp ./backup/$$BACKUP_DIR/dump.rdb goal_keepr_redis:/data/
+	docker cp ./backup/$$BACKUP_DIR/appendonly.aof goal_keepr_redis:/data/
+	rm -rf ./backup/$$BACKUP_DIR
+	docker compose -f docker-compose.redis.yml up -d
+	@echo "Restore completed. Verify with: redis-cli dbsize"
+
+# 进入 Redis 容器
+redis-shell:
+	docker exec -it goal_keepr_redis redis-cli
+
+# 查看 Redis 内存使用
+redis-memory:
+	redis-cli info memory | grep used_memory_human
+
+# 查看持久化状态
+redis-persistence:
+	redis-cli info persistence
+
+# 清空所有数据（危险！）
+redis-flushall:
+	@echo "Warning: This will delete ALL data! Press Ctrl+C to cancel or Enter to continue."
+	@read
+	redis-cli flushall
+	@echo "All data flushed."

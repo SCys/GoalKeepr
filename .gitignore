@@ -142,6 +142,10 @@ cython_debug/
 
 /main.ini
 
+# Redis 持久化数据（如果使用 bind mount）
+/data/dump.rdb
+/data/appendonly.aof
+
 # ai commands
 .gemini/
 gha-creds-*.json
