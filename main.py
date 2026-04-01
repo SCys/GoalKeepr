@@ -4,7 +4,9 @@ import database
 from manager import manager
 from handlers import *  # Import handlers to register them
 from handlers.commands.image import worker as txt2img_worker
+from handlers.member_captcha import member_captcha, new_member_callback
 from handlers.member_captcha.events import new_member_check, unban_member
+from handlers.member_captcha.join_queue import process_join_events
 
 logger = manager.logger
 
@@ -29,10 +31,19 @@ create table if not exists lazy_sessions(
 )
 """
 
-SQL_FETCH_LAZY_DELETE_MESSAGES = (
-    "select id,chat,msg from lazy_delete_messages where deleted_at < datetime('now','localtime') order by deleted_at limit 500"
+SQL_CREATE_CAPTCHA_ANSWERS = """
+create table if not exists captcha_answers(
+    chat int,
+    member int,
+    answer text,
+    expires_at timestamp with time zone,
+    primary key(chat, member)
 )
+"""
+
+SQL_FETCH_LAZY_DELETE_MESSAGES = "select id,chat,msg from lazy_delete_messages where deleted_at < datetime('now','localtime') order by deleted_at limit 500"
 SQL_FETCH_SESSIONS = "select id,chat,msg,member,type from lazy_sessions where checkout_at < datetime('now','localtime') order by checkout_at limit 500"
+
 
 async def lazy_messages() -> int:
     """
@@ -61,11 +72,13 @@ async def lazy_messages() -> int:
 
         # Process SQLite tasks
         rows = await database.execute_fetch(SQL_FETCH_LAZY_DELETE_MESSAGES)
-        
+
         for row in rows:
             # row: id, chat, msg
             if await manager.delete_message(row[1], row[2]):
-                await database.execute("delete from lazy_delete_messages where id=?", (row[0],))
+                await database.execute(
+                    "delete from lazy_delete_messages where id=?", (row[0],)
+                )
                 processed += 1
     except Exception as e:
         logger.error(f"lazy_messages error: {e}")
@@ -98,21 +111,25 @@ async def lazy_sessions() -> int:
                         member = int(parts[1])
                         session_type = parts[2]
                         msg = int(parts[3])
-                        
+
                         func = manager.events.get(session_type)
                         if not func or not callable(func):
-                            logger.error(f"lazy_session handler missing: {session_type}")
+                            logger.error(
+                                f"lazy_session handler missing: {session_type}"
+                            )
                             remove_task = True
                         else:
                             try:
-                                await func(manager.client, chat, msg, member)
+                                await func(chat, msg, member)
                                 remove_task = True
                             except Exception as e:
-                                logger.error(f"lazy_session func {session_type} error: {e}")
+                                logger.error(
+                                    f"lazy_session func {session_type} error: {str(e)}"
+                                )
                 except Exception as e:
                     logger.error(f"lazy_sessions redis task {task} error: {e}")
                     remove_task = True
-                
+
                 if remove_task:
                     await rdb.zrem("lazy_sessions", task)
                     logger.info(f"lazy session is touched: {task} (redis)")
@@ -120,7 +137,7 @@ async def lazy_sessions() -> int:
 
         # Process SQLite tasks
         rows = await database.execute_fetch(SQL_FETCH_SESSIONS)
-        
+
         if not rows:
             return processed
 
@@ -133,20 +150,14 @@ async def lazy_sessions() -> int:
 
             func = manager.events.get(session_type)
             if func and callable(func):
-                # func signature: await func(bot, chat, msg, member) -> changed to func(chat, msg, member) or use manager.client
-                # The original signature was func(bot, ...). 
-                # We need to update the event handlers signature too.
-                # Passing manager.client as first arg to maintain compatibility if possible,
-                # or better, update handlers to not expect bot.
-                # For now, pass client.
                 try:
-                    await func(manager.client, chat, msg, member)
+                    await func(chat, msg, member)
                 except Exception as e:
                     logger.error(f"lazy_session func {session_type} error: {e}")
                     continue
             else:
                 logger.error(f"lazy_session handler missing: {session_type}")
-            
+
             await database.execute("delete from lazy_sessions where id=?", (id,))
             logger.info(f"lazy session is touched:{id} {session_type}")
             processed += 1
@@ -154,12 +165,21 @@ async def lazy_sessions() -> int:
         logger.error(f"lazy_sessions error: {e}")
     return processed
 
+
 async def worker_loop():
     logger.info("Worker loop started")
     while manager.is_running:
-        processed = await lazy_messages()
-        processed += await lazy_sessions()
-        await asyncio.sleep(0.25 if processed else 1.0)
+        try:
+            processed = await lazy_messages()
+            processed += await lazy_sessions()
+            rdb = await manager.get_redis()
+            if rdb:
+                processed += await process_join_events(rdb, block_seconds=2.0)
+            await asyncio.sleep(0.25 if processed else 1.0)
+        except Exception as e:
+            logger.error(f"worker_loop error: {e}", exc_info=True)
+            await asyncio.sleep(5.0)  # 避免死循环
+
 
 async def main():
     manager.setup()
@@ -167,14 +187,16 @@ async def main():
     # Initialize database tables
     await database.execute(SQL_CREATE_MESSAGES)
     await database.execute(SQL_CREATE_NEW_MEMBER_SESSION)
+    await database.execute(SQL_CREATE_CAPTCHA_ANSWERS)
 
-    # Start tasks
+    await manager.start()
+
+    # 在主连接建立完成后再启动后台任务，避免 worker 读取到 is_running=False 后直接退出
     asyncio.create_task(txt2img_worker())
     asyncio.create_task(worker_loop())
-    
+
     logger.info("主进程开始运行")
     try:
-        await manager.start()
         await manager.client.run_until_disconnected()
     except KeyboardInterrupt:
         logger.info("主进程收到退出信号，正在断开连接…")
@@ -184,6 +206,7 @@ async def main():
         logger.error(f"主进程断开连接时发生错误: {e}")
 
     await manager.stop()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

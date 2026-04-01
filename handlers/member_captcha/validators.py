@@ -10,10 +10,16 @@ from typing import Optional, Any
 from loguru import logger
 from telethon import events, types
 
-from manager import manager
+from manager import manager, RedisUnavailableError
 from manager.group import settings_get
 
-from .config import SUPPORT_GROUP_TYPES, EVENT_EXPIRY_SECONDS, VerificationMode, MEMBER_CHECK_WAIT_TIME, get_chat_type
+from .config import (
+    SUPPORT_GROUP_TYPES,
+    EVENT_EXPIRY_SECONDS,
+    VerificationMode,
+    MEMBER_CHECK_WAIT_TIME,
+    get_chat_type,
+)
 from .exceptions import LogContext, ValidationError
 from .security import restrict_member_permissions
 from .session import Session
@@ -34,9 +40,22 @@ async def validate_basic_conditions(
     if not user:
         return "用户对象不存在"
 
-    event_time = event.action_message.date if event.action_message else event.date
-    if event_time and datetime.now(timezone.utc) > event_time + timedelta(seconds=EVENT_EXPIRY_SECONDS):
-        return f"事件过期，事件时间: {event_time}"
+    event_time = (
+        event.action_message.date
+        if event.action_message
+        else getattr(event, "date", None)
+    )
+    if event_time:
+        # 确保 event_time 有时区信息
+        if event_time.tzinfo is None:
+            event_time = event_time.replace(tzinfo=timezone.utc)
+        else:
+            event_time = event_time.astimezone(timezone.utc)
+
+        if datetime.now(timezone.utc) > event_time + timedelta(
+            seconds=EVENT_EXPIRY_SECONDS
+        ):
+            return f"事件过期，事件时间: {event_time}"
 
     return None
 
@@ -51,19 +70,28 @@ async def get_verification_method(chat_id: int) -> str:
     Returns:
         str: 验证方法
     """
-    rdb = await manager.get_redis()
-    if not rdb:
-        logger.warning("Redis connection failed")
+    try:
+        rdb = await manager.require_redis()
+    except RedisUnavailableError:
+        logger.debug("Redis 不可用，使用默认验证方式 ban")
         return VerificationMode.BAN
 
-    result = await settings_get(rdb, chat_id, "new_member_check_method", VerificationMode.BAN)
-    # Convert to string if result is a dictionary or ensure it's a string
-    if isinstance(result, dict):
-        return str(result.get("value", VerificationMode.BAN))
-    return str(result)
+    try:
+        result = await settings_get(
+            rdb, chat_id, "new_member_check_method", VerificationMode.BAN
+        )
+        # Convert to string if result is a dictionary or ensure it's a string
+        if isinstance(result, dict):
+            return str(result.get("value", VerificationMode.BAN))
+        return str(result)
+    except Exception as e:
+        logger.warning(f"获取验证方法失败，使用默认值: {e}")
+        return VerificationMode.BAN
 
 
-async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, check_method: str, log_prefix: str) -> bool:
+async def handle_silence_mode(
+    chat: Any, member_id: int, member_fullname: str, check_method: str, log_prefix: str
+) -> bool:
     """
     处理静默模式
 
