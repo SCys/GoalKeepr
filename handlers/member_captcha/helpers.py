@@ -192,8 +192,9 @@ async def build_captcha_message(
     else:
         raise ValueError(f"Unknown member type {type(member)}")
 
-    ts_str = str(msg_timestamp)
-    # 正确逻辑：先抽样5个选项，再从中选一个正确答案
+        # 使用 Unix 时间戳（整数值）以减少数据大小
+    ts_str = str(int(msg_timestamp.timestamp()))
+        # 正确逻辑：先抽样5个选项，再从中选一个正确答案
     items = list(ICONS.items())  # [(key, icon), ...]
     selected_items = random.sample(items, k=5)
     correct_key, correct_icon = random.choice(selected_items)
@@ -205,14 +206,14 @@ async def build_captcha_message(
     row_user = []
     for key, icon in selected_items:
         # data 包含 member_id, timestamp 和 icon 的 key（用于验证）
-        data = f"{member_id}__{ts_str}__{key}".encode("utf-8")
+        data = f"{member_id}_{ts_str}_{key}".encode("utf-8")
         row_user.append(Button.inline(icon, data))
 
     random.shuffle(row_user)  # 打乱用户按钮顺序
 
     row_admin = [
-        Button.inline("✔", f"{member_id}__{ts_str}__admin_O".encode("utf-8")),
-        Button.inline("❌", f"{member_id}__{ts_str}__admin_X".encode("utf-8")),
+        Button.inline("✔", f"{member_id}_{ts_str}_admin_O".encode("utf-8")),
+        Button.inline("❌", f"{member_id}_{ts_str}_admin_X".encode("utf-8")),
     ]
 
     content = WELCOME_TEXT % {

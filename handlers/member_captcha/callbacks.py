@@ -99,7 +99,7 @@ async def handle_admin_operation(
 ) -> bool:
     """处理管理员操作。"""
     try:
-        items = data.split("__")
+        items = data.split("_")
         if len(items) != 4:
             logger.warning(f"{log_prefix} | 数据格式错误")
             return False
@@ -152,8 +152,8 @@ async def handle_self_verification(
 ) -> bool:
     """处理用户自验证（从 Redis 读取正确答案进行验证）。"""
     try:
-        # 解析 data: "member_id__timestamp__icon_key"
-        parts = data.split("__")
+        # 解析 data: "member_id_timestamp_icon_key"
+        parts = data.split("_")
         if len(parts) != 3:
             logger.warning(f"{log_prefix} | 验证回调数据格式错误: {data}")
             return False
@@ -212,8 +212,8 @@ async def handle_security_mode_admin_operation(
 
         if not data.startswith(SECURITY_MODE_CALLBACK_PREFIX):
             return False
-        parts = data[len(SECURITY_MODE_CALLBACK_PREFIX) :].split("__")
-        # 格式应为: sm__{member_id}__{ts}__O/X → 去掉前缀后分割为3部分
+        parts = data[len(SECURITY_MODE_CALLBACK_PREFIX) :].split("_")
+        # 格式应为: sm_{member_id}_{ts}_O/X → 去掉前缀后分割为3部分
         if len(parts) != 3:
             logger.warning(
                 f"{log_prefix} | 安全模式回调数据格式错误: {data} | parts: {parts}"
@@ -310,7 +310,7 @@ async def process_callback_query(event: events.CallbackQuery.Event) -> None:
         return
 
     is_admin = await manager.is_admin(chat, operator)
-    is_self = data.startswith(f"{operator.id}__")
+    is_self = data.startswith(f"{operator.id}_")
 
     if not (is_admin or is_self):
         logger.warning(f"{log_prefix} | 权限不足 | 非管理员且非本人操作")

@@ -15,6 +15,10 @@ from manager import manager
 # Redis 入群队列 List key（LPUSH / BRPOP）
 MEMBER_JOIN_QUEUE = "member_join_queue"
 
+# 入群事件处理中标记（用于去重）
+PROCESSING_JOIN_PREFIX = "processing_join:"
+PROCESSING_JOIN_TTL = 30  # 30秒内不重复处理同一入群事件
+
 # 重复加入：按用户维度的近期入群记录 Sorted Set，key = recent_joins:chat:{chat_id}:user:{user_id}，score=ts
 RECENT_JOINS_USER_PREFIX = "recent_joins:chat:"
 RECENT_JOINS_USER_SUFFIX = ":user:"
@@ -46,8 +50,19 @@ async def publish_join_event(
 ) -> bool:
     """
     限制成功后将入群事件写入 Redis 队列，供消费者统计与重复加入处理。
+    使用 processing key 去重，30秒内不重复处理同一入群事件。
     """
     try:
+        # 去重：检查是否正在处理该用户的入群事件
+        processing_key = f"{PROCESSING_JOIN_PREFIX}{chat_id}:{user_id}"
+        if await rdb.set(processing_key, "1", nx=True, ex=PROCESSING_JOIN_TTL):
+            # 首次处理，设置标记成功
+            pass
+        else:
+            # 已在处理中，跳过
+            logger.debug(f"入群事件去重 chat_id={chat_id} user_id={user_id}")
+            return False
+
         ts = ts or _now_ts()
         payload = {
             "chat_id": chat_id,

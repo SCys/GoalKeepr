@@ -104,7 +104,8 @@ async def member_captcha(event: events.ChatAction.Event):
             if getattr(now, "timestamp", None)
             else datetime.now(timezone.utc).timestamp()
         )
-        await publish_join_event(
+        # publish_join_event 返回 False 表示去重跳过了
+        if not await publish_join_event(
             rdb,
             chat.id,
             user.id,
@@ -112,7 +113,10 @@ async def member_captcha(event: events.ChatAction.Event):
             checker_type,
             getattr(user, "username", None),
             _full_name(user),
-        )
+        ):
+            # 去重跳过，不启动后台任务
+            logger.debug(f"{log_context.log_prefix} | 入群事件去重，跳过后续处理")
+            return
 
     # 启动后台验证任务（异步执行耗时操作）
     asyncio.create_task(
