@@ -23,56 +23,54 @@ WELCOME_TEXT = (
     "You would be allowed to send the message after choosing the right option for [*%(icon)s*] through pressing the correct button"
 )
 
-ICONS = {
-    "爱心|Love": "❤️️",
-    "感叹号|Exclamation mark": "❗",
-    "问号|Question mark": "❓",
-    "壹|One": "1⃣",
-    "贰|Two": "2⃣",
-    "叁|Three": "3⃣",
-    "肆|Four": "4⃣",
-    "伍|Five": "5⃣",
-    "陆|Six": "6⃣",
-    "柒|Seven": "7⃣",
-    "捌|Eight": "8⃣",
-    "玖|Nine": "9⃣",
-    "乘号|Multiplication number": "✖",
-    "加号|Plus": "➕",
-    "减号|Minus": "➖",
-    "除号|Divisor": "➗",
-    "禁止|Prohibition": "🚫",
-    "美元|US Dollar": "💲",
-    "A": "🅰",
-    "B": "🅱",
-    "O": "🅾",
-    "彩虹旗|Rainbow flag": "🏳‍🌈",
-    "眼睛|Eye": "👁",
-    "脚印|Footprints": "👣",
-    "汽车|Car": "🚗",
-    "飞机|Aircraft": "✈️",
-    "火箭|Rocket": "🚀",
-    "帆船|Sailboat": "⛵️",
-    "警察|Police": "👮",
-    "信|Letter": "✉",
-    "1/2": "½",
-    "雪花|Snowflake": "❄",
-    "眼镜|Eyeglasses": "👓",
-    "手枪|Pistol": "🔫",
-    "炸弹|Bomb": "💣",
-    "骷髅|Skull": "💀",
-    "骰子|Dice": "🎲",
+# Emoji 验证码选项池（40个，足够区分）
+CAPTCHA_ICONS = {
+    # 第一组：常用符号
+    "星星|Star": "⭐",
+    "爱心|Heart": "❤️",
+    "对勾|Check": "✅",
+    "叉号|Cross": "❌",
+    "圆圈|Circle": "⭕",
+    "方块|Square": "⬜",
+    "三角形|Triangle": "🔺",
+    "心碎|Broken": "💔",
+    # 第二组：自然
+    "火焰|Fire": "🔥",
+    "闪电|Lightning": "⚡",
+    "水滴|Water": "💧",
+    "太阳|Sun": "☀",
+    "月亮|Moon": "🌙",
+    "云朵|Cloud": "☁",
+    "雨滴|Rain": "🌧",
+    "雪花|Snow": "❄",
+    # 第三组：植物
+    "花朵|Flower": "🌸",
+    "树叶|Leaf": "🌿",
+    "树木|Tree": "🌲",
+    "蘑菇|Mushroom": "🍄",
+    "四叶草|Clover": "🍀",
+    # 第四组：动物
+    "小猫|Cat": "🐱",
+    "小狗|Dog": "🐶",
+    "小熊|Bear": "🐻",
+    "熊猫|Panda": "🐼",
+    "狐狸|Fox": "🦊",
+    "独角兽|Unicorn": "🦄",
+    "老鹰|Eagle": "🦅",
+    "蝴蝶|Butterfly": "🦋",
+    # 第五组：物品
+    "钻石|Diamond": "💎",
+    "钱袋|Money": "💰",
+    "礼物|Gift": "🎁",
+    "书本|Book": "📖",
+    "电话|Phone": "📱",
+    "相机|Camera": "📷",
+    "电脑|Computer": "💻",
+    "耳机|Headphone": "🎧",
     "音乐|Music": "🎵",
     "电影|Movie": "🎬",
-    "电话|Telephone": "☎️",
-    "电视|Television": "📺",
-    "相机|Camera": "📷",
-    "计算机|Computer": "💻",
-    "手机|Mobile phone": "📱",
-    "钱包|Wallet": "👛",
-    "钱|Money": "💰",
-    "书|Book": "📖",
-    "信封|Envelope": "✉️",
-    "礼物|Gift": "🎁",
+    "足球|Football": "⚽",
+    "篮球|Basketball": "🏀",
 }
 
 
@@ -195,7 +193,7 @@ async def build_captcha_message(
         # 使用 Unix 时间戳（整数值）以减少数据大小
     ts_str = str(int(msg_timestamp.timestamp()))
         # 正确逻辑：先抽样5个选项，再从中选一个正确答案
-    items = list(ICONS.items())  # [(key, icon), ...]
+    items = list(CAPTCHA_ICONS.items())  # [(key, icon), ...]
     selected_items = random.sample(items, k=5)
     correct_key, correct_icon = random.choice(selected_items)
 
@@ -216,11 +214,15 @@ async def build_captcha_message(
         Button.inline("❌", f"{member_id}_{ts_str}_admin_X".encode("utf-8")),
     ]
 
-    content = WELCOME_TEXT % {
-        "title": member_name,
-        "user_id": member_id,
-        "icon": correct_icon,
-    }
+    # 提取描述文字（用于显示）
+    correct_desc = correct_key.split("|")[0]  # "星星|Star" -> "星星"
+    
+    # 简化消息内容
+    content = (
+        f"👋 欢迎 {member_name}！\n\n"
+        f"请在 12 秒内点击 **{correct_desc}{correct_icon}** 验证通过。\n"
+        f"超时将被移出群组。"
+    )
     buttons = [row_user, row_admin]
     return content, buttons
 

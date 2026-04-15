@@ -269,13 +269,13 @@ async def _process_member_verification_background(
             reply.id,
             user.id,
             "new_member_check",
-            now + timedelta(seconds=DELETED_AFTER),
+            now + timedelta(seconds=12),
         )
         await manager.delete_message(
             chat, reply, now + timedelta(seconds=DELETED_AFTER)
         )
         logger.debug(
-            f"{log_context.log_prefix} | 设置验证消息自动删除 | 时长:{DELETED_AFTER}秒"
+            f"{log_context.log_prefix} | 设置验证超时 | 时长:{12}秒"
         )
 
     except Exception as e:

@@ -1,4 +1,4 @@
-FROM python:3.14-alpine
+FROM python:3.12-alpine
 
 # Install system dependencies
 RUN apk add --no-cache ffmpeg nodejs

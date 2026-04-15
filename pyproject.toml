@@ -3,7 +3,7 @@ name = "goal-keepr"
 version = "0.2.0"
 description = "A telegram bot manage your group."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "aiosqlite>=0.22.1",
     "aiohttp>=3.13.2",
