@@ -154,7 +154,9 @@ class Manager:
 
         def wrapper(func):
             event_cls = None
-            if type_name == "message":
+            if type_name == "raw":
+                event_cls = events.Raw
+            elif type_name == "message":
                 event_cls = events.NewMessage
             elif type_name == "callback_query":
                 event_cls = events.CallbackQuery
@@ -162,6 +164,7 @@ class Manager:
                 event_cls = events.ChatAction
                 # 只处理新成员加入（自己加入或被邀请）
                 kwargs.setdefault("func", lambda e: e.user_joined or e.user_added)
+
 
             if event_cls:
                 self.handlers.append((func, event_cls, args, kwargs))
@@ -287,16 +290,19 @@ class Manager:
         if msg is None:
             return True
 
-        # Resolve ID
-        id_chat = chat
-        if isinstance(chat, types.Chat):
-            id_chat = chat.id
-            
-        id_message = msg
-        if isinstance(msg, types.Message):
-            id_message = msg.id
-        
+        # 解析真实 id：Channel/Chat/User 等 TL 对象统一取 .id
+        id_chat = getattr(chat, "id", chat)
+        id_message = getattr(msg, "id", msg)
+
         if id_message is None:
+            return False
+
+        # 防御：确保是 int，避免把 TL 对象 repr 写进存储
+        try:
+            id_chat = int(id_chat)
+            id_message = int(id_message)
+        except (TypeError, ValueError):
+            logger.error(f"delete_message 收到非法 id: chat={chat!r} msg={msg!r}")
             return False
 
         if deleted_at is not None:

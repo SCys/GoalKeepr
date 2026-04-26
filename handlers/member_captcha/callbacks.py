@@ -25,7 +25,7 @@ async def validate_callback_conditions(event: events.CallbackQuery.Event) -> Opt
     """
     验证回调查询的基本条件。event 为 Telethon CallbackQuery.Event。
     """
-    msg = event.message
+    msg = await event.get_message()
     if not msg:
         return "消息不存在"
 
@@ -139,7 +139,7 @@ async def process_callback_query(event: events.CallbackQuery.Event) -> None:
         logger.debug(f"回调验证失败: {validation_error}")
         return
 
-    msg = event.message
+    msg = await event.get_message()
     operator = await event.get_sender()
     data = getattr(event, "_decoded_data", None) or (event.data.decode("utf-8") if isinstance(event.data, bytes) else event.data)
 

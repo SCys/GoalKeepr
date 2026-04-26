@@ -33,6 +33,8 @@ async def member_captcha(event: events.ChatAction.Event):
         logger.warning(f"chat_member 事件无用户信息 chat_id={event.chat_id}")
         return
 
+    await event.delete()
+
     # 基本条件验证（内部会按 get_chat_type(chat) 判断群组类型）
     validation_error = await validate_basic_conditions(event, chat, user)
     if validation_error:

@@ -56,7 +56,7 @@ async def lazy_messages() -> int:
                     else:
                         logger.warning(f"lazy_messages delete failed: {task}")
                 except Exception as e:
-                    logger.error(f"lazy_messages redis task {task} error: {e}")
+                    logger.exception(f"lazy_messages redis task {task} error: {e}")
                     await rdb.zrem("lazy_delete_messages", task)
 
         # Process SQLite tasks

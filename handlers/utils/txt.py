@@ -259,6 +259,15 @@ async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict
                     continue
                 
                 raise ValueError("网络请求失败，请稍后重试")
+        
+            except RuntimeError as e:
+                logger.error(f"运行时错误 - 模型: {model_name}, 尝试: {attempt + 1}, 错误: {str(e)}")
+                
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay * (2 ** attempt))
+                    continue
+                
+                raise ValueError("AI服务发生错误，请稍后重试")
             
             except ValueError:
                 # ValueError是我们自定义的错误，不需要重试
@@ -400,5 +409,5 @@ async def chat_completions(messages: List[Dict[str, Any]], model_name: Optional[
     }
 
     response_data = await _api_request(url, data, proxy_token)
-    logger.info(f"generate txt use model {model_name}")
+    logger.debug(f"generate txt use model {model_name}")
     return response_data["choices"][0]["message"]["content"]
