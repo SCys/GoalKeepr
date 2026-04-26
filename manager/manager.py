@@ -162,9 +162,6 @@ class Manager:
                 event_cls = events.CallbackQuery
             elif type_name == "chat_member":
                 event_cls = events.ChatAction
-                # 只处理新成员加入（自己加入或被邀请）
-                kwargs.setdefault("func", lambda e: e.user_joined or e.user_added)
-
 
             if event_cls:
                 self.handlers.append((func, event_cls, args, kwargs))
