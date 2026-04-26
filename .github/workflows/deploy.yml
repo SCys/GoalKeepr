@@ -10,16 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: rsync deployments
-        uses: burnett01/rsync-deployments@5.2
-        with:
-          switches: -avzr
-          path: .
-          remote_path: ${{ secrets.DEPLOY_PATH }}
-          remote_host: ${{ secrets.DEPLOY_HOST }}
-          remote_user: ${{ secrets.DEPLOY_USER }}
-          remote_key: ${{ secrets.DEPLOY_KEY }}
-
       - name: restart service
         uses: appleboy/ssh-action@master
         with:
@@ -27,12 +17,8 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           script: |
-            # systemctl --user restart goalkeepr_worker
-            # systemctl --user restart goalkeepr
-            cd /data
-            # at lx
-            #podman-compose down gk
-            #podman-compose up -d gk
-            # at eu
+            cd /data/goalkeepr
+            git pull
+            cd /data/
             docker compose build gk 
             docker compose up -d gk
