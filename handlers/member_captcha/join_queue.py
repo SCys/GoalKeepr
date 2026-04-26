@@ -53,16 +53,6 @@ async def publish_join_event(
     使用 processing key 去重，30秒内不重复处理同一入群事件。
     """
     try:
-        # 去重：检查是否正在处理该用户的入群事件
-        processing_key = f"{PROCESSING_JOIN_PREFIX}{chat_id}:{user_id}"
-        if await rdb.set(processing_key, "1", nx=True, ex=PROCESSING_JOIN_TTL):
-            # 首次处理，设置标记成功
-            pass
-        else:
-            # 已在处理中，跳过
-            logger.debug(f"入群事件去重 chat_id={chat_id} user_id={user_id}")
-            return False
-
         ts = ts or _now_ts()
         payload = {
             "chat_id": chat_id,
@@ -72,7 +62,16 @@ async def publish_join_event(
             "username": username or "",
             "full_name": full_name or "",
         }
+        # 先入队，再设置去重标记，避免入队失败导致事件丢失且被去重
         await rdb.lpush(MEMBER_JOIN_QUEUE, json.dumps(payload))
+
+        # 去重：检查是否正在处理该用户的入群事件
+        processing_key = f"{PROCESSING_JOIN_PREFIX}{chat_id}:{user_id}"
+        if await rdb.set(processing_key, "1", nx=True, ex=PROCESSING_JOIN_TTL):
+            pass  # 首次处理，设置标记成功
+        else:
+            logger.debug(f"入群事件去重 chat_id={chat_id} user_id={user_id}")
+            # 事件已入队，但标记已存在，由消费者去重
         return True
     except Exception as e:
         logger.warning(f"入群事件入队失败 chat_id={chat_id} user_id={user_id} err={e}")

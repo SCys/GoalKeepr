@@ -68,8 +68,10 @@ class Session:
                     old_data = loads(raw_old)
                     ts_create_raw = old_data["ts_create"]
                     ts_create = (
-                        datetime.fromisoformat(ts_create_raw)
+                        datetime.fromisoformat(ts_create_raw.replace("Z", "+00:00"))
                         if isinstance(ts_create_raw, str)
+                        else datetime.fromtimestamp(ts_create_raw)
+                        if isinstance(ts_create_raw, (int, float))
                         else ts_create_raw
                     )
                     # 更新 ts_create 为原来的，保留首次创建时间

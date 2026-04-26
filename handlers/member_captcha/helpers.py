@@ -133,7 +133,7 @@ async def load_captcha_answer(chat_id: int, member_id: int) -> Optional[str]:
         rows = await database.execute_fetch(
             """
             select answer from captcha_answers
-            where chat=? and member=? and expires_at >= datetime('now','localtime')
+            where chat=? and member=? and expires_at >= datetime('now')
             limit 1
             """,
             (chat_id, member_id),
@@ -220,7 +220,7 @@ async def build_captcha_message(
     # 简化消息内容
     content = (
         f"👋 欢迎 {member_name}！\n\n"
-        f"请在 12 秒内点击 **{correct_desc}{correct_icon}** 验证通过。\n"
+        f"请在 30 秒内点击 **{correct_desc}{correct_icon}** 验证通过。\n"
         f"超时将被移出群组。"
     )
     buttons = [row_user, row_admin]

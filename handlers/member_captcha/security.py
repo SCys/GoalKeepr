@@ -105,7 +105,8 @@ async def perform_security_checks(
     """
     try:
         # LLM检查
-        await _perform_llm_check(user, session, check_list, log_context, now)
+        if not await _perform_llm_check(user, session, check_list, log_context, now):
+            return False
 
         # 广告检查
         return await _perform_advertising_check(
@@ -118,8 +119,8 @@ async def perform_security_checks(
 
 async def _perform_llm_check(
     user: types.User, session: Session, check_list: List[str], log_context: LogContext, now: datetime
-) -> None:
-    """执行LLM检查"""
+) -> bool:
+    """执行LLM检查，返回 True 表示通过，False 表示检测到垃圾需要封禁。"""
     try:
         llm_start_time = datetime.now()
         logger.debug(f"{log_context.log_prefix} | 开始LLM检查")
@@ -129,20 +130,23 @@ async def _perform_llm_check(
         )
 
         if spams_result and len(spams_result) > 0:
-            # 过滤掉不需要的内容
             spams_result = [item for item in spams_result if item[0] == user.id]
 
             if spams_result:
                 llm_cost_time = datetime.now() - llm_start_time
+                reason = spams_result[0][1]
                 logger.warning(
-                    f"{log_context.log_prefix} | LLM检测到广告 | "
-                    f"原因:{spams_result[0][1]} | "
+                    f"{log_context.log_prefix} | LLM检测到垃圾 | "
+                    f"原因:{reason} | "
                     f"耗时:{llm_cost_time.total_seconds():.2f}秒"
                 )
+                await _ban_member_for_spam(log_context.chat, user.id, f"LLM: {reason}", session, log_context.log_prefix)
+                return False
     except asyncio.TimeoutError:
         logger.warning(f"{log_context.log_prefix} | LLM检查超时")
     except Exception as e:
         logger.exception(f"{log_context.log_prefix} | LLM检查失败 | 错误:{e}")
+    return True
 
 
 async def _perform_advertising_check(
@@ -191,3 +195,36 @@ async def _handle_advertising_violation(
     except Exception as e:
         logger.error(f"{log_prefix} | 封禁用户失败 | 错误:{e}")
         raise SecurityCheckError(f"处理广告违规失败: {e}", chat.id, member_id)
+
+
+async def _ban_member_for_spam(
+    chat: Any, member_id: int, reason: str, session: Session, log_prefix: str
+) -> None:
+    """LLM/安全检查检测到垃圾用户后封禁。"""
+    try:
+        await manager.send(
+            chat.id,
+            f"用户 {member_id} 被检测为垃圾用户，已被移出群组。\n"
+            f"User {member_id} has been removed as spam.",
+            auto_deleted_at=datetime.now() + timedelta(seconds=DELETED_AFTER),
+        )
+
+        log_details = f"原因:{reason}"
+        if session.member_username:
+            log_details += f" | 用户名:@{session.member_username}"
+        if session.member_bio:
+            log_details += f" | Bio:{session.member_bio}"
+
+        logger.warning(f"{log_prefix} | LLM检测到垃圾并封禁 | {log_details}")
+
+        await manager.client.edit_permissions(
+            chat,
+            member_id,
+            view_messages=False,
+            until_date=timedelta(days=DEFAULT_BAN_DAYS),
+        )
+        logger.info(f"{log_prefix} | 用户已被封禁(LLM) | 封禁时长:{DEFAULT_BAN_DAYS}天")
+
+    except Exception as e:
+        logger.error(f"{log_prefix} | LLM垃圾封禁失败 | 错误:{e}")
+        raise SecurityCheckError(f"LLM垃圾封禁失败: {e}", chat.id, member_id)

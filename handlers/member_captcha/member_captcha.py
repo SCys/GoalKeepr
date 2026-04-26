@@ -214,18 +214,7 @@ async def _process_member_verification_background(
                 )
                 return
 
-        # 处理静默模式
-        if checker_type in [
-            VerificationMode.SILENCE,
-            VerificationMode.SLEEP_1WEEK,
-            VerificationMode.SLEEP_2WEEKS,
-        ]:
-            if await handle_silence_mode(
-                chat, user.id, _full_name(user), checker_type, log_context.log_prefix
-            ):
-                return
-
-        # 创建验证会话
+        # 创建验证会话（所有模式都需要，用于安全检查）
         session = await create_verification_session(chat, user, now, log_context)
         if not session:
             return
@@ -249,13 +238,24 @@ async def _process_member_verification_background(
         # 收集需要检查的文本
         check_list = await get_member_info_for_check(user, session)
 
-        # 执行安全检查
+        # 执行安全检查（所有模式均需检查，防止垃圾用户钻空子）
         if not await perform_security_checks(
             user, session, check_list, log_context, now
         ):
             return
 
-        # 生成验证码消息
+        # 处理静默模式
+        if checker_type in [
+            VerificationMode.SILENCE,
+            VerificationMode.SLEEP_1WEEK,
+            VerificationMode.SLEEP_2WEEKS,
+        ]:
+            if await handle_silence_mode(
+                chat, user.id, _full_name(user), checker_type, log_context.log_prefix
+            ):
+                return
+
+        # 生成验证码消息（仅 BAN 模式需要）
         message_content, buttons = await build_captcha_message(user, now, chat.id)
 
         # 发送验证消息
@@ -269,13 +269,13 @@ async def _process_member_verification_background(
             reply.id,
             user.id,
             "new_member_check",
-            now + timedelta(seconds=12),
+            now + timedelta(seconds=30),
         )
         await manager.delete_message(
             chat, reply, now + timedelta(seconds=DELETED_AFTER)
         )
         logger.debug(
-            f"{log_context.log_prefix} | 设置验证超时 | 时长:{12}秒"
+            f"{log_context.log_prefix} | 设置验证超时 | 时长:{30}秒"
         )
 
     except Exception as e:

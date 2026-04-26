@@ -18,7 +18,7 @@ async def test_handle_admin_operation_accepts_admin_callback_payload(mock_manage
         "handlers.member_captcha.callbacks.accepted_member", AsyncMock(return_value=True)
     ) as accepted_mock:
         result = await handle_admin_operation(
-            chat, msg, "123__2026-01-01 00:00:00+00:00__admin__O", "log"
+            chat, msg, "123_1714141234_admin_O", "log"
         )
 
     assert result is True

@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 
 from telethon import events, utils, types
 from manager import manager
@@ -6,7 +6,7 @@ from manager import manager
 logger = manager.logger
 
 
-@manager.register("message", pattern="/id")
+@manager.register("message", pattern=r"(?i)^/id$")
 async def whoami(event: events.NewMessage.Event):
     """我的信息"""
     if event.is_reply:
@@ -36,5 +36,5 @@ async def whoami(event: events.NewMessage.Event):
 
     # auto delete after 5s at (super)group
     if event.is_group or event.is_channel:
-        # manager.delete_message expects (chat_id, msg_id, time)
-        await manager.delete_message(event.chat_id, msg_reply.id, event.date + timedelta(seconds=15))
+        msg_date = getattr(event, 'date', None) or datetime.now(timezone.utc)
+        await manager.delete_message(event.chat_id, msg_reply.id, msg_date + timedelta(seconds=15))

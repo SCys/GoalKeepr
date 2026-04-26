@@ -1,3 +1,4 @@
+import asyncio
 import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -52,7 +53,9 @@ async def test_main_starts_background_workers_after_manager_start(mock_manager):
     def fake_create_task(coro):
         created_when_running.append(manager.is_running)
         coro.close()
-        return MagicMock()
+        future = asyncio.Future()
+        future.set_result(None)
+        return future
 
     with patch("main.database.execute", AsyncMock()):
         with patch("main.asyncio.create_task", side_effect=fake_create_task):

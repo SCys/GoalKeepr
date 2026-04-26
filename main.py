@@ -41,8 +41,8 @@ create table if not exists captcha_answers(
 )
 """
 
-SQL_FETCH_LAZY_DELETE_MESSAGES = "select id,chat,msg from lazy_delete_messages where deleted_at < datetime('now','localtime') order by deleted_at limit 500"
-SQL_FETCH_SESSIONS = "select id,chat,msg,member,type from lazy_sessions where checkout_at < datetime('now','localtime') order by checkout_at limit 500"
+SQL_FETCH_LAZY_DELETE_MESSAGES = "select id,chat,msg from lazy_delete_messages where deleted_at < datetime('now') order by deleted_at limit 500"
+SQL_FETCH_SESSIONS = "select id,chat,msg,member,type from lazy_sessions where checkout_at < datetime('now') order by checkout_at limit 500"
 
 
 async def lazy_messages() -> int:
@@ -192,8 +192,10 @@ async def main():
     await manager.start()
 
     # 在主连接建立完成后再启动后台任务，避免 worker 读取到 is_running=False 后直接退出
-    asyncio.create_task(txt2img_worker())
-    asyncio.create_task(worker_loop())
+    bg_tasks = [
+        asyncio.create_task(txt2img_worker()),
+        asyncio.create_task(worker_loop()),
+    ]
 
     logger.info("主进程开始运行")
     try:
@@ -206,6 +208,9 @@ async def main():
         logger.error(f"主进程断开连接时发生错误: {e}")
 
     await manager.stop()
+    for task in bg_tasks:
+        task.cancel()
+    await asyncio.gather(*bg_tasks, return_exceptions=True)
 
 
 if __name__ == "__main__":

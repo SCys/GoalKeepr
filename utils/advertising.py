@@ -10,6 +10,10 @@ from manager import manager
 
 logger = manager.logger
 
+# Module-level cache for advertising words and patterns
+_advertising_words_cache: Optional[List[str]] = None
+_advertising_patterns_cache: Optional[List[Dict[str, Any]]] = None
+
 
 def _get_config_bool(section, key: str, default: bool = False) -> bool:
     """
@@ -114,42 +118,56 @@ def load_advertising_patterns() -> List[Dict[str, Any]]:
     return patterns
 
 
+def _reload_advertising_cache() -> None:
+    """重新加载广告词和正则表达式缓存（主要用于测试时切换配置）。"""
+    global _advertising_words_cache, _advertising_patterns_cache
+    _advertising_words_cache = load_advertising_words()
+    _advertising_patterns_cache = load_advertising_patterns()
+
+
 def check_advertising(text: str) -> Tuple[bool, Optional[str]]:
     """
     检查文本是否包含广告词
     Check if text contains advertising words
-    
+
     Args:
         text (str): 要检查的文本 (text to check)
-    
+
     Returns:
-        Tuple[bool, Optional[str]]: 
+        Tuple[bool, Optional[str]]:
             - 是否包含广告词 (whether contains advertising words)
             - 匹配到的广告词或模式名称 (matched advertising word or pattern name, if any)
     """
+    global _advertising_words_cache, _advertising_patterns_cache
+
     if not text:
         return False, None
-    
+
+    # Lazy-load and cache advertising words
+    if _advertising_words_cache is None:
+        _advertising_words_cache = load_advertising_words()
+
+    # Lazy-load and cache advertising patterns
+    if _advertising_patterns_cache is None:
+        _advertising_patterns_cache = load_advertising_patterns()
+
     # Check simple word matches
-    words = load_advertising_words()
-    if words:
-        # Convert text to lowercase for case-insensitive matching
+    if _advertising_words_cache:
         text_lower = text.lower()
-        
-        for word in words:
+
+        for word in _advertising_words_cache:
             if word.lower() in text_lower:
                 logger.info(f"Advertising word detected: {word}")
                 return True, word
-    
+
     # Check regex patterns
-    patterns = load_advertising_patterns()
-    if patterns:
-        for pattern_info in patterns:
+    if _advertising_patterns_cache:
+        for pattern_info in _advertising_patterns_cache:
             compiled_pattern = pattern_info["compiled"]
             name = pattern_info["name"]
-            
+
             if compiled_pattern.search(text):
                 logger.info(f"Advertising pattern detected: {name}")
                 return True, f"pattern:{name}"
-    
+
     return False, None

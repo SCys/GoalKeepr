@@ -129,7 +129,8 @@ class TestCheckAdvertising:
         """测试词匹配（忽略大小写）"""
         with patch("utils.advertising.manager.config", mock_config_enabled_words):
             with patch("utils.advertising.logger", mock_logger):
-                from utils.advertising import check_advertising
+                from utils.advertising import check_advertising, _reload_advertising_cache
+                _reload_advertising_cache()
                 is_ad, matched = check_advertising("Buy SPAM now!")
                 assert is_ad is True
                 assert matched == "spam"
@@ -138,7 +139,8 @@ class TestCheckAdvertising:
         """测试正则匹配"""
         with patch("utils.advertising.manager.config", mock_config_enabled_patterns):
             with patch("utils.advertising.logger", mock_logger):
-                from utils.advertising import check_advertising
+                from utils.advertising import check_advertising, _reload_advertising_cache
+                _reload_advertising_cache()
                 is_ad, matched = check_advertising("Visit http://example.com")
                 assert is_ad is True
                 assert matched == "pattern:url"
@@ -147,7 +149,8 @@ class TestCheckAdvertising:
         """测试无匹配"""
         with patch("utils.advertising.manager.config", mock_config_enabled_words):
             with patch("utils.advertising.logger", mock_logger):
-                from utils.advertising import check_advertising
+                from utils.advertising import check_advertising, _reload_advertising_cache
+                _reload_advertising_cache()
                 is_ad, matched = check_advertising("normal text")
                 assert is_ad is False
                 assert matched is None
@@ -171,6 +174,7 @@ class TestCheckAdvertising:
         }[section]
         with patch("utils.advertising.manager.config", mock_config):
             with patch("utils.advertising.logger", mock_logger):
-                from utils.advertising import check_advertising
+                from utils.advertising import check_advertising, _reload_advertising_cache
+                _reload_advertising_cache()
                 is_ad, matched = check_advertising("test and 广告")
                 assert matched == "test"  # 第一个匹配的词（列表顺序）

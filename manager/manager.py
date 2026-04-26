@@ -1,7 +1,7 @@
 import os.path
 import sys
 from configparser import ConfigParser
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import wraps
 from typing import Optional, Union, Tuple, Any
 from urllib.parse import urlparse
@@ -41,7 +41,7 @@ def _parse_proxy(proxy_url: str) -> Optional[Tuple[Any, ...]]:
         scheme = r.scheme.lower()
         if scheme not in ("socks5", "http"):
             logger.warning(
-                f"telegram proxy 仅支持 socks5/socks4/http，当前为 {scheme}，将按 socks5 使用"
+                f"telegram proxy 仅支持 socks5/http，当前为 {scheme}，将按 socks5 使用"
             )
             if scheme == "https":
                 scheme = "http"
@@ -387,17 +387,17 @@ class Manager:
             logger.debug(
                 f"chat {chat} member {member} lazy session {type} is deleted (redis)"
             )
-        else:
-            try:
-                await database.execute(
-                    "delete from lazy_sessions where chat=? and member=? and type=?",
-                    (chat, member, type),
-                )
-                logger.debug(
-                    f"chat {chat} member {member} lazy session {type} is deleted (sqlite)"
-                )
-            except Exception as e:
-                logger.error(f"lazy session delete failed (sqlite): {e}")
+        # Always clean SQLite too, even if Redis was used, to avoid stale entries
+        try:
+            await database.execute(
+                "delete from lazy_sessions where chat=? and member=? and type=?",
+                (chat, member, type),
+            )
+            logger.debug(
+                f"chat {chat} member {member} lazy session {type} is deleted (sqlite)"
+            )
+        except Exception as e:
+            logger.error(f"lazy session delete failed (sqlite): {e}")
 
     async def send(self, chat: hints.EntityLike, msg: str, **kwargs):
         auto_deleted_at = kwargs.pop("auto_deleted_at", None)
@@ -497,10 +497,13 @@ class Manager:
     @staticmethod
     def _format_sqlite_datetime(dt: datetime) -> str:
         """
-        格式化 datetime 为 SQLite 可比较的字符串
+        格式化 datetime 为 SQLite UTC 字符串。
+        若 dt 为 naive，视为 UTC 处理。
         """
-        if dt.tzinfo is not None:
-            dt = dt.astimezone()
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
         return dt.strftime("%Y-%m-%d %H:%M:%S")
 
     async def create_session(self) -> aiohttp.ClientSession:
