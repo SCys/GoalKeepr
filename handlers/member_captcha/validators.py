@@ -34,7 +34,7 @@ async def validate_basic_conditions(
     if not user:
         return "用户对象不存在"
 
-    event_time = event.action_message.date if event.action_message else event.date
+    event_time = event.action_message.date if event.action_message else getattr(event, "date", None)
     if event_time and datetime.now(timezone.utc) > event_time + timedelta(seconds=EVENT_EXPIRY_SECONDS):
         return f"事件过期，事件时间: {event_time}"
 
