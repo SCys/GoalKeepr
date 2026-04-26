@@ -12,11 +12,14 @@ WORKDIR /app
 # Copy dependency files for layer caching
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies (no dev dependencies)
+# Install dependencies into .venv (no dev dependencies)
 RUN uv sync --frozen --no-dev
 
 # Copy the rest of the application
 COPY . .
+
+# Re-sync to ensure .venv is intact after COPY (no-op if unchanged, fast)
+RUN uv sync --frozen --no-dev
 
 # Ensure startup script is executable
 RUN chmod +x docker/startup.sh
