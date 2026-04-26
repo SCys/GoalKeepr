@@ -146,3 +146,5 @@ cython_debug/
 .gemini/
 gha-creds-*.json
 .qwen/
+
+/bot.session
