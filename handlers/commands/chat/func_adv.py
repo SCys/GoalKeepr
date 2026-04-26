@@ -98,7 +98,7 @@ async def operations_person(
 
         model = settings_person.get(
             "model",
-            settings_global.get("model", "gemini-1.0-pro"),
+            settings_global.get("model", "qwen3.6-flash"),
         )
 
         await manager.reply(

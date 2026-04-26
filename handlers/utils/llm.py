@@ -6,7 +6,7 @@ from loguru import logger
 
 from ..utils import chat_completions
 
-SPAM_MODELS = ["gemini-flash-lite", "gemma3"]
+SPAM_MODELS = ["gemini-3.1-flash-lite-preview", "gemma-4-31b-it"]
 
 
 def _user_fullname(user: Any) -> str:
