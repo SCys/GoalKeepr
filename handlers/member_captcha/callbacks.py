@@ -118,8 +118,18 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
 
         elif data.endswith(f"__{CallbackOperation.RETRY}"):
             msg_date = getattr(msg, "date", None) or datetime.now(timezone.utc)
-            content, buttons = await build_captcha_message(operator, msg_date)
+            content, buttons, answer_meta = await build_captcha_message(operator, msg_date)
             await manager.client.edit_message(chat, msg.id, content, parse_mode="md", buttons=buttons)
+
+            # ★ 更新 CaptchaSession 中的答案
+            from .session import CaptchaSession
+            await CaptchaSession.record_answer(
+                chat.id, operator.id,
+                icon=answer_meta["icon"],
+                answer=answer_meta["answer"],
+                options=answer_meta["options"],
+            )
+
             logger.info(f"{log_prefix} | 验证失败 | 已重新生成验证码")
             return True
 

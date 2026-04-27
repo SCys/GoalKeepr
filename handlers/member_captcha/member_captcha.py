@@ -11,6 +11,7 @@ from loguru import logger
 from manager import manager
 from .config import VerificationMode, DELETED_AFTER, MEMBER_CHECK_WAIT_TIME
 from .exceptions import LogContext
+from .session import CaptchaSession
 from .validators import (
     validate_basic_conditions,
     get_verification_method,
@@ -37,17 +38,11 @@ async def member_captcha(event: events.ChatAction.Event):
 
     # 只处理新成员加入事件（不处理成员离开、被踢等事件）
     if not event.user_joined and not event.user_added:
-        # convert event to dict for better logging
-        event_dict = {
-            "chat_id": event.chat_id,
-            "user_id": user.id,
-            "event_type": type(event).__name__,
-            "action_message": getattr(event, "action_message", None).to_dict() if getattr(event, "action_message", None) else None,
-            "date": getattr(event, "date", None).isoformat() if getattr(event, "date", None) else None,
-        }
-        
-        logger.debug(f"chat_member 事件非新成员加入 chat_id={event.chat_id} user_id={user.id} {event_dict}")
+        logger.debug(f"chat_member 事件非新成员加入 chat_id={event.chat_id} user_id={user.id}")
         return
+
+    # 构建入群检查的唯一ID： chat_id-user_id
+    session_id = f"{event.chat_id}-{user.id}"
 
     # 基本条件验证（内部会按 get_chat_type(chat) 判断群组类型）
     validation_error = await validate_basic_conditions(event, chat, user)
@@ -58,11 +53,40 @@ async def member_captcha(event: events.ChatAction.Event):
 
     log_context = LogContext(chat, user.id, user.username, _full_name(user))
 
-    # 获取验证方法配置
-    new_member_check_method = await get_verification_method(chat.id)
+    # ★ 频率控制 + 去重检查（最早执行）
     now = (
         event.action_message.date if getattr(event, "action_message", None) else getattr(event, "date", None)
     ) or datetime.now(timezone.utc)
+
+    should_proceed, captcha_data = await CaptchaSession.check_and_record(chat.id, user.id, now)
+
+    if not should_proceed:
+        state = captcha_data.get("state", "unknown")
+        if state == "throttled":
+            # 频率过高 → Kick
+            join_count = captcha_data.get("join_count", "?")
+            logger.warning(
+                f"{log_context.log_prefix} | 频率限制Kick | "
+                f"24h内第{join_count}次入群 | state={state}"
+            )
+            try:
+                await manager.client.edit_permissions(
+                    chat, user.id,
+                    view_messages=False,
+                    until_date=timedelta(seconds=60),
+                )
+                # 60s 后自动 unban，让用户可重新加入
+                await manager.lazy_session(
+                    chat.id, 0, user.id, "unban_member",
+                    now + timedelta(seconds=60),
+                )
+            except Exception as e:
+                logger.error(f"{log_context.log_prefix} | Kick 失败 | {e}")
+        # duplicate 或其他状态：静默跳过
+        return
+
+    # 获取验证方法配置
+    new_member_check_method = await get_verification_method(chat.id)
 
     logger.info(f"{log_context.log_prefix} | 新成员加入 | 时间:{now} | 处理方式:{new_member_check_method}")
 
@@ -104,21 +128,16 @@ async def member_captcha(event: events.ChatAction.Event):
     if not await perform_security_checks(user, session, check_list, log_context, now):
         return
 
-    # 生成验证码消息（返回文字 + Telethon buttons）
-    message_content, buttons = await build_captcha_message(user, now)
+    # 生成验证码消息（返回文字 + Telethon buttons + 答案元数据）
+    message_content, buttons, answer_meta = await build_captcha_message(user, now)
 
-    # 发送验证消息（Telethon 用 buttons=）
-    reply = await manager.client.send_message(chat.id, message_content, parse_mode="md", buttons=buttons)
-    logger.info(f"{log_context.log_prefix} | 已发送验证消息 | 消息ID:{reply.id}")
-
-    await manager.lazy_session(
-        chat.id,
-        reply.id,
-        user.id,
-        "new_member_check",
-        now + timedelta(seconds=DELETED_AFTER),
+    # ★ 记录验证码答案到 CaptchaSession
+    await CaptchaSession.record_answer(
+        chat.id, user.id,
+        icon=answer_meta["icon"],
+        answer=answer_meta["answer"],
+        options=answer_meta["options"],
     )
-    await manager.delete_message(chat, reply, now + timedelta(seconds=DELETED_AFTER))
     logger.debug(f"{log_context.log_prefix} | 设置验证消息自动删除 | 时长:{DELETED_AFTER}秒")
 
 

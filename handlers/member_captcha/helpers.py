@@ -1,6 +1,7 @@
 import random
+import json
 from datetime import datetime, timedelta, timezone
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Dict
 
 from telethon import Button
 
@@ -80,10 +81,14 @@ logger = manager.logger
 async def build_captcha_message(
     member: Any,
     msg_timestamp: datetime,
-) -> Tuple[str, List[List[Any]]]:
+) -> Tuple[str, List[List[Any]], Dict[str, str]]:
     """
     构建新用户验证信息的文字与 Telethon 内联按钮（二维列表，供 send_message(buttons=) 使用）。
     member 需有 .user (id, first_name, last_name) 或自身为 User。
+
+    返回:
+      (message_content, buttons, answer_meta)
+        answer_meta = {"icon": emoji, "answer": key, "options": json_string}
     """
     if getattr(member, "user", None):
         member_id = member.user.id
@@ -96,9 +101,9 @@ async def build_captcha_message(
 
     ts_str = str(msg_timestamp)
     items = random.sample(list(ICONS.items()), k=5)
-    button_user_ok, _ = random.choice(items)
+    button_user_ok_key, button_user_ok_emoji = random.choice(items)
     row_user = [
-        Button.inline(i[1], ("__".join([str(member_id), ts_str, "!" if button_user_ok == i[0] else "?"])).encode("utf-8"))
+        Button.inline(i[1], ("__".join([str(member_id), ts_str, "!" if button_user_ok_key == i[0] else "?"])).encode("utf-8"))
         for i in items
     ]
     random.shuffle(row_user)
@@ -108,9 +113,18 @@ async def build_captcha_message(
         Button.inline("❌", "__".join([str(member_id), ts_str, "X"]).encode("utf-8")),
     ]
 
-    content = WELCOME_TEXT % {"title": member_name, "user_id": member_id, "icon": button_user_ok}
+    content = WELCOME_TEXT % {"title": member_name, "user_id": member_id, "icon": button_user_ok_emoji}
     buttons = [row_user, row_admin]
-    return content, buttons
+
+    # 构建答案元数据
+    all_options = [{"key": k, "emoji": v} for k, v in items]
+    answer_meta = {
+        "icon": button_user_ok_emoji,
+        "answer": button_user_ok_key,
+        "options": json.dumps(all_options, ensure_ascii=False),
+    }
+
+    return content, buttons, answer_meta
 
 
 async def accepted_member(chat: Any, msg: Any, user: Any):
@@ -124,6 +138,20 @@ async def accepted_member(chat: Any, msg: Any, user: Any):
         return
 
     logger.info(f"{prefix} member {user.id}({manager.username(user)}) is accepted")
+
+    # ★ 记录验证耗时到 CaptchaSession
+    from .session import CaptchaSession
+    msg_date = getattr(msg, "date", None) or datetime.now(timezone.utc)
+    captcha_data = await CaptchaSession.get(chat_id, user.id)
+    if captcha_data:
+        first_join = captcha_data.get("first_join_ts", "")
+        if first_join:
+            try:
+                first_join_dt = datetime.fromisoformat(first_join)
+                cost = (msg_date - first_join_dt).total_seconds()
+                await CaptchaSession.record_cost(chat_id, user.id, cost)
+            except (ValueError, TypeError):
+                pass
 
     title = manager.username(user)
     user_id = user.id
@@ -145,6 +173,5 @@ async def accepted_member(chat: Any, msg: Any, user: Any):
         logger.exception("get profile photos error")
 
     reply = await manager.client.send_message(chat, content, parse_mode="md")
-    msg_date = getattr(msg, "date", None) or datetime.now(timezone.utc)
     await manager.delete_message(chat, reply, msg_date + timedelta(seconds=DELETED_AFTER))
     await manager.lazy_session_delete(chat_id, user.id, "new_member_check")
