@@ -83,9 +83,6 @@ async def member_captcha(event: events.ChatAction.Event):
     if not user_permissions:
         logger.error(f"{log_context.log_prefix} | 获取用户权限失败")
         return
-    if not user_permissions.is_banned:
-        logger.info(f"{log_context.log_prefix} | 用户被其他机器人或者管理员允许，已经解除限制")
-        return
     if user_permissions.has_left:
         logger.info(f"{log_context.log_prefix} | 用户已离开群组")
         return

@@ -26,12 +26,9 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
     if perms.is_admin or perms.is_creator:
         logger.info(f"{prefix} member {member_id} is admin/creator")
         return
-    
-    if not perms.is_banned:
-        # User can send messages, so they are likely verified or normal member
-        logger.info(f"{prefix} member {member_id} can send messages")
-        return
 
+    # 超时触发意味着用户没有点击验证按钮（否则 lazy_session 会被删除）
+    # 不需要检查 is_banned，因为 restrict_member_permissions 只限制发言，不会 ban
     logger.info(f"{prefix} member {member_id} has restricted rights (timeout)")
 
     try:
@@ -39,8 +36,8 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
         # view_messages=False hides the chat (ban)
         await client.edit_permissions(chat, member_id, view_messages=False, until_date=timedelta(seconds=60))
 
-        # 45秒后解除禁言 (Schedule unban)
-        await manager.lazy_session(chat_id, message_id, member_id, "unban_member", datetime.now() + timedelta(seconds=45))
+        # 60秒后解除封禁，允许用户重新加入重试
+        await manager.lazy_session(chat_id, message_id, member_id, "unban_member", datetime.now() + timedelta(seconds=60))
 
         logger.info(f"{prefix} member {member_id} is kicked by timeout")
     except Exception as e:
@@ -58,8 +55,7 @@ async def unban_member(client, chat_id: int, message_id: int, member_id: int):
     prefix = f"chat {chat_id} msg {message_id}"
 
     try:
-        # Unban: Grant default permissions (View/Send)
-        # Setting rights to True explicitly
+        # 清除所有限制，允许用户重新加入。重新加入后会重新触发 captcha 验证。
         await client.edit_permissions(
             chat,
             member_id,
@@ -71,7 +67,6 @@ async def unban_member(client, chat_id: int, message_id: int, member_id: int):
             send_games=True,
             send_inline=True,
             embed_link_previews=True,
-            until_date=0,
         )
         logger.info(f"{prefix} member {member_id} is unbanned")
     except Exception as e:

@@ -165,6 +165,8 @@ async def process_callback_query(event: events.CallbackQuery.Event) -> None:
         elif is_self:
             logger.debug(f"{log_prefix} | 成员自验证 | 数据:{data}")
             await handle_self_verification(chat, msg, data, operator, log_prefix)
+        else:
+            logger.warning(f"{log_prefix} | 无法确定操作类型 | 数据:{data}")
     except Exception as e:
         logger.error(f"{log_prefix} | 回调处理失败 | 错误:{e}")
     finally:
