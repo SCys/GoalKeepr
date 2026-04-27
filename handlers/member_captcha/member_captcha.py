@@ -41,9 +41,6 @@ async def member_captcha(event: events.ChatAction.Event):
         logger.debug(f"chat_member 事件非新成员加入 chat_id={event.chat_id} user_id={user.id}")
         return
 
-    # 构建入群检查的唯一ID： chat_id-user_id
-    session_id = f"{event.chat_id}-{user.id}"
-
     # 基本条件验证（内部会按 get_chat_type(chat) 判断群组类型）
     validation_error = await validate_basic_conditions(event, chat, user)
     if validation_error:
