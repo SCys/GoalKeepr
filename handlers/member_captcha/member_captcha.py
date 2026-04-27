@@ -35,7 +35,7 @@ async def member_captcha(event: events.ChatAction.Event):
 
     await event.delete()
 
-    if not event.user_joined or not event.user_added:
+    if not (event.user_joined and event.user_added):
         logger.debug(f"chat_member 事件非新成员加入 chat_id={event.chat_id} user_id={user.id} {event}")
         return
 
