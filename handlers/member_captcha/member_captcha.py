@@ -35,8 +35,18 @@ async def member_captcha(event: events.ChatAction.Event):
 
     await event.delete()
 
-    if not (event.user_joined and event.user_added):
-        logger.debug(f"chat_member 事件非新成员加入 chat_id={event.chat_id} user_id={user.id} {event}")
+    # 只处理新成员加入事件（不处理成员离开、被踢等事件）
+    if not event.user_joined and not event.user_added:
+        # convert event to dict for better logging
+        event_dict = {
+            "chat_id": event.chat_id,
+            "user_id": user.id,
+            "event_type": type(event).__name__,
+            "action_message": getattr(event, "action_message", None).to_dict() if getattr(event, "action_message", None) else None,
+            "date": getattr(event, "date", None).isoformat() if getattr(event, "date", None) else None,
+        }
+        
+        logger.debug(f"chat_member 事件非新成员加入 chat_id={event.chat_id} user_id={user.id} {event_dict}")
         return
 
     # 基本条件验证（内部会按 get_chat_type(chat) 判断群组类型）
