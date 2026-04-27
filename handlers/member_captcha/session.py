@@ -3,7 +3,7 @@
 Member captcha session management module
 
 Redis Key: chat_captcha-{chat_id}-{user_id}  (Hash)
-Dedup Key: chat_captcha-dedup-{chat_id}-{user_id}  (String, SETNX)
+Dedup Key: chat_captcha-dedup-{chat_id}-{user_id}-{event_uid}  (String, SETNX)
 """
 
 from datetime import datetime, timezone
@@ -51,9 +51,9 @@ class CaptchaSession:
         return f"{CAPTCHA_REDIS_KEY_PREFIX}-{chat_id}-{user_id}"
 
     @staticmethod
-    def make_dedup_key(chat_id: int, user_id: int) -> str:
-        """构建去重锁 key"""
-        return f"{CAPTCHA_REDIS_KEY_PREFIX}-dedup-{chat_id}-{user_id}"
+    def make_dedup_key(chat_id: int, user_id: int, event_uid: str) -> str:
+        """构建单条入群事件的去重锁 key"""
+        return f"{CAPTCHA_REDIS_KEY_PREFIX}-dedup-{chat_id}-{user_id}-{event_uid}"
 
     # ------------------------------------------------------------------
     # 核心：入群频率检查 + 去重
@@ -61,7 +61,10 @@ class CaptchaSession:
 
     @staticmethod
     async def check_and_record(
-        chat_id: int, user_id: int, now: Optional[datetime] = None
+        chat_id: int,
+        user_id: int,
+        now: Optional[datetime] = None,
+        event_uid: Optional[str] = None,
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         检查入群频率并记录本次入群。
@@ -72,8 +75,9 @@ class CaptchaSession:
             - should_proceed=False → 应 Kick（频率过高）或重复事件
 
         去重逻辑:
-          用 SETNX 原子锁防止同一事件被并发重复处理。
+          用 SETNX 原子锁防止同一条入群事件被并发重复处理。
           锁 TTL=10s，足够覆盖单次事件处理周期。
+          event_uid 应来自 action_message.id 等稳定字段，避免把同一用户短时间再次入群误判为重复事件。
         """
         if now is None:
             now = datetime.now(timezone.utc)
@@ -85,12 +89,15 @@ class CaptchaSession:
             return True, {}
 
         session_key = CaptchaSession.make_key(chat_id, user_id)
-        dedup_key = CaptchaSession.make_dedup_key(chat_id, user_id)
+        if event_uid is None:
+            # 理论上入口会传入稳定事件 ID；缺失时用事件时间兜底，避免退回“按用户去重”的粗粒度。
+            event_uid = f"ts:{now.isoformat()}"
+        dedup_key = CaptchaSession.make_dedup_key(chat_id, user_id, event_uid)
 
         # 1) 去重锁：SETNX 原子操作
         acquired = await rdb.set(dedup_key, "1", nx=True, ex=CAPTCHA_DEDUP_TTL)
         if not acquired:
-            logger.debug(f"去重锁命中，跳过重复事件 chat={chat_id} user={user_id}")
+            logger.debug(f"去重锁命中，跳过重复事件 chat={chat_id} user={user_id} event={event_uid}")
             return False, {"state": "duplicate"}
 
         # 2) 读取已有 session

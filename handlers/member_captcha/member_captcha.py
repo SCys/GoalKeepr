@@ -38,7 +38,7 @@ async def member_captcha(event: events.ChatAction.Event):
 
     # 只处理新成员加入事件（不处理成员离开、被踢等事件）
     if not event.user_joined and not event.user_added:
-        logger.debug(f"chat_member 事件非新成员加入 chat_id={event.chat_id} user_id={user.id}")
+        logger.debug(f"chat_member 事件非新成员加入 chat_id={event.chat_id} user_id={user.id} {event}")
         return
 
     # 基本条件验证（内部会按 get_chat_type(chat) 判断群组类型）
@@ -54,8 +54,14 @@ async def member_captcha(event: events.ChatAction.Event):
     now = (
         event.action_message.date if getattr(event, "action_message", None) else getattr(event, "date", None)
     ) or datetime.now(timezone.utc)
+    event_uid = _event_dedup_uid(event, now)
 
-    should_proceed, captcha_data = await CaptchaSession.check_and_record(chat.id, user.id, now)
+    should_proceed, captcha_data = await CaptchaSession.check_and_record(
+        chat.id,
+        user.id,
+        now,
+        event_uid=event_uid,
+    )
 
     if not should_proceed:
         state = captcha_data.get("state", "unknown")
@@ -85,7 +91,7 @@ async def member_captcha(event: events.ChatAction.Event):
     # 获取验证方法配置
     new_member_check_method = await get_verification_method(chat.id)
 
-    logger.info(f"{log_context.log_prefix} | 新成员加入 | 时间:{now} | 处理方式:{new_member_check_method}")
+    logger.info(f"{log_context.log_prefix} | 新成员加入 | 时间:{now} | 处理方式:{new_member_check_method} | {event}")
 
     if new_member_check_method == VerificationMode.NONE:
         logger.info(f"{log_context.log_prefix} | 无作为 | 新成员加入")
@@ -135,12 +141,42 @@ async def member_captcha(event: events.ChatAction.Event):
         answer=answer_meta["answer"],
         options=answer_meta["options"],
     )
+
+    # 发送验证消息
+    captcha_msg = await manager.client.send_message(
+        chat, message_content, buttons=buttons, parse_mode="md",
+    )
+    logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg.id}")
+
+    # 设置验证消息自动删除
+    await manager.delete_message(
+        chat, captcha_msg,
+        now + timedelta(seconds=DELETED_AFTER),
+    )
     logger.debug(f"{log_context.log_prefix} | 设置验证消息自动删除 | 时长:{DELETED_AFTER}秒")
 
 
 def _full_name(user: types.User) -> str:
     parts = [user.first_name or "", user.last_name or ""]
     return " ".join(x for x in parts if x).strip() or ""
+
+
+def _event_dedup_uid(event: events.ChatAction.Event, now: datetime) -> str:
+    """提取单条入群事件的稳定 ID，用于精确去重。"""
+    action_message = getattr(event, "action_message", None)
+    message_id = getattr(action_message, "id", None)
+    if message_id is not None:
+        return f"msg:{message_id}"
+
+    original_update = getattr(event, "original_update", None)
+    pts = getattr(original_update, "pts", None)
+    if pts is not None:
+        return f"pts:{pts}"
+
+    event_date = getattr(action_message, "date", None) or getattr(event, "date", None) or now
+    if isinstance(event_date, datetime):
+        return f"date:{event_date.isoformat()}"
+    return f"date:{event_date}"
 
 
 @manager.register("callback_query")
