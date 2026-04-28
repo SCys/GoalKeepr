@@ -5,6 +5,7 @@ Member captcha main module
 
 import asyncio
 from datetime import timedelta, datetime, timezone
+from typing import Optional
 from telethon import events, types
 from loguru import logger
 
@@ -35,6 +36,16 @@ async def member_captcha(event: events.ChatAction.Event):
         return
 
     await event.delete()
+
+    action_message: Optional[ types.MessageService] = event.action_message
+    if not action_message:
+        # logger.warning(f"chat_member 事件无 action_message chat_id={event.chat_id} user_id={user.id} {event}")
+        return
+    
+    action = action_message.action
+    if not isinstance(action, (types.MessageActionChatJoinedByLink, types.MessageActionChatAddUser)):
+        # logger.debug(f"chat_member 事件非加入事件 chat_id={event.chat_id} user_id={user.id} action={action} {event}")
+        return
 
     # 只处理新成员加入事件（不处理成员离开、被踢等事件）
     if not event.user_joined and not event.user_added:
