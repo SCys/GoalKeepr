@@ -228,6 +228,22 @@ class CaptchaSession:
         logger.debug(f"CaptchaSession 记录耗时 chat={chat_id} user={user_id} cost={cost_seconds:.2f}s")
 
     # ------------------------------------------------------------------
+    # 记录验证重试次数（用户点击错误答案后）
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def record_retry(chat_id: int, user_id: int) -> int:
+        """递增并返回重试次数。"""
+        rdb = await manager.get_redis()
+        if not rdb:
+            return 0
+
+        session_key = CaptchaSession.make_key(chat_id, user_id)
+        new_count = await rdb.hincrby(session_key, "retry_count", 1)
+        logger.debug(f"CaptchaSession 重试 chat={chat_id} user={user_id} retry_count={new_count}")
+        return new_count
+
+    # ------------------------------------------------------------------
     # 读取 session
     # ------------------------------------------------------------------
 

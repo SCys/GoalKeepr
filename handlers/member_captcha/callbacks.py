@@ -12,7 +12,7 @@ from loguru import logger
 from manager import manager
 from .config import SUPPORT_GROUP_TYPES, CallbackOperation, DEFAULT_BAN_DAYS, get_chat_type
 from .exceptions import LogContext
-from .helpers import accepted_member, build_captcha_message
+from .helpers import accepted_member, build_captcha_message, get_callback_map, store_callback_map, delete_callback_map
 
 
 def _user_full_name(user: Any) -> str:
@@ -84,12 +84,14 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
 
         if op == CallbackOperation.ACCEPT:
             await manager.delete_message(chat, msg)
+            await delete_callback_map(chat.id, msg.id)
             await accepted_member(chat, msg, user)
             logger.info(f"{log_prefix} | 管理员接受成员 | {member_info}")
             return True
 
         elif op == CallbackOperation.REJECT:
             await manager.delete_message(chat, msg)
+            await delete_callback_map(chat.id, msg.id)
             await manager.client.edit_permissions(
                 chat, member_id,
                 view_messages=False,
@@ -127,12 +129,35 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
 
         if chosen_key == correct_answer:
             await manager.delete_message(chat, msg, getattr(msg, "date", None))
+            await delete_callback_map(chat.id, msg.id)
             await accepted_member(chat, msg, operator)
             logger.info(f"{log_prefix} | 验证成功 | 成员已通过验证")
             return True
 
         else:
-            from .config import DELETED_AFTER
+            from .config import DELETED_AFTER, CAPTCHA_MAX_RETRY
+
+            # 递增重试次数，超过上限直接 Kick
+            retry_count = await CaptchaSession.record_retry(chat.id, operator.id)
+            if retry_count >= CAPTCHA_MAX_RETRY:
+                await manager.delete_message(chat, msg)
+                await delete_callback_map(chat.id, msg.id)
+                await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
+                await manager.client.edit_permissions(
+                    chat, operator.id,
+                    view_messages=False,
+                    until_date=timedelta(seconds=60),
+                )
+                await manager.lazy_session(
+                    chat.id, msg.id, operator.id, "unban_member",
+                    datetime.now(timezone.utc) + timedelta(seconds=60),
+                )
+                logger.warning(
+                    f"{log_prefix} | 重试次数超限Kick | "
+                    f"retry={retry_count} max={CAPTCHA_MAX_RETRY}"
+                )
+                return True
+
             msg_date = getattr(msg, "date", None) or datetime.now(timezone.utc)
             content, buttons, answer_meta = await build_captcha_message(operator, msg_date)
             await manager.client.edit_message(chat, msg.id, content, parse_mode="md", buttons=buttons)
@@ -143,6 +168,10 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                 answer=answer_meta["answer"],
                 options=answer_meta["options"],
             )
+
+            # 更新 callback_map（消息内容变了，hash 也变了）
+            await store_callback_map(chat.id, msg.id, answer_meta["callback_map"],
+                                     ttl=DELETED_AFTER + 15)
 
             # 取消旧的超时踢人并重新计时
             await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
@@ -181,6 +210,15 @@ async def process_callback_query(event: events.CallbackQuery.Event) -> None:
     chat = await event.get_chat()
     log_context = LogContext(chat, operator.id, getattr(operator, "username", None), _user_full_name(operator), "[回调]")
     log_prefix = f"{log_context.log_prefix} 消息:{msg.id}"
+
+    # 将 MD5 哈希解码为原始 callback data
+    raw_data = data
+    cb_map = await get_callback_map(chat.id, msg.id)
+    if cb_map and data in cb_map:
+        data = cb_map[data]
+        logger.debug(f"{log_prefix} | 回调数据解码 | hash={raw_data} -> data={data}")
+    else:
+        logger.warning(f"{log_prefix} | callback_map 未命中 | hash={raw_data} | cb_map={cb_map}")
 
     is_admin = await manager.is_admin(chat, operator)
     is_self = data.startswith(f"{operator.id}__")

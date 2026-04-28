@@ -20,7 +20,7 @@ from .validators import (
     create_verification_session,
 )
 from .security import restrict_member_permissions, get_member_info_for_check, perform_security_checks
-from .helpers import build_captcha_message
+from .helpers import build_captcha_message, store_callback_map
 from .callbacks import process_callback_query
 
 
@@ -156,6 +156,10 @@ async def member_captcha(event: events.ChatAction.Event):
         chat, message_content, buttons=buttons, parse_mode="md",
     )
     logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg.id}")
+
+    # 存储 callback_map 供回调时解码 MD5 哈希
+    await store_callback_map(chat.id, captcha_msg.id, answer_meta["callback_map"],
+                             ttl=DELETED_AFTER + 15)
 
     # 调度超时检查：DELETED_AFTER 秒后若用户未通过验证则 Kick
     await manager.lazy_session(

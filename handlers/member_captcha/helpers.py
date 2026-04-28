@@ -2,7 +2,7 @@ import random
 import json
 import hashlib
 from datetime import datetime, timedelta, timezone
-from typing import Tuple, List, Any, Dict
+from typing import Optional, Tuple, List, Any, Dict
 
 from telethon import Button
 
@@ -136,6 +136,36 @@ async def build_captcha_message(
     }
 
     return content, buttons, answer_meta
+
+
+async def store_callback_map(chat_id: int, msg_id: int, callback_map: Dict[str, str], ttl: int = 60) -> None:
+    """将 callback_map (hash→原始数据) 存入 Redis，供回调时解码 MD5 哈希。"""
+    rdb = await manager.get_redis()
+    if not rdb:
+        return
+    key = f"captcha_cb_map:{chat_id}:{msg_id}"
+    await rdb.set(key, json.dumps(callback_map, ensure_ascii=False), ex=ttl)
+
+
+async def get_callback_map(chat_id: int, msg_id: int) -> Optional[Dict[str, str]]:
+    """从 Redis 读取 callback_map。"""
+    rdb = await manager.get_redis()
+    if not rdb:
+        return None
+    key = f"captcha_cb_map:{chat_id}:{msg_id}"
+    raw = await rdb.get(key)
+    if raw:
+        return json.loads(raw if isinstance(raw, str) else raw.decode("utf-8"))
+    return None
+
+
+async def delete_callback_map(chat_id: int, msg_id: int) -> None:
+    """删除 callback_map。"""
+    rdb = await manager.get_redis()
+    if not rdb:
+        return
+    key = f"captcha_cb_map:{chat_id}:{msg_id}"
+    await rdb.delete(key)
 
 
 async def accepted_member(chat: Any, msg: Any, user: Any):

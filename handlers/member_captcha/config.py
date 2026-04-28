@@ -36,6 +36,7 @@ CAPTCHA_TTL_EXTENDED = 60 * 60 * 24 * 7             # 提升 TTL: 7天
 CAPTCHA_JOIN_THRESHOLD_KICK = 30                    # 24h 内超过此次数就 Kick
 CAPTCHA_JOIN_THRESHOLD_RESET = 1                    # 降到此次数恢复默认 TTL
 CAPTCHA_DEDUP_TTL = 10                              # 去重锁 TTL: 10秒（防止同事件重复处理）
+CAPTCHA_MAX_RETRY = 3                               # 验证最大重试次数，超过则 Kick
 
 # 正则表达式
 RE_TG_NAME = re.compile(r"^@[a-zA-Z0-9_]{5,32}$")
