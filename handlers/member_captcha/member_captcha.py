@@ -37,11 +37,11 @@ async def member_captcha(event: events.ChatAction.Event):
 
     await event.delete()
 
-    action_message: Optional[ types.MessageService] = event.action_message
+    action_message: Optional[types.MessageService] = event.action_message
     if not action_message:
         # logger.warning(f"chat_member 事件无 action_message chat_id={event.chat_id} user_id={user.id} {event}")
         return
-    
+
     action = action_message.action
     if not isinstance(action, (types.MessageActionChatJoinedByLink, types.MessageActionChatAddUser)):
         # logger.debug(f"chat_member 事件非加入事件 chat_id={event.chat_id} user_id={user.id} action={action} {event}")
@@ -77,19 +77,20 @@ async def member_captcha(event: events.ChatAction.Event):
         if state == "throttled":
             # 频率过高 → Kick
             join_count = captcha_data.get("join_count", "?")
-            logger.warning(
-                f"{log_context.log_prefix} | 频率限制Kick | "
-                f"24h内第{join_count}次入群 | state={state}"
-            )
+            logger.warning(f"{log_context.log_prefix} | 频率限制Kick | " f"24h内第{join_count}次入群 | state={state}")
             try:
                 await manager.client.edit_permissions(
-                    chat, user.id,
+                    chat,
+                    user.id,
                     view_messages=False,
                     until_date=timedelta(seconds=60),
                 )
                 # 60s 后自动 unban，让用户可重新加入
                 await manager.lazy_session(
-                    chat.id, 0, user.id, "unban_member",
+                    chat.id,
+                    0,
+                    user.id,
+                    "unban_member",
                     now + timedelta(seconds=60),
                 )
             except Exception as e:
@@ -138,6 +139,19 @@ async def member_captcha(event: events.ChatAction.Event):
 
     # 执行安全检查
     if not await perform_security_checks(user, session, check_list, log_context, now):
+        logger.warning(f"{log_context.log_prefix} | 安全检查未通过 | 踢出用户")
+        try:
+            await manager.client.edit_permissions(
+                chat,
+                user.id,
+                view_messages=False,
+                until_date=timedelta(seconds=60),
+            )
+            await manager.lazy_session(
+                chat.id, 0, user.id, "unban_member", now + timedelta(seconds=60),
+            )
+        except Exception as e:
+            logger.error(f"{log_context.log_prefix} | Kick 失败 | {e}")
         return
 
     # 生成验证码消息（返回文字 + Telethon buttons + 答案元数据）
@@ -145,7 +159,8 @@ async def member_captcha(event: events.ChatAction.Event):
 
     # ★ 记录验证码答案到 CaptchaSession
     await CaptchaSession.record_answer(
-        chat.id, user.id,
+        chat.id,
+        user.id,
         icon=answer_meta["icon"],
         answer=answer_meta["answer"],
         options=answer_meta["options"],
@@ -153,23 +168,29 @@ async def member_captcha(event: events.ChatAction.Event):
 
     # 发送验证消息
     captcha_msg = await manager.client.send_message(
-        chat, message_content, buttons=buttons, parse_mode="md",
+        chat,
+        message_content,
+        buttons=buttons,
+        parse_mode="md",
     )
     logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg.id}")
 
     # 存储 callback_map 供回调时解码 MD5 哈希
-    await store_callback_map(chat.id, captcha_msg.id, answer_meta["callback_map"],
-                             ttl=DELETED_AFTER + 15)
+    await store_callback_map(chat.id, captcha_msg.id, answer_meta["callback_map"], ttl=DELETED_AFTER + 15)
 
     # 调度超时检查：DELETED_AFTER 秒后若用户未通过验证则 Kick
     await manager.lazy_session(
-        chat.id, captcha_msg.id, user.id, "new_member_check",
+        chat.id,
+        captcha_msg.id,
+        user.id,
+        "new_member_check",
         now + timedelta(seconds=DELETED_AFTER),
     )
 
     # 设置验证消息自动删除
     await manager.delete_message(
-        chat, captcha_msg,
+        chat,
+        captcha_msg,
         now + timedelta(seconds=DELETED_AFTER),
     )
     logger.debug(f"{log_context.log_prefix} | 设置验证消息自动删除 | 时长:{DELETED_AFTER}秒")

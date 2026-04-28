@@ -106,6 +106,8 @@ async def perform_security_checks(
     try:
         # LLM检查
         await _perform_llm_check(user, session, check_list, log_context, now)
+        if session.banned:
+            return False
 
         # 广告检查
         return await _perform_advertising_check(
@@ -139,6 +141,7 @@ async def _perform_llm_check(
                     f"原因:{spams_result[0][1]} | "
                     f"耗时:{llm_cost_time.total_seconds():.2f}秒"
                 )
+                # session.banned = True
     except asyncio.TimeoutError:
         logger.warning(f"{log_context.log_prefix} | LLM检查超时")
     except Exception as e:
