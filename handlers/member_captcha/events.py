@@ -27,8 +27,13 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
         logger.info(f"{prefix} member {member_id} is admin/creator")
         return
 
+    # 如果用户已被接受（权限已恢复），跳过踢人。这是防御性检查，正常情况下
+    # lazy_session 在用户通过验证时已被删除，不会触发此 handler。
+    if getattr(perms, 'send_messages', False):
+        logger.info(f"{prefix} member {member_id} already accepted, skipping kick")
+        return
+
     # 超时触发意味着用户没有点击验证按钮（否则 lazy_session 会被删除）
-    # 不需要检查 is_banned，因为 restrict_member_permissions 只限制发言，不会 ban
     logger.info(f"{prefix} member {member_id} has restricted rights (timeout)")
 
     try:

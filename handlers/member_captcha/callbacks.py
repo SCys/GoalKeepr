@@ -108,21 +108,35 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
 
 
 async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any, log_prefix: str) -> bool:
-    """处理用户自验证。"""
+    """处理用户自验证。从 Redis 读取正确答案进行比较。"""
     try:
-        if data.endswith(f"__{CallbackOperation.SUCCESS}"):
+        parts = data.split("__")
+        if len(parts) != 3:
+            logger.warning(f"{log_prefix} | 自验证数据格式错误 | data={data}")
+            return False
+
+        chosen_key = parts[2]
+
+        from .session import CaptchaSession
+        session_data = await CaptchaSession.get(chat.id, operator.id)
+        if not session_data:
+            logger.warning(f"{log_prefix} | 自验证时 session 不存在")
+            return False
+
+        correct_answer = session_data.get("last_answer", "")
+
+        if chosen_key == correct_answer:
             await manager.delete_message(chat, msg, getattr(msg, "date", None))
             await accepted_member(chat, msg, operator)
             logger.info(f"{log_prefix} | 验证成功 | 成员已通过验证")
             return True
 
-        elif data.endswith(f"__{CallbackOperation.RETRY}"):
+        else:
+            from .config import DELETED_AFTER
             msg_date = getattr(msg, "date", None) or datetime.now(timezone.utc)
             content, buttons, answer_meta = await build_captcha_message(operator, msg_date)
             await manager.client.edit_message(chat, msg.id, content, parse_mode="md", buttons=buttons)
 
-            # ★ 更新 CaptchaSession 中的答案
-            from .session import CaptchaSession
             await CaptchaSession.record_answer(
                 chat.id, operator.id,
                 icon=answer_meta["icon"],
@@ -130,12 +144,20 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                 options=answer_meta["options"],
             )
 
-            logger.info(f"{log_prefix} | 验证失败 | 已重新生成验证码")
-            return True
+            # 取消旧的超时踢人并重新计时
+            await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
+            await manager.lazy_session(
+                chat.id, msg.id, operator.id, "new_member_check",
+                msg_date + timedelta(seconds=DELETED_AFTER),
+            )
+            # 推迟消息自动删除时间
+            await manager.delete_message(
+                chat, msg,
+                msg_date + timedelta(seconds=DELETED_AFTER),
+            )
 
-        else:
-            logger.warning(f"{log_prefix} | 未知验证操作 | 数据:{data}")
-            return False
+            logger.info(f"{log_prefix} | 验证失败 | 已重新生成验证码 | chosen={chosen_key} correct={correct_answer}")
+            return True
 
     except Exception as e:
         logger.error(f"{log_prefix} | 自验证处理失败 | 错误:{e}")
@@ -168,8 +190,16 @@ async def process_callback_query(event: events.CallbackQuery.Event) -> None:
         await event.answer()
         return
 
+    # 按操作类型分流：O/X 为管理员操作，其余为自验证
+    parts = data.split("__")
+    is_admin_op = len(parts) == 3 and parts[2] in (CallbackOperation.ACCEPT, CallbackOperation.REJECT)
+
     try:
-        if is_admin and not is_self:
+        if is_admin_op:
+            if not is_admin:
+                logger.warning(f"{log_prefix} | 非管理员尝试管理员操作")
+                await event.answer()
+                return
             logger.debug(f"{log_prefix} | 管理员操作 | 数据:{data}")
             await handle_admin_operation(chat, msg, data, log_prefix)
         elif is_self:

@@ -62,9 +62,7 @@ async def member_captcha(event: events.ChatAction.Event):
     log_context = LogContext(chat, user.id, user.username, _full_name(user))
 
     # ★ 频率控制 + 去重检查（最早执行）
-    now = (
-        event.action_message.date if getattr(event, "action_message", None) else getattr(event, "date", None)
-    ) or datetime.now(timezone.utc)
+    now = action_message.date
     event_uid = _event_dedup_uid(event, now)
 
     should_proceed, captcha_data = await CaptchaSession.check_and_record(
@@ -158,6 +156,12 @@ async def member_captcha(event: events.ChatAction.Event):
         chat, message_content, buttons=buttons, parse_mode="md",
     )
     logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg.id}")
+
+    # 调度超时检查：DELETED_AFTER 秒后若用户未通过验证则 Kick
+    await manager.lazy_session(
+        chat.id, captcha_msg.id, user.id, "new_member_check",
+        now + timedelta(seconds=DELETED_AFTER),
+    )
 
     # 设置验证消息自动删除
     await manager.delete_message(

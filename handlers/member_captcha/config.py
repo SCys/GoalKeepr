@@ -54,5 +54,3 @@ class CallbackOperation:
     """回调操作类型常量"""
     ACCEPT = "O"  # 管理员接受
     REJECT = "X"  # 管理员拒绝
-    SUCCESS = "!"  # 验证成功
-    RETRY = "?"  # 验证失败，重试

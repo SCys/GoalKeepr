@@ -1,5 +1,6 @@
 import random
 import json
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Tuple, List, Any, Dict
 
@@ -102,15 +103,24 @@ async def build_captcha_message(
     ts_str = str(msg_timestamp)
     items = random.sample(list(ICONS.items()), k=5)
     button_user_ok_key, button_user_ok_emoji = random.choice(items)
+
+    # Use a hash map to avoid exceeding Telethon's 64-byte callback data limit
+    callback_map: Dict[str, str] = {}
+
+    def _short_callback(data_str: str) -> bytes:
+        h = hashlib.md5(data_str.encode("utf-8")).hexdigest()
+        callback_map[h] = data_str
+        return h.encode("utf-8")
+
     row_user = [
-        Button.inline(i[1], ("__".join([str(member_id), ts_str, "!" if button_user_ok_key == i[0] else "?"])).encode("utf-8"))
-        for i in items
+        Button.inline(emoji, _short_callback("__".join([str(member_id), ts_str, key])))
+        for key, emoji in items
     ]
     random.shuffle(row_user)
 
     row_admin = [
-        Button.inline("✔", "__".join([str(member_id), ts_str, "O"]).encode("utf-8")),
-        Button.inline("❌", "__".join([str(member_id), ts_str, "X"]).encode("utf-8")),
+        Button.inline("✔", _short_callback("__".join([str(member_id), ts_str, "O"]))),
+        Button.inline("❌", _short_callback("__".join([str(member_id), ts_str, "X"]))),
     ]
 
     content = WELCOME_TEXT % {"title": member_name, "user_id": member_id, "icon": button_user_ok_emoji}
@@ -122,6 +132,7 @@ async def build_captcha_message(
         "icon": button_user_ok_emoji,
         "answer": button_user_ok_key,
         "options": json.dumps(all_options, ensure_ascii=False),
+        "callback_map": callback_map,
     }
 
     return content, buttons, answer_meta
