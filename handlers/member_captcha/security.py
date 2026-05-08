@@ -36,8 +36,8 @@ async def restrict_member_permissions(chat: Any, user: types.User, until_date: O
         )
         return True
     except Exception as e:
-        logger.error(f"限制成员 {user.id} 权限失败: {e}")
-        raise PermissionError(f"限制成员权限时发生错误: {e}", getattr(chat, "id", chat), user.id)
+        logger.error(f"failed to restrict permissions for member {user.id}: {e}")
+        raise PermissionError(f"error restricting member permissions: {e}", getattr(chat, "id", chat), user.id)
 
 
 async def restore_member_permissions(chat: Any, user: types.User) -> bool:
@@ -57,7 +57,7 @@ async def restore_member_permissions(chat: Any, user: types.User) -> bool:
         )
         return True
     except Exception as e:
-        logger.error(f"恢复成员 {user.id} 权限失败: {e}")
+        logger.error(f"failed to restore permissions for member {user.id}: {e}")
         return False
 
 
@@ -77,9 +77,9 @@ async def get_member_info_for_check(user: types.User, session: Session) -> List[
                 bio = user_info["bio"]
                 strings_to_check.append(bio)
                 session.member_bio = bio
-                logger.debug(f"获取用户Bio: {bio}")
+                logger.debug(f"fetched user bio: {bio}")
         except Exception as e:
-            logger.warning(f"获取用户 {user.username} 额外信息失败: {e}")
+            logger.warning(f"failed to fetch extra info for user {user.username}: {e}")
 
     return strings_to_check
 
@@ -105,8 +105,8 @@ async def perform_security_checks(
     """
     try:
         # LLM检查
-        await _perform_llm_check(user, session, check_list, log_context, now)
-        if session.banned:
+        llm_found_spam = await _perform_llm_check(user, session, check_list, log_context, now)
+        if llm_found_spam:
             return False
 
         # 广告检查
@@ -114,17 +114,17 @@ async def perform_security_checks(
             log_context.chat, user.id, check_list, session, log_context.log_prefix
         )
     except Exception as e:
-        logger.exception(f"{log_context.log_prefix} | 安全检查失败 | 错误:{e}")
+        logger.exception(f"{log_context.log_prefix} | security check failed | error:{e}")
         raise SecurityCheckError(f"安全检查失败: {e}", log_context.chat.id, user.id)
 
 
 async def _perform_llm_check(
     user: types.User, session: Session, check_list: List[str], log_context: LogContext, now: datetime
-) -> None:
-    """执行LLM检查"""
+) -> bool:
+    """执行LLM检查，返回 True 表示检测到 spam（应封禁）。"""
     try:
         llm_start_time = datetime.now()
-        logger.debug(f"{log_context.log_prefix} | 开始LLM检查")
+        logger.debug(f"{log_context.log_prefix} | starting LLM check")
 
         spams_result = await asyncio.wait_for(
             check_spams_with_llm([user], session, check_list, now), timeout=LLM_CHECK_TIMEOUT
@@ -137,15 +137,18 @@ async def _perform_llm_check(
             if spams_result:
                 llm_cost_time = datetime.now() - llm_start_time
                 logger.warning(
-                    f"{log_context.log_prefix} | LLM检测到广告 | "
-                    f"原因:{spams_result[0][1]} | "
-                    f"耗时:{llm_cost_time.total_seconds():.2f}秒"
+                    f"{log_context.log_prefix} | LLM detected spam | "
+                    f"reason:{spams_result[0][1]} | "
+                    f"elapsed:{llm_cost_time.total_seconds():.2f}s"
                 )
-                # session.banned = True
+                session.banned = True
+                return True
     except asyncio.TimeoutError:
-        logger.warning(f"{log_context.log_prefix} | LLM检查超时")
+        logger.warning(f"{log_context.log_prefix} | LLM check timed out")
     except Exception as e:
-        logger.exception(f"{log_context.log_prefix} | LLM检查失败 | 错误:{e}")
+        logger.exception(f"{log_context.log_prefix} | LLM check failed | error:{e}")
+
+    return False
 
 
 async def _perform_advertising_check(
@@ -174,13 +177,13 @@ async def _handle_advertising_violation(
             auto_deleted_at=datetime.now() + timedelta(seconds=DELETED_AFTER),
         )
 
-        log_details = f"匹配词:{matched_word}"
+        log_details = f"matched:{matched_word}"
         if session.member_username:
-            log_details += f" | 用户名:@{session.member_username}"
+            log_details += f" | username:@{session.member_username}"
         if session.member_bio:
-            log_details += f" | Bio:{session.member_bio}"
+            log_details += f" | bio:{session.member_bio}"
 
-        logger.warning(f"{log_prefix} | 检测到广告内容 | {log_details}")
+        logger.warning(f"{log_prefix} | advertising content detected | {log_details}")
 
         # 封禁用户（Telethon: view_messages=False + until_date）
         await manager.client.edit_permissions(
@@ -189,8 +192,8 @@ async def _handle_advertising_violation(
             view_messages=False,
             until_date=timedelta(days=DEFAULT_BAN_DAYS),
         )
-        logger.info(f"{log_prefix} | 用户已被封禁 | 封禁时长:{DEFAULT_BAN_DAYS}天")
+        logger.info(f"{log_prefix} | user banned | ban_days:{DEFAULT_BAN_DAYS}")
 
     except Exception as e:
-        logger.error(f"{log_prefix} | 封禁用户失败 | 错误:{e}")
+        logger.error(f"{log_prefix} | failed to ban user | error:{e}")
         raise SecurityCheckError(f"处理广告违规失败: {e}", chat.id, member_id)

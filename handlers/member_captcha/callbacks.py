@@ -27,37 +27,37 @@ async def validate_callback_conditions(event: events.CallbackQuery.Event) -> Opt
     """
     msg = await event.get_message()
     if not msg:
-        return "消息不存在"
+        return "message not found"
 
     chat = await event.get_chat()
     operator = await event.get_sender()
     if not operator:
-        return "操作者不存在"
+        return "operator not found"
 
     if get_chat_type(chat) not in SUPPORT_GROUP_TYPES:
-        return "不支持的群组类型"
+        return "unsupported group type"
 
-    # 确保是机器人自己发送的消息（Telethon 中 message.out 表示己方发出）
+    # Telethon: msg.out means sent by the bot itself
     if not getattr(msg, "out", False):
-        return "非机器人消息"
+        return "not a bot message"
 
-    # 判断是否为验证消息（通过按钮布局：2 行，首行 5 按钮，次行 2 按钮）
+    # Verify it's a captcha message by button layout: 2 rows, first row 5 buttons, second row 2 buttons
     markup = getattr(msg, "reply_markup", None)
     if not markup or not getattr(markup, "rows", None):
-        return "按钮布局不正确"
+        return "invalid button layout"
     rows = markup.rows
     if len(rows) != 2:
-        return "按钮布局不正确"
+        return "invalid button layout"
     if len(rows[0].buttons) != 5 or len(rows[1].buttons) != 2:
-        return "按钮布局不正确"
+        return "invalid button layout"
 
     data = event.data
     if data is None:
-        return "无回调数据"
+        return "no callback data"
     if isinstance(data, bytes):
         data = data.decode("utf-8", errors="replace")
 
-    # 把解码后的 data 挂到 event 上供后续使用
+    # attach decoded data to event for downstream use
     setattr(event, "_decoded_data", data)
     return None
 
@@ -67,7 +67,7 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
     try:
         items = data.split("__")
         if len(items) != 3:
-            logger.warning(f"{log_prefix} | 数据格式错误")
+            logger.warning(f"{log_prefix} | invalid data format")
             return False
 
         member_id, _, op = items
@@ -75,37 +75,41 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
         try:
             user = await manager.client.get_entity(member_id)
         except Exception as e:
-            logger.error(f"{log_prefix} | 获取成员失败 | 成员ID:{member_id} | {e}")
+            logger.error(f"{log_prefix} | failed to fetch member | member_id:{member_id} | {e}")
             return False
 
-        member_info = f"目标成员:{member_id}"
+        member_info = f"target:{member_id}"
         if getattr(user, "username", None):
             member_info += f"(@{user.username})"
 
         if op == CallbackOperation.ACCEPT:
             await manager.delete_message(chat, msg)
             await delete_callback_map(chat.id, msg.id)
+            from .session import CaptchaSession
+            await CaptchaSession.delete(chat.id, member_id)
             await accepted_member(chat, msg, user)
-            logger.info(f"{log_prefix} | 管理员接受成员 | {member_info}")
+            logger.info(f"{log_prefix} | admin accepted member | {member_info}")
             return True
 
         elif op == CallbackOperation.REJECT:
             await manager.delete_message(chat, msg)
             await delete_callback_map(chat.id, msg.id)
+            from .session import CaptchaSession
+            await CaptchaSession.delete(chat.id, member_id)
             await manager.client.edit_permissions(
                 chat, member_id,
                 view_messages=False,
                 until_date=timedelta(days=DEFAULT_BAN_DAYS),
             )
-            logger.warning(f"{log_prefix} | 管理员拒绝成员 | {member_info} | 封禁时长:{DEFAULT_BAN_DAYS}天")
+            logger.warning(f"{log_prefix} | admin rejected member | {member_info} | ban_days:{DEFAULT_BAN_DAYS}")
             return True
 
         else:
-            logger.warning(f"{log_prefix} | 未知操作类型 | 操作:{op}")
+            logger.warning(f"{log_prefix} | unknown operation | op:{op}")
             return False
 
     except Exception as e:
-        logger.error(f"{log_prefix} | 管理员操作处理失败 | 错误:{e}")
+        logger.error(f"{log_prefix} | admin operation failed | error:{e}")
         return False
 
 
@@ -114,7 +118,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
     try:
         parts = data.split("__")
         if len(parts) != 3:
-            logger.warning(f"{log_prefix} | 自验证数据格式错误 | data={data}")
+            logger.warning(f"{log_prefix} | invalid self-verify data | data={data}")
             return False
 
         chosen_key = parts[2]
@@ -122,7 +126,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
         from .session import CaptchaSession
         session_data = await CaptchaSession.get(chat.id, operator.id)
         if not session_data:
-            logger.warning(f"{log_prefix} | 自验证时 session 不存在")
+            logger.warning(f"{log_prefix} | session not found during self-verification")
             return False
 
         correct_answer = session_data.get("last_answer", "")
@@ -130,8 +134,9 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
         if chosen_key == correct_answer:
             await manager.delete_message(chat, msg, getattr(msg, "date", None))
             await delete_callback_map(chat.id, msg.id)
+            await CaptchaSession.delete(chat.id, operator.id)
             await accepted_member(chat, msg, operator)
-            logger.info(f"{log_prefix} | 验证成功 | 成员已通过验证")
+            logger.info(f"{log_prefix} | verification passed | member accepted")
             return True
 
         else:
@@ -142,6 +147,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
             if retry_count >= CAPTCHA_MAX_RETRY:
                 await manager.delete_message(chat, msg)
                 await delete_callback_map(chat.id, msg.id)
+                await CaptchaSession.delete(chat.id, operator.id)
                 await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
                 await manager.client.edit_permissions(
                     chat, operator.id,
@@ -153,7 +159,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                     datetime.now(timezone.utc) + timedelta(seconds=60),
                 )
                 logger.warning(
-                    f"{log_prefix} | 重试次数超限Kick | "
+                    f"{log_prefix} | retry limit exceeded, kicking | "
                     f"retry={retry_count} max={CAPTCHA_MAX_RETRY}"
                 )
                 return True
@@ -185,11 +191,11 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                 msg_date + timedelta(seconds=DELETED_AFTER),
             )
 
-            logger.info(f"{log_prefix} | 验证失败 | 已重新生成验证码 | chosen={chosen_key} correct={correct_answer}")
+            logger.info(f"{log_prefix} | verification failed | regenerated captcha | chosen={chosen_key} correct={correct_answer}")
             return True
 
     except Exception as e:
-        logger.error(f"{log_prefix} | 自验证处理失败 | 错误:{e}")
+        logger.error(f"{log_prefix} | self-verification failed | error:{e}")
         return False
 
 
@@ -197,7 +203,7 @@ async def process_callback_query(event: events.CallbackQuery.Event) -> None:
     """处理回调查询的主要逻辑。"""
     validation_error = await validate_callback_conditions(event)
     if validation_error:
-        logger.debug(f"回调验证失败: {validation_error}")
+        logger.debug(f"callback validation failed: {validation_error}")
         return
 
     msg = await event.get_message()
@@ -216,15 +222,21 @@ async def process_callback_query(event: events.CallbackQuery.Event) -> None:
     cb_map = await get_callback_map(chat.id, msg.id)
     if cb_map and data in cb_map:
         data = cb_map[data]
-        logger.debug(f"{log_prefix} | 回调数据解码 | hash={raw_data} -> data={data}")
+        logger.debug(f"{log_prefix} | callback data decoded | hash={raw_data} -> data={data}")
     else:
-        logger.warning(f"{log_prefix} | callback_map 未命中 | hash={raw_data} | cb_map={cb_map}")
+        logger.warning(f"{log_prefix} | callback_map miss | hash={raw_data}")
+        # 验证已过期，提示用户
+        try:
+            await event.answer("验证已过期，请重新入群获取新的验证。", alert=True)
+        except Exception:
+            pass
+        return
 
     is_admin = await manager.is_admin(chat, operator)
     is_self = data.startswith(f"{operator.id}__")
 
     if not (is_admin or is_self):
-        logger.warning(f"{log_prefix} | 权限不足 | 非管理员且非本人操作")
+        logger.warning(f"{log_prefix} | insufficient permissions | not admin and not self")
         await event.answer()
         return
 
@@ -235,17 +247,17 @@ async def process_callback_query(event: events.CallbackQuery.Event) -> None:
     try:
         if is_admin_op:
             if not is_admin:
-                logger.warning(f"{log_prefix} | 非管理员尝试管理员操作")
+                logger.warning(f"{log_prefix} | non-admin attempted admin operation")
                 await event.answer()
                 return
-            logger.debug(f"{log_prefix} | 管理员操作 | 数据:{data}")
+            logger.debug(f"{log_prefix} | admin operation | data:{data}")
             await handle_admin_operation(chat, msg, data, log_prefix)
         elif is_self:
-            logger.debug(f"{log_prefix} | 成员自验证 | 数据:{data}")
+            logger.debug(f"{log_prefix} | member self-verification | data:{data}")
             await handle_self_verification(chat, msg, data, operator, log_prefix)
         else:
-            logger.warning(f"{log_prefix} | 无法确定操作类型 | 数据:{data}")
+            logger.warning(f"{log_prefix} | cannot determine operation type | data:{data}")
     except Exception as e:
-        logger.error(f"{log_prefix} | 回调处理失败 | 错误:{e}")
+        logger.error(f"{log_prefix} | callback processing failed | error:{e}")
     finally:
         await event.answer()

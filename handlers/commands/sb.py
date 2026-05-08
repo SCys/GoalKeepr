@@ -1,5 +1,4 @@
 from datetime import timedelta
-from typing import Union
 
 from telethon import events, types
 from manager import manager
@@ -17,17 +16,17 @@ async def sb(event: events.NewMessage.Event):
     prefix = f"chat {event.chat_id} msg {event.id}"
 
     if not sender:
-        logger.warning(f"{prefix} message without user, ignored")
+        logger.warning(f"{prefix} message has no sender, ignoring")
         return
 
     # check permission
     if not await manager.is_admin(event.chat_id, sender.id):
-        logger.warning(f"{prefix} user {sender.id} is not admin")
+        logger.warning(f"{prefix} user {sender.id} is not an admin")
         return
 
     reply = await event.get_reply_message()
     if not reply:
-        logger.info(f"{prefix} no reply message")
+        logger.info(f"{prefix} no reply message found")
         return
 
     await manager.delete_message(event.chat_id, reply.id, event.date + timedelta(seconds=DELETED_AFTER))
@@ -45,13 +44,13 @@ async def sb(event: events.NewMessage.Event):
 
     # ignore
     elif isinstance(reply.action, types.MessageActionChatDeleteUser):
-        logger.info(f"{prefix} is left chat member message, ignored")
+        logger.info(f"{prefix} is a member-left message, ignoring")
         return
 
     reply_sender = await reply.get_sender()
     if resp := await ban_member(chat, event, sender, reply_sender):
         await manager.delete_message(event.chat_id, resp, event.date + timedelta(seconds=DELETED_AFTER))
-    
+
     await manager.delete_message(event.chat_id, event.id, event.date + timedelta(seconds=DELETED_AFTER))
 
 
@@ -70,15 +69,15 @@ async def ban_member(chat, event, administrator, member):
         # edit_permissions(view_messages=False) bans the user.
         await manager.client.edit_permissions(chat, member, view_messages=False)
     except Exception as e:
-        logger.warning(f"{prefix} user {id} ban is failed: {e}")
+        logger.warning(f"{prefix} failed to ban user {id}: {e}")
         return
 
-    logger.info(f"{prefix} user {id} is baned")
+    logger.info(f"{prefix} user {id} banned")
     
     member_name = manager.username(member)
     admin_name = manager.username(administrator)
 
     return await event.reply(
-        f"{member_name} 进入黑名单/is Baned by {admin_name}",
+        f"{member_name} 进入黑名单/is Banned by {admin_name}",
         link_preview=False
     )
