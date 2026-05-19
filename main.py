@@ -161,12 +161,36 @@ async def worker_loop():
         processed += await lazy_sessions()
         await asyncio.sleep(0.25 if processed else 1.0)
 
+async def startup_cleanup():
+    """启动时清理可能残留的 Redis 数据。"""
+    rdb = await manager.get_redis()
+    if not rdb:
+        return
+
+    cursor = 0
+    total = 0
+    while True:
+        cursor, keys = await rdb.scan(cursor, match="captcha_cb_map:*", count=100)
+        if keys:
+            await rdb.delete(*keys)
+            total += len(keys)
+        if cursor == 0:
+            break
+    if total:
+        logger.warning(f"启动清理：已清除 {total} 个残留 callback_map（重启导致失效）")
+    else:
+        logger.debug("启动清理：无残留 callback_map")
+
+
 async def main():
     manager.setup()
 
     # Initialize database tables
     await database.execute(SQL_CREATE_MESSAGES)
     await database.execute(SQL_CREATE_NEW_MEMBER_SESSION)
+
+    # Cleanup stale Redis data from previous run
+    await startup_cleanup()
 
     # Start tasks
     asyncio.create_task(txt2img_worker())

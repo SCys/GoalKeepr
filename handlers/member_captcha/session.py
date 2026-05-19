@@ -167,6 +167,9 @@ class CaptchaSession:
             "last_join_ts": now_iso,
             "state": new_state,
         })
+        # 新入群，清除上一轮入群的临时数据（标记、重试次数、验证码答案等），
+        # 让本次入群获得全新评估。频率计数器保留不变。
+        await rdb.hdel(session_key, "flagged_reason", "retry_count", "last_icon", "last_answer", "last_options")
         await rdb.expire(session_key, new_ttl)
 
         if new_state == "throttled":
@@ -242,6 +245,34 @@ class CaptchaSession:
         new_count = await rdb.hincrby(session_key, "retry_count", 1)
         logger.debug(f"CaptchaSession 重试 chat={chat_id} user={user_id} retry_count={new_count}")
         return new_count
+
+    # ------------------------------------------------------------------
+    # 安全检查标记（验证通过后执行踢出）
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def flag(chat_id: int, user_id: int, reason: str) -> None:
+        """标记会话：安全检查未通过，验证后执行对应动作。"""
+        rdb = await manager.get_redis()
+        if not rdb:
+            return
+
+        session_key = CaptchaSession.make_key(chat_id, user_id)
+        await rdb.hset(session_key, "flagged_reason", reason)
+        logger.debug(f"CaptchaSession 标记 chat={chat_id} user={user_id} reason={reason}")
+
+    @staticmethod
+    async def is_flagged(chat_id: int, user_id: int) -> Optional[str]:
+        """检查会话是否被标记。返回 reason 或 None。"""
+        rdb = await manager.get_redis()
+        if not rdb:
+            return None
+
+        session_key = CaptchaSession.make_key(chat_id, user_id)
+        raw = await rdb.hget(session_key, "flagged_reason")
+        if raw is None:
+            return None
+        return raw.decode() if isinstance(raw, bytes) else raw
 
     # ------------------------------------------------------------------
     # 读取 session

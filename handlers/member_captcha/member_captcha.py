@@ -114,6 +114,12 @@ async def member_captcha(event: events.ChatAction.Event):
 
     logger.info(f"{log_context.log_prefix} | 权限限制成功")
 
+    # ★ 兜底：程序在 restrict → captcha 之间崩溃时，到期后检查并踢出未验证成员
+    await manager.lazy_session(
+        chat.id, 0, user.id, "safety_timeout_check",
+        now + timedelta(seconds=180),
+    )
+
     # 处理静默模式
     if new_member_check_method in [VerificationMode.SILENCE, VerificationMode.SLEEP_1WEEK, VerificationMode.SLEEP_2WEEKS]:
         if await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix):
@@ -137,22 +143,11 @@ async def member_captcha(event: events.ChatAction.Event):
     # 收集需要检查的文本
     check_list = await get_member_info_for_check(user, session)
 
-    # 执行安全检查
-    if not await perform_security_checks(user, session, check_list, log_context, now):
-        logger.warning(f"{log_context.log_prefix} | 安全检查未通过 | 踢出用户")
-        try:
-            await manager.client.edit_permissions(
-                chat,
-                user.id,
-                view_messages=False,
-                until_date=timedelta(seconds=60),
-            )
-            await manager.lazy_session(
-                chat.id, 0, user.id, "unban_member", now + timedelta(seconds=60),
-            )
-        except Exception as e:
-            logger.error(f"{log_context.log_prefix} | Kick 失败 | {e}")
-        return
+    # 执行安全检查（不踢人，标记会话供验证通过后处理）
+    security_reason = await perform_security_checks(user, session, check_list, log_context, now)
+    if security_reason:
+        logger.warning(f"{log_context.log_prefix} | 安全检查未通过 | reason:{security_reason}")
+        await CaptchaSession.flag(chat.id, user.id, security_reason)
 
     # 生成验证码消息（返回文字 + Telethon buttons + 答案元数据）
     message_content, buttons, answer_meta = await build_captcha_message(user, now)
@@ -174,6 +169,9 @@ async def member_captcha(event: events.ChatAction.Event):
         parse_mode="md",
     )
     logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg.id}")
+
+    # 兜底已生效，取消兜底检查（下面开始调度正常 30s 超时踢人）
+    await manager.lazy_session_delete(chat.id, user.id, "safety_timeout_check")
 
     # 存储 callback_map 供回调时解码 MD5 哈希
     await store_callback_map(chat.id, captcha_msg.id, answer_meta["callback_map"], ttl=DELETED_AFTER + 15)

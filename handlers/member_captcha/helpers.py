@@ -216,3 +216,4 @@ async def accepted_member(chat: Any, msg: Any, user: Any):
     reply = await manager.client.send_message(chat, content, parse_mode="md")
     await manager.delete_message(chat, reply, msg_date + timedelta(seconds=DELETED_AFTER))
     await manager.lazy_session_delete(chat_id, user.id, "new_member_check")
+    await manager.lazy_session_delete(chat_id, user.id, "safety_timeout_check")
