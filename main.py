@@ -4,7 +4,7 @@ import database
 from manager import manager
 from handlers import *  # Import handlers to register them
 from handlers.commands.image import worker as txt2img_worker
-from handlers.member_captcha.events import new_member_check, unban_member
+from handlers.member_captcha.events import new_member_check, unban_member, safety_timeout_check
 
 logger = manager.logger
 

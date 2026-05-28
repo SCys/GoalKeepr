@@ -6,10 +6,9 @@ SETTINGS_KEY_PREFIX = "group:settings:"
 
 SETTINGS_DEFAULT_VALUE = {
     "new_member_check_method": "ban",
-    "auto_ban_time_seconds": 24 * 60 * 60,
 }
 
-NEW_MEBMER_CHECK_METHODS = {
+NEW_MEMBER_CHECK_METHODS = {
     "ban": "认证剔除",
     "silence": "手动解封",
     "none": "无作为",

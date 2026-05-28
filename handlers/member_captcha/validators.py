@@ -3,7 +3,6 @@
 Member captcha validation logic module
 """
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
 
@@ -13,7 +12,7 @@ from telethon import events, types
 from manager import manager
 from manager.group import settings_get
 
-from .config import SUPPORT_GROUP_TYPES, EVENT_EXPIRY_SECONDS, VerificationMode, MEMBER_CHECK_WAIT_TIME, get_chat_type
+from .config import SUPPORT_GROUP_TYPES, EVENT_EXPIRY_SECONDS, VerificationMode, get_chat_type
 from .exceptions import LogContext, ValidationError
 from .security import restrict_member_permissions
 from .session import Session
@@ -57,9 +56,6 @@ async def get_verification_method(chat_id: int) -> str:
         return VerificationMode.BAN
 
     result = await settings_get(rdb, chat_id, "new_member_check_method", VerificationMode.BAN)
-    # Convert to string if result is a dictionary or ensure it's a string
-    if isinstance(result, dict):
-        return str(result.get("value", VerificationMode.BAN))
     return str(result)
 
 
@@ -140,4 +136,4 @@ async def create_verification_session(
     try:
         return await Session.create(chat, user, now)
     except Exception as e:
-        logger.error(f"{log_context.log_prefix} | 创建会话失败 | 错误:{e}")
+        logger.exception(f"{log_context.log_prefix} | 创建会话失败 | 错误:{e}")

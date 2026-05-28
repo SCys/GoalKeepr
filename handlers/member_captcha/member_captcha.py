@@ -107,6 +107,26 @@ async def member_captcha(event: events.ChatAction.Event):
         logger.info(f"{log_context.log_prefix} | 无作为 | 新成员加入")
         return
 
+    # 静默模式：SILENCE（永久限制，管理员手动解封）
+    if new_member_check_method == VerificationMode.SILENCE:
+        if not await restrict_member_permissions(chat, user):
+            logger.error(f"{log_context.log_prefix} | 权限不足 | 无法限制用户")
+            return
+        logger.info(f"{log_context.log_prefix} | 权限限制成功")
+        await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix)
+        return
+
+    # 静默模式：SLEEP_1WEEK / SLEEP_2WEEKS（由 handle_silence_mode 内部限制权限）
+    if new_member_check_method in [VerificationMode.SLEEP_1WEEK, VerificationMode.SLEEP_2WEEKS]:
+        if await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix):
+            return
+        # handle_silence_mode 失败，降级到验证码流程
+        logger.warning(f"{log_context.log_prefix} | 静默模式处理失败，降级到验证码")
+
+    # BAN 模式（默认）— 验证码验证流程
+    if new_member_check_method != VerificationMode.BAN:
+        logger.warning(f"{log_context.log_prefix} | 未知处理方式: {new_member_check_method}，使用默认验证码流程")
+
     # 收紧新成员权限，禁止发送消息
     if not await restrict_member_permissions(chat, user):
         logger.error(f"{log_context.log_prefix} | 权限不足 | 无法限制用户")
@@ -119,11 +139,6 @@ async def member_captcha(event: events.ChatAction.Event):
         chat.id, 0, user.id, "safety_timeout_check",
         now + timedelta(seconds=180),
     )
-
-    # 处理静默模式
-    if new_member_check_method in [VerificationMode.SILENCE, VerificationMode.SLEEP_1WEEK, VerificationMode.SLEEP_2WEEKS]:
-        if await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix):
-            return
 
     # 创建验证会话（传入 event 以兼容 Session.get 的 event.date）
     session = await create_verification_session(chat, user, now, log_context)

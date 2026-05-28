@@ -5,7 +5,7 @@ Member captcha security check module
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 
 from loguru import logger
 from telethon import types
@@ -19,12 +19,13 @@ from .exceptions import LogContext, PermissionError, SecurityCheckError
 from .session import Session
 
 
-async def restrict_member_permissions(chat: Any, user: types.User, until_date: Optional[timedelta] = None) -> bool:
+async def restrict_member_permissions(chat: Any, user: Union[int, types.User], until_date: Optional[timedelta] = None) -> bool:
     """使用 Telethon edit_permissions 限制成员发言等权限。"""
+    user_id = user.id if isinstance(user, types.User) else user
     try:
         await manager.client.edit_permissions(
             chat,
-            user,
+            user_id,
             send_messages=False,
             send_media=False,
             send_stickers=False,
@@ -36,8 +37,8 @@ async def restrict_member_permissions(chat: Any, user: types.User, until_date: O
         )
         return True
     except Exception as e:
-        logger.error(f"failed to restrict permissions for member {user.id}: {e}")
-        raise PermissionError(f"error restricting member permissions: {e}", getattr(chat, "id", chat), user.id)
+        logger.error(f"failed to restrict permissions for member {user_id}: {e}")
+        raise PermissionError(f"error restricting member permissions: {e}", getattr(chat, "id", chat), user_id)
 
 
 async def restore_member_permissions(chat: Any, user: types.User) -> bool:
