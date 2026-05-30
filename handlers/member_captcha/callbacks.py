@@ -10,7 +10,7 @@ from telethon import events
 from loguru import logger
 
 from manager import manager
-from .config import SUPPORT_GROUP_TYPES, CallbackOperation, DEFAULT_BAN_DAYS, get_chat_type
+from .config import SUPPORT_GROUP_TYPES, CallbackOperation, DEFAULT_BAN_DAYS, DELETED_AFTER, CAPTCHA_MAX_RETRY, get_chat_type
 from .exceptions import LogContext
 from .helpers import accepted_member, build_captcha_message, get_callback_map, store_callback_map, delete_callback_map
 
@@ -86,6 +86,7 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
             await manager.delete_message(chat, msg)
             await delete_callback_map(chat.id, msg.id)
             from .session import CaptchaSession
+            await manager.lazy_session_delete(chat.id, member_id, "safety_timeout_check")
             await CaptchaSession.delete(chat.id, member_id)
             await accepted_member(chat, msg, user)
             logger.info(f"{log_prefix} | admin accepted member | {member_info}")
@@ -95,6 +96,7 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
             await manager.delete_message(chat, msg)
             await delete_callback_map(chat.id, msg.id)
             from .session import CaptchaSession
+            await manager.lazy_session_delete(chat.id, member_id, "safety_timeout_check")
             await CaptchaSession.delete(chat.id, member_id)
             await manager.client.edit_permissions(
                 chat, member_id,
@@ -134,13 +136,40 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
         if chosen_key == correct_answer:
             await manager.delete_message(chat, msg, getattr(msg, "date", None))
             await delete_callback_map(chat.id, msg.id)
+
+            # 检查是否有安全检查标记
+            flagged_reason = await CaptchaSession.is_flagged(chat.id, operator.id)
+            await manager.lazy_session_delete(chat.id, operator.id, "safety_timeout_check")
             await CaptchaSession.delete(chat.id, operator.id)
+
+            if flagged_reason == "advertising":
+                await manager.client.edit_permissions(
+                    chat, operator.id,
+                    view_messages=False,
+                    until_date=timedelta(days=DEFAULT_BAN_DAYS),
+                )
+                await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
+                logger.warning(f"{log_prefix} | advertising detected | member banned | ban_days:{DEFAULT_BAN_DAYS}")
+                return True
+            elif flagged_reason == "llm":
+                await manager.client.edit_permissions(
+                    chat, operator.id,
+                    view_messages=False,
+                    until_date=timedelta(seconds=60),
+                )
+                await manager.lazy_session(
+                    chat.id, msg.id, operator.id, "unban_member",
+                    datetime.now(timezone.utc) + timedelta(seconds=60),
+                )
+                await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
+                logger.warning(f"{log_prefix} | LLM detected spam | member kicked")
+                return True
+
             await accepted_member(chat, msg, operator)
             logger.info(f"{log_prefix} | verification passed | member accepted")
             return True
 
         else:
-            from .config import DELETED_AFTER, CAPTCHA_MAX_RETRY
 
             # 递增重试次数，超过上限直接 Kick
             retry_count = await CaptchaSession.record_retry(chat.id, operator.id)
@@ -158,6 +187,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                     chat.id, msg.id, operator.id, "unban_member",
                     datetime.now(timezone.utc) + timedelta(seconds=60),
                 )
+                await manager.lazy_session_delete(chat.id, operator.id, "safety_timeout_check")
                 logger.warning(
                     f"{log_prefix} | retry limit exceeded, kicking | "
                     f"retry={retry_count} max={CAPTCHA_MAX_RETRY}"

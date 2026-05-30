@@ -2,6 +2,8 @@ name: Deploy Bot
 
 on:
   push:
+    branches:
+      - master
 
 jobs:
   deploy:

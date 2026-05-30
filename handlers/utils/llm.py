@@ -53,8 +53,7 @@ async def check_spams_with_llm(
         system_prompt = "分辨出那些用户是SPAM，这些用户资料来自 Telegram，判断依据：\n"
         system_prompt += "1. username可能为null，为空也不减分\n"
         system_prompt += "2. 检查bio是否包含广告或推广内容\n"
-        system_prompt += "3. 检查用户名是否看起来像随机生成的\n"
-        system_prompt += "4. 检查用户资料是否有可疑模式\n\n"
+        system_prompt += "3. 检查用户资料是否有可疑模式\n\n"
         system_prompt += "\n 输出格式："
 
         if additional_strings and len(additional_strings) > 0:

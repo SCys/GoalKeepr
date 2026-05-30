@@ -113,8 +113,10 @@ def check_advertising(text: str) -> Tuple[bool, Optional[str]]:
     if words:
         # Convert text to lowercase for case-insensitive matching
         text_lower = text.lower()
-        
+
         for word in words:
+            if len(word) < 2:
+                continue
             if word.lower() in text_lower:
                 logger.info(f"Advertising word detected: {word}")
                 return True, word

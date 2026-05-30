@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from telethon import events, Button
 
 from manager import manager
-from manager.group import NEW_MEBMER_CHECK_METHODS, settings_get, settings_set
-from handlers.member_captcha.config import get_chat_type
+from manager.group import NEW_MEMBER_CHECK_METHODS, settings_get, settings_set
+from handlers.member_captcha.config import VerificationMode, get_chat_type
 
 log = manager.logger
 
@@ -30,8 +30,8 @@ async def group_setting_command(event: events.NewMessage.Event):
         log.error("Redis connection failed")
         return
 
-    new_member_check_method = await settings_get(rdb, chat.id, "new_member_check_method", "ban")
-    new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(new_member_check_method, "未知")
+    new_member_check_method = await settings_get(rdb, chat.id, "new_member_check_method", VerificationMode.BAN)
+    new_member_check_method_name = NEW_MEMBER_CHECK_METHODS.get(new_member_check_method, "未知")
 
     text = "⚙️ 群组设置面板\n\n"
     text += "📋 当前配置：\n"
@@ -98,8 +98,8 @@ async def group_setting_callback(event: events.CallbackQuery.Event):
         key = "new_member_check_method"
         await settings_set(rdb, chat.id, {key: value})
 
-        new_member_check_method = await settings_get(rdb, chat.id, "new_member_check_method", "ban")
-        new_member_check_method_name = NEW_MEBMER_CHECK_METHODS.get(new_member_check_method, "未知")
+        new_member_check_method = await settings_get(rdb, chat.id, "new_member_check_method", VerificationMode.BAN)
+        new_member_check_method_name = NEW_MEMBER_CHECK_METHODS.get(new_member_check_method, "未知")
 
         text = "✅ 设置已成功更新！\n\n"
         text += "📋 当前群组配置：\n"

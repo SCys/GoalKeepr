@@ -107,6 +107,26 @@ async def member_captcha(event: events.ChatAction.Event):
         logger.info(f"{log_context.log_prefix} | 无作为 | 新成员加入")
         return
 
+    # 静默模式：SILENCE（永久限制，管理员手动解封）
+    if new_member_check_method == VerificationMode.SILENCE:
+        if not await restrict_member_permissions(chat, user):
+            logger.error(f"{log_context.log_prefix} | 权限不足 | 无法限制用户")
+            return
+        logger.info(f"{log_context.log_prefix} | 权限限制成功")
+        await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix)
+        return
+
+    # 静默模式：SLEEP_1WEEK / SLEEP_2WEEKS（由 handle_silence_mode 内部限制权限）
+    if new_member_check_method in [VerificationMode.SLEEP_1WEEK, VerificationMode.SLEEP_2WEEKS]:
+        if await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix):
+            return
+        # handle_silence_mode 失败，降级到验证码流程
+        logger.warning(f"{log_context.log_prefix} | 静默模式处理失败，降级到验证码")
+
+    # BAN 模式（默认）— 验证码验证流程
+    if new_member_check_method != VerificationMode.BAN:
+        logger.warning(f"{log_context.log_prefix} | 未知处理方式: {new_member_check_method}，使用默认验证码流程")
+
     # 收紧新成员权限，禁止发送消息
     if not await restrict_member_permissions(chat, user):
         logger.error(f"{log_context.log_prefix} | 权限不足 | 无法限制用户")
@@ -114,10 +134,11 @@ async def member_captcha(event: events.ChatAction.Event):
 
     logger.info(f"{log_context.log_prefix} | 权限限制成功")
 
-    # 处理静默模式
-    if new_member_check_method in [VerificationMode.SILENCE, VerificationMode.SLEEP_1WEEK, VerificationMode.SLEEP_2WEEKS]:
-        if await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix):
-            return
+    # ★ 兜底：程序在 restrict → captcha 之间崩溃时，到期后检查并踢出未验证成员
+    await manager.lazy_session(
+        chat.id, 0, user.id, "safety_timeout_check",
+        now + timedelta(seconds=180),
+    )
 
     # 创建验证会话（传入 event 以兼容 Session.get 的 event.date）
     session = await create_verification_session(chat, user, now, log_context)
@@ -137,22 +158,11 @@ async def member_captcha(event: events.ChatAction.Event):
     # 收集需要检查的文本
     check_list = await get_member_info_for_check(user, session)
 
-    # 执行安全检查
-    if not await perform_security_checks(user, session, check_list, log_context, now):
-        logger.warning(f"{log_context.log_prefix} | 安全检查未通过 | 踢出用户")
-        try:
-            await manager.client.edit_permissions(
-                chat,
-                user.id,
-                view_messages=False,
-                until_date=timedelta(seconds=60),
-            )
-            await manager.lazy_session(
-                chat.id, 0, user.id, "unban_member", now + timedelta(seconds=60),
-            )
-        except Exception as e:
-            logger.error(f"{log_context.log_prefix} | Kick 失败 | {e}")
-        return
+    # 执行安全检查（不踢人，标记会话供验证通过后处理）
+    security_reason = await perform_security_checks(user, session, check_list, log_context, now)
+    if security_reason:
+        logger.warning(f"{log_context.log_prefix} | 安全检查未通过 | reason:{security_reason}")
+        await CaptchaSession.flag(chat.id, user.id, security_reason)
 
     # 生成验证码消息（返回文字 + Telethon buttons + 答案元数据）
     message_content, buttons, answer_meta = await build_captcha_message(user, now)
@@ -174,6 +184,9 @@ async def member_captcha(event: events.ChatAction.Event):
         parse_mode="md",
     )
     logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg.id}")
+
+    # 兜底已生效，取消兜底检查（下面开始调度正常 30s 超时踢人）
+    await manager.lazy_session_delete(chat.id, user.id, "safety_timeout_check")
 
     # 存储 callback_map 供回调时解码 MD5 哈希
     await store_callback_map(chat.id, captcha_msg.id, answer_meta["callback_map"], ttl=DELETED_AFTER + 15)

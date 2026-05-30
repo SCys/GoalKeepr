@@ -5,7 +5,7 @@ Member captcha security check module
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 
 from loguru import logger
 from telethon import types
@@ -14,17 +14,18 @@ from manager import manager
 from utils.advertising import check_advertising
 from ..utils.llm import check_spams_with_llm
 
-from .config import LLM_CHECK_TIMEOUT, DEFAULT_BAN_DAYS, DELETED_AFTER
+from .config import LLM_CHECK_TIMEOUT, DELETED_AFTER
 from .exceptions import LogContext, PermissionError, SecurityCheckError
 from .session import Session
 
 
-async def restrict_member_permissions(chat: Any, user: types.User, until_date: Optional[timedelta] = None) -> bool:
+async def restrict_member_permissions(chat: Any, user: Union[int, types.User], until_date: Optional[timedelta] = None) -> bool:
     """使用 Telethon edit_permissions 限制成员发言等权限。"""
+    user_id = user.id if isinstance(user, types.User) else user
     try:
         await manager.client.edit_permissions(
             chat,
-            user,
+            user_id,
             send_messages=False,
             send_media=False,
             send_stickers=False,
@@ -36,8 +37,8 @@ async def restrict_member_permissions(chat: Any, user: types.User, until_date: O
         )
         return True
     except Exception as e:
-        logger.error(f"failed to restrict permissions for member {user.id}: {e}")
-        raise PermissionError(f"error restricting member permissions: {e}", getattr(chat, "id", chat), user.id)
+        logger.error(f"failed to restrict permissions for member {user_id}: {e}")
+        raise PermissionError(f"error restricting member permissions: {e}", getattr(chat, "id", chat), user_id)
 
 
 async def restore_member_permissions(chat: Any, user: types.User) -> bool:
@@ -86,7 +87,7 @@ async def get_member_info_for_check(user: types.User, session: Session) -> List[
 
 async def perform_security_checks(
     user: types.User, session: Session, check_list: List[str], log_context: LogContext, now: datetime
-) -> bool:
+) -> Optional[str]:
     """
     执行安全检查（LLM检查和广告检查）
 
@@ -98,7 +99,7 @@ async def perform_security_checks(
         now: 当前时间
 
     Returns:
-        bool: True表示检查通过，False表示发现问题需要封禁
+        Optional[str]: None 表示通过，'llm' 或 'advertising' 表示检测类型
 
     Raises:
         SecurityCheckError: 安全检查过程中发生错误
@@ -107,12 +108,16 @@ async def perform_security_checks(
         # LLM检查
         llm_found_spam = await _perform_llm_check(user, session, check_list, log_context, now)
         if llm_found_spam:
-            return False
+            return "llm"
 
         # 广告检查
-        return await _perform_advertising_check(
-            log_context.chat, user.id, check_list, session, log_context.log_prefix
+        adv_found = await _perform_advertising_check(
+            check_list, session, log_context
         )
+        if adv_found:
+            return "advertising"
+
+        return None
     except Exception as e:
         logger.exception(f"{log_context.log_prefix} | security check failed | error:{e}")
         raise SecurityCheckError(f"安全检查失败: {e}", log_context.chat.id, user.id)
@@ -152,28 +157,28 @@ async def _perform_llm_check(
 
 
 async def _perform_advertising_check(
-    chat: Any, member_id: int, strings_to_check: List[str], session: Session, log_prefix: str
+    strings_to_check: List[str], session: Session, log_context: LogContext
 ) -> bool:
-    """执行广告检查"""
+    """执行广告检查，返回 True 表示检测到广告内容。"""
     for txt in strings_to_check:
         contains_adv, matched_word = check_advertising(txt)
 
         if contains_adv:
-            await _handle_advertising_violation(chat, member_id, matched_word or "未知", session, log_prefix)
-            return False
+            await _handle_advertising_violation(matched_word or "未知", session, log_context)
+            return True
 
-    return True
+    return False
 
 
 async def _handle_advertising_violation(
-    chat: Any, member_id: int, matched_word: str, session: Session, log_prefix: str
+    matched_word: str, session: Session, log_context: LogContext
 ) -> None:
-    """处理广告违规"""
+    """处理广告违规：发送通知并记录日志（不执行封禁，由上层验证通过后统一处理）。"""
     try:
         await manager.send(
-            chat.id,
-            f"用户 {member_id} 的名或者BIO明确包含广告内容，已经被剔除。\n"
-            f"Message from {member_id} contains advertising content and has been removed.",
+            log_context.chat.id,
+            f"用户 {log_context.member_id} 的昵称或者BIO明确包含广告内容，已记录。\n"
+            f"Message from {log_context.member_id} contains advertising content and has been recorded.",
             auto_deleted_at=datetime.now() + timedelta(seconds=DELETED_AFTER),
         )
 
@@ -183,17 +188,8 @@ async def _handle_advertising_violation(
         if session.member_bio:
             log_details += f" | bio:{session.member_bio}"
 
-        logger.warning(f"{log_prefix} | advertising content detected | {log_details}")
-
-        # 封禁用户（Telethon: view_messages=False + until_date）
-        await manager.client.edit_permissions(
-            chat,
-            member_id,
-            view_messages=False,
-            until_date=timedelta(days=DEFAULT_BAN_DAYS),
-        )
-        logger.info(f"{log_prefix} | user banned | ban_days:{DEFAULT_BAN_DAYS}")
+        logger.warning(f"{log_context.log_prefix} | advertising content detected | {log_details}")
 
     except Exception as e:
-        logger.error(f"{log_prefix} | failed to ban user | error:{e}")
-        raise SecurityCheckError(f"处理广告违规失败: {e}", chat.id, member_id)
+        logger.error(f"{log_context.log_prefix} | failed to handle advertising violation | error:{e}")
+        raise SecurityCheckError(f"处理广告违规失败: {e}", log_context.chat.id, log_context.member_id)
