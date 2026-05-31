@@ -116,8 +116,8 @@ async def member_captcha(event: events.ChatAction.Event):
         await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix)
         return
 
-    # 静默模式：SLEEP_1WEEK / SLEEP_2WEEKS（由 handle_silence_mode 内部限制权限）
-    if new_member_check_method in [VerificationMode.SLEEP_1WEEK, VerificationMode.SLEEP_2WEEKS]:
+    # 静默模式：SLEEP_1WEEK / SLEEP_2WEEKS / sleep_custom:N（由 handle_silence_mode 内部限制权限）
+    if new_member_check_method in [VerificationMode.SLEEP_1WEEK, VerificationMode.SLEEP_2WEEKS] or new_member_check_method.startswith("sleep_custom:"):
         if await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix):
             return
         # handle_silence_mode 失败，降级到验证码流程

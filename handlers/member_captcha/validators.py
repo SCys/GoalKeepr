@@ -112,6 +112,29 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
                 logger.error(f"{log_prefix} | 权限不足 | 无法限制用户")
                 return False
 
+        elif check_method.startswith("sleep_custom:"):
+            try:
+                days = float(check_method.split(":")[1])
+            except (ValueError, IndexError):
+                logger.error(f"{log_prefix} | 自定义静默天数解析失败: {check_method}")
+                return False
+            if days <= 0:
+                logger.error(f"{log_prefix} | 自定义静默天数无效: {days}")
+                return False
+            if await restrict_member_permissions(chat, member_id, timedelta(days=days)):
+                await manager.send(
+                    chat.id,
+                    f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，"
+                    f"已被静默 {int(days)} 天。\n"
+                    f"Welcome, you are muted for {int(days)} days.",
+                    parse_mode="markdown",
+                )
+                logger.info(f"{log_prefix} | 自定义静默 {int(days)} 天 | 新成员加入")
+                return True
+            else:
+                logger.error(f"{log_prefix} | 权限不足 | 无法限制用户")
+                return False
+
         return False
     except Exception as e:
         logger.error(f"{log_prefix} | 静默模式处理失败 | 错误:{e}")
