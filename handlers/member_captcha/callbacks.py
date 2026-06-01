@@ -71,7 +71,11 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
             return False
 
         member_id, _, op = items
-        member_id = int(member_id)
+        try:
+            member_id = int(member_id)
+        except ValueError:
+            logger.warning(f"{log_prefix} | invalid member_id format: {member_id}")
+            return False
         try:
             user = await manager.client.get_entity(member_id)
         except Exception as e:

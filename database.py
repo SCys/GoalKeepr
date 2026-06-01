@@ -2,13 +2,15 @@ import asyncio
 import aiosqlite
 import os
 from typing import Optional
+import loguru
 
 # Ensure data directory exists
 os.makedirs("./data", exist_ok=True)
 
 _conn: Optional[aiosqlite.Connection] = None
-_conn_lock = asyncio.Lock()
 _conn_use_lock = asyncio.Lock()
+
+logger = loguru.logger
 
 async def connection() -> aiosqlite.Connection:
     """
@@ -16,7 +18,7 @@ async def connection() -> aiosqlite.Connection:
     """
     global _conn
     if _conn is None:
-        async with _conn_lock:
+        async with _conn_use_lock:
             if _conn is None:
                 _conn = await aiosqlite.connect("./data/main.db", timeout=30.0)
     return _conn

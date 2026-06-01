@@ -1,4 +1,5 @@
 """
+from typing import Optional
 广告词检测模块
 Advertising words detection module
 """
@@ -92,7 +93,7 @@ def load_advertising_patterns() -> List[Dict[str, Any]]:
     return patterns
 
 
-def check_advertising(text: str) -> Tuple[bool, Optional[str]]:
+def check_advertising(text: Optional[str]) -> Tuple[bool, Optional[str]]:
     """
     检查文本是否包含广告词
     Check if text contains advertising words

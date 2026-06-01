@@ -155,7 +155,11 @@ async def get_callback_map(chat_id: int, msg_id: int) -> Optional[Dict[str, str]
     key = f"captcha_cb_map:{chat_id}:{msg_id}"
     raw = await rdb.get(key)
     if raw:
-        return json.loads(raw if isinstance(raw, str) else raw.decode("utf-8"))
+        try:
+            return json.loads(raw if isinstance(raw, str) else raw.decode("utf-8"))
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse callback_map: {e}")
+            return None
     return None
 
 

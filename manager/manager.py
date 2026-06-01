@@ -451,3 +451,10 @@ class Manager:
         if self.http_session is None or self.http_session.closed:
             self.http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
         return self.http_session
+
+    async def close_http_session(self) -> None:
+        """关闭 HTTP 会话"""
+        if self.http_session and not self.http_session.closed:
+            await self.http_session.close()
+            self.http_session = None
+            logger.debug("http session closed")

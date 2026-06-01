@@ -77,7 +77,7 @@ async def check_spams_with_llm(
                     ),
                     timeout=7,
                 )
-            except TimeoutError as e:
+            except asyncio.TimeoutError as e:
                 logger.error(f"check_spams_with_llm timeout for model {model}: {e}")
                 continue
 
