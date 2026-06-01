@@ -15,7 +15,7 @@ from utils.advertising import check_advertising
 from ..utils.llm import check_spams_with_llm
 
 from .config import LLM_CHECK_TIMEOUT, DELETED_AFTER
-from .exceptions import LogContext, PermissionError, SecurityCheckError
+from .exceptions import LogContext, SecurityCheckError
 from .session import Session
 
 
@@ -38,7 +38,7 @@ async def restrict_member_permissions(chat: Any, user: Union[int, types.User], u
         return True
     except Exception as e:
         logger.error(f"failed to restrict permissions for member {user_id}: {e}")
-        raise PermissionError(f"error restricting member permissions: {e}", getattr(chat, "id", chat), user_id)
+        return False
 
 
 async def restore_member_permissions(chat: Any, user: types.User) -> bool:

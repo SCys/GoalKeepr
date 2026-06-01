@@ -414,7 +414,7 @@ async def chat_admin_settings_callback(event: events.CallbackQuery.Event):
 
         settings["model"] = model
         await rdb.set(f"chat:settings:global", dumps(settings))
-        msg = event.message
+        msg = await event.get_message()
         await manager.reply(
             msg,
             f"全局默认模型已设置为{model}",

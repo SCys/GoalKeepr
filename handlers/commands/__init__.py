@@ -16,4 +16,4 @@ from .whoami import whoami
 # from .chat import chat, chat_admin_settings_callback
 
 # setting
-# from .group_setting import group_setting_command, group_setting_callback
+from .group_setting import group_setting_command, group_setting_callback

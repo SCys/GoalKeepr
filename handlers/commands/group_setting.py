@@ -69,7 +69,7 @@ async def group_setting_callback(event: events.CallbackQuery.Event):
     if not data.startswith("su:"):
         return
 
-    msg = event.message
+    msg = await event.get_message()
     chat = await event.get_chat()
     user = await event.get_sender()
     if not await manager.is_admin(chat, user):
