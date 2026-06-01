@@ -29,8 +29,8 @@ async def execute(query: str, *args, **kwargs):
     Execute a query and commit the changes.
     Creates a new connection for each call to avoid thread reuse issues.
     """
+    conn = await connection()
     async with _conn_use_lock:
-        conn = await connection()
         await conn.execute(query, *args, **kwargs)
         await conn.commit()
 
@@ -38,10 +38,9 @@ async def execute(query: str, *args, **kwargs):
 async def execute_fetch(query: str, *args, **kwargs):
     """
     Execute a query and return the results.
-    Creates a new connection for each call to avoid thread reuse issues.
     """
+    conn = await connection()
     async with _conn_use_lock:
-        conn = await connection()
         cursor = await conn.execute(query, *args, **kwargs)
         rows = await cursor.fetchall()
         await cursor.close()
@@ -52,5 +51,7 @@ async def close() -> None:
     """关闭数据库连接"""
     global _conn
     if _conn is not None:
-        await _conn.close()
-        _conn = None
+        async with _conn_use_lock:
+            if _conn is not None:
+                await _conn.close()
+                _conn = None

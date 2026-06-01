@@ -138,7 +138,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
         correct_answer = session_data.get("last_answer", "")
 
         if chosen_key == correct_answer:
-            await manager.delete_message(chat, msg, getattr(msg, "date", None))
+            await manager.delete_message(chat, msg)
             await delete_callback_map(chat.id, msg.id)
 
             # 检查是否有安全检查标记
