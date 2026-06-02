@@ -17,3 +17,6 @@ from .whoami import whoami
 
 # setting
 from .group_setting import group_setting_command, group_setting_callback
+
+# stats
+from .captcha_stats import captcha_stats

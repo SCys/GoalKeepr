@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from manager import manager
 from .config import DEFAULT_BAN_DAYS
+from .stats import stats_incr, FIELD_FAILED
 
 logger = manager.logger
 
@@ -78,6 +79,8 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
                 datetime.now() + timedelta(seconds=60),
             )
             logger.info(f"chat {chat_id} msg {message_id} member {member_id} is kicked by timeout")
+            rdb = await manager.get_redis()
+            await stats_incr(rdb, FIELD_FAILED, chat_id, member_id)
 
 
 @manager.register_event("unban_member")
@@ -126,3 +129,5 @@ async def safety_timeout_check(client, chat_id: int, message_id: int, member_id:
                 datetime.now() + timedelta(seconds=60),
             )
             logger.info(f"chat {chat_id} msg {message_id} member {member_id} is kicked by safety timeout")
+            rdb = await manager.get_redis()
+            await stats_incr(rdb, FIELD_FAILED, chat_id, member_id)

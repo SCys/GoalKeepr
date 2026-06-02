@@ -22,6 +22,7 @@ from .validators import (
 from .security import restrict_member_permissions, get_member_info_for_check, perform_security_checks
 from .helpers import build_captcha_message, store_callback_map
 from .callbacks import process_callback_query
+from .stats import stats_incr, FIELD_GROUP_JOINS, FIELD_VERIFICATIONS
 
 
 @manager.register("chat_member")
@@ -98,6 +99,10 @@ async def member_captcha(event: events.ChatAction.Event):
         # duplicate 或其他状态：静默跳过
         return
 
+    # ★ 统计：入群人次
+    rdb_stats = await manager.get_redis()
+    await stats_incr(rdb_stats, FIELD_GROUP_JOINS, chat.id, user.id)
+
     # 获取验证方法配置
     new_member_check_method = await get_verification_method(chat.id)
 
@@ -113,12 +118,12 @@ async def member_captcha(event: events.ChatAction.Event):
             logger.error(f"{log_context.log_prefix} | 权限不足 | 无法限制用户")
             return
         logger.info(f"{log_context.log_prefix} | 权限限制成功")
-        await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix)
+        await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix, now)
         return
 
     # 静默模式：SLEEP_1WEEK / SLEEP_2WEEKS（由 handle_silence_mode 内部限制权限）
     if new_member_check_method in [VerificationMode.SLEEP_1WEEK, VerificationMode.SLEEP_2WEEKS]:
-        if await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix):
+        if await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix, now):
             return
         # handle_silence_mode 失败，降级到验证码流程
         logger.warning(f"{log_context.log_prefix} | 静默模式处理失败，降级到验证码")
@@ -184,6 +189,9 @@ async def member_captcha(event: events.ChatAction.Event):
         parse_mode="md",
     )
     logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg.id}")
+
+    # ★ 统计：验证次数
+    await stats_incr(rdb_stats, FIELD_VERIFICATIONS, chat.id)
 
     # 兜底已生效，取消兜底检查（下面开始调度正常 30s 超时踢人）
     await manager.lazy_session_delete(chat.id, user.id, "safety_timeout_check")

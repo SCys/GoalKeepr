@@ -12,7 +12,7 @@ from telethon import events, types
 from manager import manager
 from manager.group import settings_get
 
-from .config import SUPPORT_GROUP_TYPES, EVENT_EXPIRY_SECONDS, VerificationMode, get_chat_type
+from .config import SUPPORT_GROUP_TYPES, EVENT_EXPIRY_SECONDS, VerificationMode, DELETED_AFTER, get_chat_type
 from .exceptions import LogContext, ValidationError
 from .security import restrict_member_permissions
 from .session import Session
@@ -59,7 +59,7 @@ async def get_verification_method(chat_id: int) -> str:
     return str(result)
 
 
-async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, check_method: str, log_prefix: str) -> bool:
+async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, check_method: str, log_prefix: str, now: datetime) -> bool:
     """
     处理静默模式
 
@@ -80,6 +80,7 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
                 f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，请管理员手动解封。"
                 f"Welcome to the group, please wait for admin to unmute you.",
                 parse_mode="markdown",
+                auto_deleted_at=now + timedelta(seconds=DELETED_AFTER),
             )
             logger.info(f"{log_prefix} | 静默处理 | 新成员加入")
             return True
@@ -91,6 +92,7 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
                     f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，已静默1周。"
                     f"Welcome to the group, you are muted for 1 week.",
                     parse_mode="markdown",
+                    auto_deleted_at=now + timedelta(seconds=DELETED_AFTER),
                 )
                 logger.info(f"{log_prefix} | 静默1周 | 新成员加入")
                 return True
@@ -105,6 +107,7 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
                     f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，已静默2周。"
                     f"Welcome to the group, you are muted for 2 weeks.",
                     parse_mode="markdown",
+                    auto_deleted_at=now + timedelta(seconds=DELETED_AFTER),
                 )
                 logger.info(f"{log_prefix} | 静默2周 | 新成员加入")
                 return True

@@ -20,6 +20,7 @@ class FakeRedis:
     def __init__(self):
         self._data: dict[str, Any] = {}
         self._hashes: dict[str, dict[Any, Any]] = {}
+        self._sets: dict[str, set[str]] = {}
         self._sorted_sets: dict[str, dict[Any, float]] = {}
         self._expiry: dict[str, float] = {}
 
@@ -33,6 +34,7 @@ class FakeRedis:
         for k in stale:
             self._data.pop(k, None)
             self._hashes.pop(k, None)
+            self._sets.pop(k, None)
             self._sorted_sets.pop(k, None)
             del self._expiry[k]
 
@@ -60,14 +62,14 @@ class FakeRedis:
     async def exists(self, key):
         self._evict()
         k = self._norm_key(key)
-        return k in self._data or k in self._hashes or k in self._sorted_sets
+        return k in self._data or k in self._hashes or k in self._sets or k in self._sorted_sets
 
     async def delete(self, *keys):
         self._evict()
         count = 0
         for key in keys:
             k = self._norm_key(key)
-            for store in (self._data, self._hashes, self._sorted_sets):
+            for store in (self._data, self._hashes, self._sets, self._sorted_sets):
                 if k in store:
                     del store[k]
                     count += 1
@@ -78,7 +80,7 @@ class FakeRedis:
         self._evict()
         import fnmatch
 
-        all_keys = list(self._data) + list(self._hashes) + list(self._sorted_sets)
+        all_keys = list(self._data) + list(self._hashes) + list(self._sets) + list(self._sorted_sets)
         seen: set[str] = set()
         deduped: list[str] = []
         for k in all_keys:
@@ -146,6 +148,32 @@ class FakeRedis:
         if value is None:
             return None
         return value.encode() if isinstance(value, str) else value
+
+    # ------------------------------------------------------------------
+    # Set operations
+    # ------------------------------------------------------------------
+
+    async def sadd(self, key, member):
+        self._evict()
+        k = self._norm_key(key)
+        if k not in self._sets:
+            self._sets[k] = set()
+        m = member.decode() if isinstance(member, bytes) else str(member)
+        if m in self._sets[k]:
+            return 0
+        self._sets[k].add(m)
+        return 1
+
+    async def scard(self, key):
+        self._evict()
+        k = self._norm_key(key)
+        return len(self._sets.get(k, set()))
+
+    async def smembers(self, key):
+        self._evict()
+        k = self._norm_key(key)
+        s = self._sets.get(k, set())
+        return {m.encode() if isinstance(m, str) else m for m in s}
 
     # ------------------------------------------------------------------
     # TTL

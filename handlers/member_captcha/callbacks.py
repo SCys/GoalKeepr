@@ -13,6 +13,7 @@ from manager import manager
 from .config import SUPPORT_GROUP_TYPES, CallbackOperation, DEFAULT_BAN_DAYS, DELETED_AFTER, CAPTCHA_MAX_RETRY, get_chat_type
 from .exceptions import LogContext
 from .helpers import accepted_member, build_captcha_message, get_callback_map, store_callback_map, delete_callback_map
+from .stats import stats_incr, FIELD_SUCCESS, FIELD_FAILED, FIELD_VERIFICATIONS
 
 
 def _user_full_name(user: Any) -> str:
@@ -65,6 +66,7 @@ async def validate_callback_conditions(event: events.CallbackQuery.Event) -> Opt
 async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str) -> bool:
     """处理管理员操作。"""
     try:
+        rdb = await manager.get_redis()
         items = data.split("__")
         if len(items) != 3:
             logger.warning(f"{log_prefix} | invalid data format")
@@ -94,6 +96,7 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
             await CaptchaSession.delete(chat.id, member_id)
             await accepted_member(chat, msg, user)
             logger.info(f"{log_prefix} | admin accepted member | {member_info}")
+            await stats_incr(rdb, FIELD_SUCCESS, chat.id, member_id)
             return True
 
         elif op == CallbackOperation.REJECT:
@@ -108,6 +111,7 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
                 until_date=timedelta(days=DEFAULT_BAN_DAYS),
             )
             logger.warning(f"{log_prefix} | admin rejected member | {member_info} | ban_days:{DEFAULT_BAN_DAYS}")
+            await stats_incr(rdb, FIELD_FAILED, chat.id, member_id)
             return True
 
         else:
@@ -122,6 +126,7 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
 async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any, log_prefix: str) -> bool:
     """处理用户自验证。从 Redis 读取正确答案进行比较。"""
     try:
+        rdb = await manager.get_redis()
         parts = data.split("__")
         if len(parts) != 3:
             logger.warning(f"{log_prefix} | invalid self-verify data | data={data}")
@@ -154,6 +159,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                 )
                 await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
                 logger.warning(f"{log_prefix} | advertising detected | member banned | ban_days:{DEFAULT_BAN_DAYS}")
+                await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
                 return True
             elif flagged_reason == "llm":
                 await manager.client.edit_permissions(
@@ -167,10 +173,12 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                 )
                 await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
                 logger.warning(f"{log_prefix} | LLM detected spam | member kicked")
+                await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
                 return True
 
             await accepted_member(chat, msg, operator)
             logger.info(f"{log_prefix} | verification passed | member accepted")
+            await stats_incr(rdb, FIELD_SUCCESS, chat.id, operator.id)
             return True
 
         else:
@@ -196,6 +204,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                     f"{log_prefix} | retry limit exceeded, kicking | "
                     f"retry={retry_count} max={CAPTCHA_MAX_RETRY}"
                 )
+                await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
                 return True
 
             msg_date = getattr(msg, "date", None) or datetime.now(timezone.utc)
@@ -226,6 +235,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
             )
 
             logger.info(f"{log_prefix} | verification failed | regenerated captcha | chosen={chosen_key} correct={correct_answer}")
+            await stats_incr(rdb, FIELD_VERIFICATIONS, chat.id, operator.id)
             return True
 
     except Exception as e:
