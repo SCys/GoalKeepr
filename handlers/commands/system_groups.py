@@ -106,6 +106,7 @@ async def system_groups(event: events.NewMessage.Event):
 
     text, buttons, _ = await _build_page(1)
     if text is None:
+        await event.reply("获取群组列表失败（Redis 不可用或超时）。")
         return
     await event.reply(text, buttons=buttons)
 
@@ -127,7 +128,7 @@ async def system_groups_callback(event: events.CallbackQuery.Event):
 
     text, buttons, _ = await _build_page(page)
     if text is None:
-        await event.answer()
+        await event.answer("获取群组列表失败。")
         return
 
     await event.answer()
