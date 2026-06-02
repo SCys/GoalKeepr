@@ -22,7 +22,7 @@ from .validators import (
 from .security import restrict_member_permissions, get_member_info_for_check, perform_security_checks
 from .helpers import build_captcha_message, store_callback_map
 from .callbacks import process_callback_query
-from .stats import stats_incr, FIELD_GROUP_JOINS, FIELD_VERIFICATIONS
+from .stats import stats_incr, record_group, FIELD_GROUP_JOINS, FIELD_VERIFICATIONS
 
 
 @manager.register("chat_member")
@@ -102,6 +102,7 @@ async def member_captcha(event: events.ChatAction.Event):
     # ★ 统计：入群人次
     rdb_stats = await manager.get_redis()
     await stats_incr(rdb_stats, FIELD_GROUP_JOINS, chat.id, user.id)
+    await record_group(rdb_stats, chat.id, getattr(chat, "title", str(chat.id)))
 
     # 获取验证方法配置
     new_member_check_method = await get_verification_method(chat.id)

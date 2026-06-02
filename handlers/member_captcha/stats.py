@@ -27,6 +27,16 @@ async def _safe_hincrby(rdb, key, field, amount=1):
         logger.warning("stats hincrby 失败 (%s:%s): %s", key, field, exc)
 
 
+async def _safe_hset(rdb, key, field, value):
+    """HSET with 1s timeout, silent on any error."""
+    try:
+        await asyncio.wait_for(rdb.hset(key, field, value), timeout=1)
+    except asyncio.TimeoutError:
+        logger.warning("stats hset 超时 (%s)", key)
+    except Exception as exc:
+        logger.warning("stats hset 失败 (%s): %s", key, exc)
+
+
 async def _safe_sadd(rdb, key, member):
     """SADD with 1s timeout, silent on any error."""
     try:
@@ -52,3 +62,10 @@ async def stats_incr(rdb, field, chat_id=None, user_id=None):
         await _safe_sadd(rdb, f"{STATS_KEY}:persons", str(user_id))
         if chat_id:
             await _safe_sadd(rdb, f"{STATS_KEY}:{chat_id}:persons", str(user_id))
+
+
+async def record_group(rdb, chat_id: int, title: str):
+    """记录群组名称到 Redis，遇错静默打日志。"""
+    if not rdb:
+        return
+    await _safe_hset(rdb, f"{STATS_KEY}:group_names", str(chat_id), title)
