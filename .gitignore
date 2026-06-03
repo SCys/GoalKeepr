@@ -153,3 +153,8 @@ data/
 log/
 bot.session-journal
 *.db-journal
+
+# Generated review / design artifacts (from review skill etc.)
+docs/ver.*.md
+/tmp/
+
