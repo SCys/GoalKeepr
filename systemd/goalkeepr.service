@@ -1,0 +1,77 @@
+# systemd user service for GoalKeepr
+#
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   cp systemd/goalkeepr.service ~/.config/systemd/user/goalkeepr.service
+#   # Edit the paths below to match your server layout.
+#
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now goalkeepr
+#
+# Useful commands (as the bot user):
+#   systemctl --user status goalkeepr
+#   journalctl --user -u goalkeepr -f
+#   systemctl --user restart goalkeepr
+#
+# Layout expected by this example (adjust to taste):
+#   /data/goalkeepr/
+#     main.ini          # secrets / config (outside git tree)
+#     src/              # git clone of the repo (this is WorkingDirectory)
+#       main.py
+#       pyproject.toml
+#       .venv/          # created by `uv sync`
+#       ...
+#     data/             # runtime: main.db + bot.session (created automatically)
+#     log/              # only used if you run without systemd (see docker/startup.sh)
+#
+# Requirements on the server:
+#   - uv installed for the user (recommended: https://docs.astral.sh/uv/getting-started/installation/)
+#   - The user has write access to /data/goalkeepr/data
+#
+# After code updates (via git or CI):
+#   cd /data/goalkeepr/src
+#   uv sync --frozen --no-dev
+#   systemctl --user restart goalkeepr
+
+[Unit]
+Description=GoalKeepr Telegram Bot (captcha, admin tools)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Run from the source directory (contains pyproject.toml)
+WorkingDirectory=/data/goalkeepr/src
+
+# Point config outside the source tree. Code reads GOALKEEPR_CONFIG.
+Environment=GOALKEEPR_CONFIG=/data/goalkeepr/main.ini
+
+# Data directory for SQLite (main.db) and Telethon session (bot.session / journal).
+# Code creates it if missing. Keep it outside src/ for easy git clean / separate backups.
+Environment=GOALKEEPR_DATA_DIR=/data/goalkeepr/data
+
+# Make Python output unbuffered so journalctl shows logs immediately.
+Environment=PYTHONUNBUFFERED=1
+
+# ExecStart using uv (adjust the path to uv if it's not in $PATH for the user service).
+# Using --project ensures the right pyproject.toml / .venv is used even if PATH differs.
+ExecStart=/usr/bin/env uv run --project /data/goalkeepr/src python -u main.py
+
+# If uv is installed to ~/.local/bin/uv and not in PATH for user services, use absolute:
+# ExecStart=/home/YOURUSERNAME/.local/bin/uv run --project /data/goalkeepr/src python -u main.py
+
+Restart=always
+RestartSec=5s
+
+# Logging goes to the user's journal (view with: journalctl --user -u goalkeepr -f)
+# This is the recommended way when using systemd.
+StandardOutput=journal
+StandardError=journal
+
+# Optional resource limits
+# MemoryMax=1G
+# CPUQuota=200%
+
+[Install]
+WantedBy=default.target

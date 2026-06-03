@@ -319,6 +319,90 @@ docker compose up -d gk
 
 ---
 
-## 部署
+## 使用 systemd 用户服务运行（推荐用于裸机/ VPS）
 
-仓库内提供 GitHub Actions 示例：`.github/workflows/deploy.yml`。通过 SSH 在服务器上执行 `git pull`，再通过 `docker compose build gk && docker compose up -d gk` 完成部署与重启。需在仓库中配置 `DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_KEY` 等 Secrets。
+适合把源码和配置/数据分离的场景：
+
+推荐目录结构：
+
+```
+/data/goalkeepr/
+├── main.ini                 # 配置文件（含 token 等敏感信息）
+├── src/                     # git 仓库克隆位置
+│   ├── main.py
+│   ├── pyproject.toml
+│   ├── uv.lock
+│   └── ...
+├── data/                    # 运行时数据（main.db + bot.session），代码会自动创建
+└── log/                     # 可选（非 systemd 方式时使用）
+```
+
+### 1. 代码修改支持（已完成）
+
+- 支持环境变量 `GOALKEEPR_CONFIG` 和 `GOALKEEPR_DATA_DIR`
+- 支持命令行参数 `--config` / `--data-dir`
+- Telethon session 和 SQLite 数据库会放在 `GOALKEEPR_DATA_DIR` 下
+- 向后兼容：不设环境变量时行为与原来完全一致（相对路径）
+
+### 2. 安装 service
+
+```bash
+# 克隆代码到 src
+mkdir -p /data/goalkeepr
+cd /data/goalkeepr
+git clone https://github.com/your/repo.git src
+
+# 准备配置文件
+cp src/example/main.ini main.ini
+# 编辑 main.ini，填入真实 token 等
+
+# 创建数据目录（权限给运行 bot 的用户）
+mkdir -p /data/goalkeepr/data
+chown -R $USER:$USER /data/goalkeepr
+
+cd src
+uv sync --frozen --no-dev
+
+# 安装 systemd user service
+mkdir -p ~/.config/systemd/user
+cp systemd/goalkeepr.service ~/.config/systemd/user/goalkeepr.service
+# 根据实际情况编辑 ~/.config/systemd/user/goalkeepr.service 中的路径和 uv 位置
+
+systemctl --user daemon-reload
+systemctl --user enable --now goalkeepr
+```
+
+查看日志：
+
+```bash
+journalctl --user -u goalkeepr -f
+```
+
+### 3. 更新部署
+
+```bash
+cd /data/goalkeepr/src
+git pull
+uv sync --frozen --no-dev
+systemctl --user restart goalkeepr
+```
+
+---
+
+## 部署（GitHub Actions）
+
+仓库提供 `.github/workflows/deploy.yml` 示例。
+
+默认使用 **src + uv + systemd user service** 流程（与上面目录结构匹配）：
+
+- 触发：push 到 master
+- 通过 SSH 在服务器执行 `cd /data/goalkeepr/src; git pull; uv sync --frozen --no-dev; systemctl --user restart goalkeepr`
+
+配置 Secrets：
+- `DEPLOY_HOST`
+- `DEPLOY_USER`（必须是启用了 user service 的那个 Linux 用户）
+- `DEPLOY_KEY`（SSH private key）
+
+如果仍使用旧的 Docker + docker-compose 布局，可以在 workflow 里注释切换或维护两个 job。
+
+详细的 service 文件模板见 `systemd/goalkeepr.service`（内有注释）。

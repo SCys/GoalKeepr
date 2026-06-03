@@ -1,5 +1,44 @@
-import asyncio
+#!/usr/bin/env python3
+"""
+GoalKeepr - Telegram group management bot (captcha + admin utils)
+支持通过环境变量或命令行参数指定配置文件和数据目录，
+以便源码树 (src/) 与配置/数据 (main.ini + data/) 分离部署。
+"""
+import argparse
+import os
+import sys
 from datetime import datetime
+
+# --- Early path / config setup (before other imports that may read env) ---
+def _setup_runtime_paths():
+    """Parse --config / --data-dir early so that database and manager pick up the env vars."""
+    parser = argparse.ArgumentParser(
+        description="GoalKeepr Telegram Bot",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--config",
+        default=os.environ.get("GOALKEEPR_CONFIG"),
+        help="Path to main.ini (or set GOALKEEPR_CONFIG env)",
+    )
+    parser.add_argument(
+        "--data-dir",
+        default=os.environ.get("GOALKEEPR_DATA_DIR"),
+        help="Directory for main.db and Telethon session file (or set GOALKEEPR_DATA_DIR env)",
+    )
+    # Use parse_known_args so extra args (e.g. from uv) don't break us.
+    args, _ = parser.parse_known_args(sys.argv[1:])
+
+    if args.config:
+        os.environ["GOALKEEPR_CONFIG"] = args.config
+    if args.data_dir:
+        os.environ["GOALKEEPR_DATA_DIR"] = args.data_dir
+
+_setup_runtime_paths()
+
+# Now safe to import modules that consume GOALKEEPR_* env vars at import/use time.
+import asyncio
+
 import database
 from manager import manager
 from handlers import *  # Import handlers to register them
@@ -194,7 +233,8 @@ async def startup_cleanup():
 
 
 async def main():
-    manager.setup()
+    config_path = os.environ.get("GOALKEEPR_CONFIG")
+    manager.setup(config_path=config_path)
 
     # Initialize database tables
     await database.execute(SQL_CREATE_MESSAGES)

@@ -1,8 +1,10 @@
+import os
 import os.path
 import sys
 from configparser import ConfigParser
 from datetime import datetime
 from functools import wraps
+from pathlib import Path
 from typing import Optional, Union, Tuple, Any
 from urllib.parse import urlparse
 
@@ -73,8 +75,8 @@ class Manager:
 
     logger = logger
 
-    def setup(self):
-        self.load_config()
+    def setup(self, config_path: Optional[str] = None):
+        self.load_config(config_path)
 
         self.setup_logger()
 
@@ -93,36 +95,46 @@ class Manager:
         # 解析代理（可选），格式如 socks5://127.0.0.1:1080 或 socks5://user:pass@host:port
         proxy = _parse_proxy(self.config["telegram"].get("proxy", ""))
 
-        # Initialize Telethon Client (session name 'bot')
+        # Data dir for session file (and DB via database module). Allows separating src/ from data/.
+        data_dir = os.environ.get("GOALKEEPR_DATA_DIR", "./data")
+        Path(data_dir).mkdir(parents=True, exist_ok=True)
+        session_path = os.path.join(data_dir, "bot")
+
+        # Initialize Telethon Client. Use path in data_dir so session lives with DB.
         self.client = TelegramClient(
-            "bot",
+            session_path,
             int(api_id) if api_id else 0,
             api_hash or "",
             proxy=proxy,
         )
 
         if proxy:
-            logger.info("telethon client is setup (with proxy)")
+            logger.info(f"telethon client is setup (with proxy), session in {session_path}")
         else:
-            logger.info("telethon client is setup")
+            logger.info(f"telethon client is setup, session in {session_path}")
 
         self.setup_handlers()
 
-    def load_config(self):
-        """加载 main.ini，默认会配置相关代码"""
+    def load_config(self, config_path: Optional[str] = None):
+        """加载配置文件。支持通过 GOALKEEPR_CONFIG 环境变量或参数指定路径，
+        便于 src/ 与 main.ini 分离部署（systemd 等场景）。
+        """
         config = self.config
 
         # 设置默认模板
         for key, section in SETTINGS_TEMPLATE.items():
             config.setdefault(key, section)
 
+        if config_path is None:
+            config_path = os.environ.get("GOALKEEPR_CONFIG") or "main.ini"
+
         # 从文件读取
-        if os.path.isfile("main.ini"):
+        if os.path.isfile(config_path):
             try:
-                with open("main.ini", "r", encoding="utf-8") as f:
+                with open(config_path, "r", encoding="utf-8") as f:
                     config.read_file(f)
 
-                logger.info("settings is loaded from main.ini")
+                logger.info(f"settings is loaded from {config_path}")
             except IOError:
                 pass
 

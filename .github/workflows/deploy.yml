@@ -10,17 +10,46 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
-      - name: restart service
+      - name: Deploy (src + systemd user service)
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           script: |
-            cd /data/goalkeepr
-            git pull
-            cd /data/
-            docker compose build gk 
-            docker compose up -d gk
+            set -euo pipefail
+
+            # New recommended layout:
+            #   /data/goalkeepr/main.ini
+            #   /data/goalkeepr/src/   <--- git working tree + uv env
+            #   /data/goalkeepr/data/  <--- runtime DB + session (auto-created)
+            echo "Deploying to /data/goalkeepr/src ..."
+
+            cd /data/goalkeepr/src
+            git pull --ff-only
+
+            # Install/update Python deps (no dev deps on server)
+            uv sync --frozen --no-dev
+
+            # Restart the user-level systemd service.
+            # The DEPLOY_USER must be the same user that owns the service
+            # (i.e. has ~/.config/systemd/user/goalkeepr.service enabled).
+            systemctl --user daemon-reload || true
+            systemctl --user restart goalkeepr
+
+            # Show brief status (helps debugging failed deploys via Actions log)
+            systemctl --user status goalkeepr --no-pager -l || true
+            echo "Deployment finished."
+
+      # --- Alternative: if you still use the old Docker layout, keep a separate job or comment the above ---
+      # - name: Deploy (Docker - legacy)
+      #   uses: appleboy/ssh-action@master
+      #   with:
+      #     ...
+      #     script: |
+      #       cd /data/goalkeepr
+      #       git pull
+      #       docker compose build gk || true
+      #       docker compose up -d gk

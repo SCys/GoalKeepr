@@ -1,11 +1,13 @@
 import asyncio
 import aiosqlite
 import os
+from pathlib import Path
 from typing import Optional
 import loguru
 
-# Ensure data directory exists
-os.makedirs("./data", exist_ok=True)
+# Configurable via env for deployments where src/ and data/ are separated (e.g. systemd)
+DATA_DIR = os.environ.get("GOALKEEPR_DATA_DIR", "./data")
+DB_PATH = str(Path(DATA_DIR) / "main.db")
 
 _conn: Optional[aiosqlite.Connection] = None
 _conn_use_lock = asyncio.Lock()
@@ -20,7 +22,8 @@ async def connection() -> aiosqlite.Connection:
     if _conn is None:
         async with _conn_use_lock:
             if _conn is None:
-                _conn = await aiosqlite.connect("./data/main.db", timeout=30.0)
+                Path(DATA_DIR).mkdir(parents=True, exist_ok=True)
+                _conn = await aiosqlite.connect(DB_PATH, timeout=30.0)
     return _conn
 
 

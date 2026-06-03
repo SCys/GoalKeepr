@@ -14,6 +14,14 @@ uv sync --group dev
 # Run the bot (foreground)
 uv run python main.py
 
+# Run with custom config / data dir (for systemd deployments where src/ and data/ are split)
+GOALKEEPR_CONFIG=/data/goalkeepr/main.ini \
+GOALKEEPR_DATA_DIR=/data/goalkeepr/data \
+uv run python main.py
+
+# Or via CLI args (parsed very early)
+uv run python main.py --config /data/goalkeepr/main.ini --data-dir /data/goalkeepr/data
+
 # Run all tests
 uv run pytest
 
