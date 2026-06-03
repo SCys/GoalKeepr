@@ -43,21 +43,25 @@ async def lazy_messages() -> int:
         # Process Redis tasks
         rdb = await manager.get_redis()
         if rdb:
-            now = datetime.now().timestamp()
-            tasks = await rdb.zrangebyscore("lazy_delete_messages", 0, now)
-            for task in tasks:
-                if isinstance(task, bytes):
-                    task = task.decode()
-                try:
-                    chat_id, msg_id = map(int, task.split(":"))
-                    if await manager.delete_message(chat_id, msg_id):
+            try:
+                now = datetime.now().timestamp()
+                tasks = await rdb.zrangebyscore("lazy_delete_messages", 0, now)
+                for task in tasks:
+                    if isinstance(task, bytes):
+                        task = task.decode()
+                    try:
+                        chat_id, msg_id = map(int, task.split(":"))
+                        if await manager.delete_message(chat_id, msg_id):
+                            await rdb.zrem("lazy_delete_messages", task)
+                            processed += 1
+                        else:
+                            logger.warning(f"lazy_messages delete failed: {task}")
+                    except Exception as e:
+                        logger.exception(f"lazy_messages redis task {task} error: {e}")
                         await rdb.zrem("lazy_delete_messages", task)
-                        processed += 1
-                    else:
-                        logger.warning(f"lazy_messages delete failed: {task}")
-                except Exception as e:
-                    logger.exception(f"lazy_messages redis task {task} error: {e}")
-                    await rdb.zrem("lazy_delete_messages", task)
+            except Exception as e:
+                logger.error(f"lazy_messages redis error: {e}")
+                manager.rdb = None  # will retry connect next tick
 
         # Process SQLite tasks
         rows = await database.execute_fetch(SQL_FETCH_LAZY_DELETE_MESSAGES)
@@ -81,42 +85,46 @@ async def lazy_sessions() -> int:
         # Process Redis tasks
         rdb = await manager.get_redis()
         if rdb:
-            now = datetime.now().timestamp()
-            tasks = await rdb.zrangebyscore("lazy_sessions", 0, now)
-            for task in tasks:
-                if isinstance(task, bytes):
-                    task = task.decode()
-                remove_task = False
-                try:
-                    # Format: chat:member:type:msg
-                    parts = task.split(":")
-                    if len(parts) != 4:
-                        logger.error(f"lazy_sessions redis task format error: {task}")
-                        remove_task = True
-                    else:
-                        chat = int(parts[0])
-                        member = int(parts[1])
-                        session_type = parts[2]
-                        msg = int(parts[3])
-                        
-                        func = manager.events.get(session_type)
-                        if not func or not callable(func):
-                            logger.error(f"lazy_session handler missing: {session_type}")
+            try:
+                now = datetime.now().timestamp()
+                tasks = await rdb.zrangebyscore("lazy_sessions", 0, now)
+                for task in tasks:
+                    if isinstance(task, bytes):
+                        task = task.decode()
+                    remove_task = False
+                    try:
+                        # Format: chat:member:type:msg
+                        parts = task.split(":")
+                        if len(parts) != 4:
+                            logger.error(f"lazy_sessions redis task format error: {task}")
                             remove_task = True
                         else:
-                            try:
-                                await func(manager.client, chat, msg, member)
+                            chat = int(parts[0])
+                            member = int(parts[1])
+                            session_type = parts[2]
+                            msg = int(parts[3])
+                            
+                            func = manager.events.get(session_type)
+                            if not func or not callable(func):
+                                logger.error(f"lazy_session handler missing: {session_type}")
                                 remove_task = True
-                            except Exception as e:
-                                logger.error(f"lazy_session func {session_type} error: {e}")
-                except Exception as e:
-                    logger.error(f"lazy_sessions redis task {task} error: {e}")
-                    remove_task = True
-                
-                if remove_task:
-                    await rdb.zrem("lazy_sessions", task)
-                    logger.info(f"lazy session is touched: {task} (redis)")
-                    processed += 1
+                            else:
+                                try:
+                                    await func(manager.client, chat, msg, member)
+                                    remove_task = True
+                                except Exception as e:
+                                    logger.error(f"lazy_session func {session_type} error: {e}")
+                    except Exception as e:
+                        logger.error(f"lazy_sessions redis task {task} error: {e}")
+                        remove_task = True
+                    
+                    if remove_task:
+                        await rdb.zrem("lazy_sessions", task)
+                        logger.info(f"lazy session is touched: {task} (redis)")
+                        processed += 1
+            except Exception as e:
+                logger.error(f"lazy_sessions redis error: {e}")
+                manager.rdb = None
 
         # Process SQLite tasks
         rows = await database.execute_fetch(SQL_FETCH_SESSIONS)
@@ -163,23 +171,26 @@ async def worker_loop():
 
 async def startup_cleanup():
     """启动时清理可能残留的 Redis 数据。"""
-    rdb = await manager.get_redis()
-    if not rdb:
-        return
+    try:
+        rdb = await manager.get_redis()
+        if not rdb:
+            return
 
-    cursor = 0
-    total = 0
-    while True:
-        cursor, keys = await rdb.scan(cursor, match="captcha_cb_map:*", count=100)
-        if keys:
-            await rdb.delete(*keys)
-            total += len(keys)
-        if cursor == 0:
-            break
-    if total:
-        logger.warning(f"启动清理：已清除 {total} 个残留 callback_map（重启导致失效）")
-    else:
-        logger.debug("启动清理：无残留 callback_map")
+        cursor = 0
+        total = 0
+        while True:
+            cursor, keys = await rdb.scan(cursor, match="captcha_cb_map:*", count=100)
+            if keys:
+                await rdb.delete(*keys)
+                total += len(keys)
+            if cursor == 0:
+                break
+        if total:
+            logger.warning(f"启动清理：已清除 {total} 个残留 callback_map（重启导致失效）")
+        else:
+            logger.debug("启动清理：无残留 callback_map")
+    except Exception as e:
+        logger.warning(f"启动清理 Redis 残留数据失败（已忽略，继续启动）: {e}")
 
 
 async def main():

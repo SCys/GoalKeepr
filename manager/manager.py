@@ -69,6 +69,8 @@ class Manager:
     # running status
     is_running = False
 
+    _redis_warned = False
+
     logger = logger
 
     def setup(self):
@@ -313,18 +315,18 @@ class Manager:
                     return True
                 except Exception as e:
                     logger.error(f"lazy delete schedule failed (redis): {e}")
-                    return False
-            else:
-                try:
-                    await database.execute(
-                        "insert into lazy_delete_messages(chat, msg, deleted_at) values(?,?,?)",
-                        (id_chat, id_message, self._format_sqlite_datetime(deleted_at)),
-                    )
-                    logger.debug(f"chat {id_chat} message {id_message} delete at {deleted_at} (sqlite)")
-                    return True
-                except Exception as e:
-                    logger.error(f"lazy delete schedule failed (sqlite): {e}")
-                    return False
+                    self.rdb = None  # force re-validation on next use
+            # fallback to sqlite (either no redis or redis op failed)
+            try:
+                await database.execute(
+                    "insert into lazy_delete_messages(chat, msg, deleted_at) values(?,?,?)",
+                    (id_chat, id_message, self._format_sqlite_datetime(deleted_at)),
+                )
+                logger.debug(f"chat {id_chat} message {id_message} delete at {deleted_at} (sqlite)")
+                return True
+            except Exception as e:
+                logger.error(f"lazy delete schedule failed (sqlite): {e}")
+                return False
         else:
             try:
                 await self.client.delete_messages(id_chat, id_message)
@@ -343,34 +345,41 @@ class Manager:
                 val = f"{chat}:{member}:{type}:{msg}"
                 await rdb.zadd("lazy_sessions", {val: deleted_at.timestamp()})
                 logger.debug(f"chat {chat} message {msg} member {member} after {deleted_at} (redis)")
+                return
             except Exception as e:
                 logger.error(f"lazy session schedule failed (redis): {e}")
-        else:
-            try:
-                await database.execute(
-                    "insert into lazy_sessions(chat, msg, member, type, checkout_at) values(?,?,?,?,?)",
-                    (chat, msg, member, type, self._format_sqlite_datetime(deleted_at)),
-                )
-                logger.debug(f"chat {chat} message {msg} member {member} after {deleted_at} (sqlite)")
-            except Exception as e:
-                logger.error(f"lazy session schedule failed (sqlite): {e}")
+                self.rdb = None  # force re-validation on next use
+        # fallback
+        try:
+            await database.execute(
+                "insert into lazy_sessions(chat, msg, member, type, checkout_at) values(?,?,?,?,?)",
+                (chat, msg, member, type, self._format_sqlite_datetime(deleted_at)),
+            )
+            logger.debug(f"chat {chat} message {msg} member {member} after {deleted_at} (sqlite)")
+        except Exception as e:
+            logger.error(f"lazy session schedule failed (sqlite): {e}")
 
     async def lazy_session_delete(self, chat: int, member: int, type: str):
         rdb = await self.get_redis()
         if rdb:
-            pattern = f"{chat}:{member}:{type}:*"
-            async for member_val, _ in rdb.zscan_iter("lazy_sessions", match=pattern):
-                await rdb.zrem("lazy_sessions", member_val)
-            logger.debug(f"chat {chat} member {member} lazy session {type} is deleted (redis)")
-        else:
             try:
-                await database.execute(
-                    "delete from lazy_sessions where chat=? and member=? and type=?",
-                    (chat, member, type),
-                )
-                logger.debug(f"chat {chat} member {member} lazy session {type} is deleted (sqlite)")
+                pattern = f"{chat}:{member}:{type}:*"
+                async for member_val, _ in rdb.zscan_iter("lazy_sessions", match=pattern):
+                    await rdb.zrem("lazy_sessions", member_val)
+                logger.debug(f"chat {chat} member {member} lazy session {type} is deleted (redis)")
+                return
             except Exception as e:
-                logger.error(f"lazy session delete failed (sqlite): {e}")
+                logger.error(f"lazy session delete failed (redis): {e}")
+                self.rdb = None  # force re-validation on next use
+        # fallback
+        try:
+            await database.execute(
+                "delete from lazy_sessions where chat=? and member=? and type=?",
+                (chat, member, type),
+            )
+            logger.debug(f"chat {chat} member {member} lazy session {type} is deleted (sqlite)")
+        except Exception as e:
+            logger.error(f"lazy session delete failed (sqlite): {e}")
 
     async def send(self, chat: hints.EntityLike, msg: str, **kwargs):
         auto_deleted_at = kwargs.pop("auto_deleted_at", None)
@@ -430,8 +439,21 @@ class Manager:
             return None
 
         if self.rdb is None:
-            redis_dsn = self.config["redis"]["dsn"]
-            self.rdb = await aioredis.from_url(redis_dsn)
+            redis_section = self.config["redis"]
+            redis_dsn = redis_section.get("dsn", "") if hasattr(redis_section, "get") else str(redis_section)
+            redis_dsn = (redis_dsn or "").strip()
+            if not redis_dsn:
+                return None
+            try:
+                client = aioredis.from_url(redis_dsn)
+                await client.ping()
+                self.rdb = client
+            except Exception as e:
+                if not self._redis_warned:
+                    logger.warning(f"Redis configured but unreachable: {e}. Falling back to SQLite for sessions, lazy deletes, group settings, etc.")
+                    self._redis_warned = True
+                # leave self.rdb as None to allow retry on next get_redis call
+                return None
 
         return self.rdb
 

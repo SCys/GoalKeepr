@@ -148,3 +148,8 @@ gha-creds-*.json
 .qwen/
 
 /bot.session
+# Runtime data (SQLite fallback, logs, Telethon journals)
+data/
+log/
+bot.session-journal
+*.db-journal
