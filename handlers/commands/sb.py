@@ -8,7 +8,7 @@ DELETED_AFTER = 3
 logger = manager.logger
 
 
-@manager.register("message", pattern=r"(?i)^/sb$")
+@manager.register("message", pattern=r"(?i)^/sb(\s|$)|^/sb@\w+")
 async def sb(event: events.NewMessage.Event):
     """将用户放入黑名单"""
     chat = await event.get_chat()

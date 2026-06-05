@@ -10,12 +10,9 @@ BAN_MEMBER = 300  # 300s
 logger = manager.logger
 
 
-@manager.register("message", pattern=r"(?i)^/k$") 
-# regex for exact match or ignoring case. 
-# Or just pattern="/k" but that might match "/kill". 
-# Telethon pattern is regex by default? No, default is not regex unless specified? 
-# Telethon events.NewMessage(pattern=...) treats it as regex if string. 
-# "^/k$" is safer.
+@manager.register("message", pattern=r"(?i)^/k(\s|$)|^/k@\w+")
+# Support /k, /k<space>, /k@botname in groups (Telegram appends @bot to commands).
+# The (\s|$) prevents matching /kill etc; ^/k@ handles bot-mention form.
 async def k(event: events.NewMessage.Event):
     """踢人功能"""
     chat = await event.get_chat()
