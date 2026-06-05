@@ -280,12 +280,13 @@ proxy_token = <代理 token>
 chat_model = deepseek-r1
 spam_models = openai/gpt-oss-120b;gemini-3.1-flash-lite-preview;openai/gpt-oss-20b;gemma-4-31b-it
 image_optimize_models = deepseek-r1;gemini-flash
-# chat_model 用于 /chat 基础会话（必须是 SUPPORTED_MODELS 中的 key，见 handlers/utils/txt.py）
+# chat_model 用于 /chat 基础会话（30min 上下文）。可使用任意后端支持的模型名；
+# SUPPORTED_MODELS 中的 key 会获得精确的上下文长度和友好显示名，否则使用 128k 默认长度 + 原始模型名作为 "Powered by"。
 # spam_models 用于新成员入群的 LLM 垃圾检测（handlers/member_captcha/security.py + utils/llm.py），支持多模型 ; 分隔 fallback
 # image_optimize_models 用于 /image 命令的提示词 LLM 自动优化
 ```
 
-所有 LLM 相关功能（`/chat`、入群 captcha 的 LLM spam 检查、` /image` 提示词优化）共享 `[ai]` 下的 proxy_host/proxy_token 配置，仅模型不同。模型均可在 main.ini 中配置（不配置则使用代码内置默认值）。
+所有 LLM 相关功能（`/chat`、入群 captcha 的 LLM spam 检查、` /image` 提示词优化）共享 `[ai]` 下的 proxy_host/proxy_token 配置，仅模型不同。模型名均可在 main.ini 中配置（不配置则使用代码内置默认值）。chat_model 不再强制要求必须是 SUPPORTED_MODELS 的 key。
 
 ```ini
 [advertising]

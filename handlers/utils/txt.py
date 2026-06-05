@@ -86,9 +86,14 @@ SUPPORTED_MODELS = {
     ),
 }
 
+# 当 chat_model 配置的值不在 SUPPORTED_MODELS 中时使用的保守默认上下文长度（用于 /chat 历史截断）。
+# 128k 对绝大多数现代模型是安全的默认值；已知模型会使用其精确的 input_length。
+DEFAULT_INPUT_LENGTH = 128000
+
 
 def get_ai_chat_model() -> str:
-    """从 [ai] chat_model 读取 /chat 使用的模型；未配置或无效时回退 DEFAULT_MODEL。"""
+    """从 [ai] chat_model 读取 /chat 使用的模型名；未配置时回退 DEFAULT_MODEL。
+    支持任意后端支持的模型标识符（不限于 SUPPORTED_MODELS 的 keys）。"""
     try:
         config = manager.config
         if config and config.has_section("ai"):
@@ -346,16 +351,20 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
     ]
 
     # Always use the default model in the basic version (advanced per-user model selection removed).
+    # chat_model 现在支持任意后端模型名（不限于 SUPPORTED_MODELS keys）。
     model_name = get_ai_chat_model()
-    if model_name not in SUPPORTED_MODELS:
-        logger.warning(f"Configured chat_model={model_name} not in SUPPORTED_MODELS, falling back to {DEFAULT_MODEL}")
-        model_name = DEFAULT_MODEL
-    model_input_length = SUPPORTED_MODELS[model_name].input_length
+    model_desc = SUPPORTED_MODELS.get(model_name)
+    if model_desc:
+        model_input_length = model_desc.input_length
+        display_name = model_desc.name
+    else:
+        model_input_length = DEFAULT_INPUT_LENGTH
+        display_name = model_name
+        logger.info(f"chat_model '{model_name}' not listed in SUPPORTED_MODELS, using default input length {DEFAULT_INPUT_LENGTH} and raw name for display")
 
     rdb = await manager.get_redis()
     if rdb:
         # No global "disabled", no per-user settings/model/prompt (simplified).
-        model_input_length = SUPPORTED_MODELS[model_name].input_length
         truncate_input = min(model_input_length * 0.99, model_input_length - 1024)
 
         # Load previous conversation history (per-user, 30min TTL).
@@ -389,7 +398,7 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
     }
 
     # Log model usage information
-    logger.info(f"chat {chat_id} user {member_id} generating text with model {model_name} ({SUPPORTED_MODELS[model_name].name})")
+    logger.info(f"chat {chat_id} user {member_id} generating text with model {model_name} ({display_name})")
 
     try:
         response_data = await _api_request(url, data, proxy_token)
@@ -400,7 +409,7 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
             chat_history.append({"role": "assistant", "content": text})
             await rdb.set(f"chat:history:{member_id}", dumps(chat_history), ex=CONVERSATION_TTL)
 
-        return telegramify_markdown.markdownify(text + f"\n\nPowered by *{SUPPORTED_MODELS[model_name].name}*")
+        return telegramify_markdown.markdownify(text + f"\n\nPowered by *{display_name}*")
     except ValueError as e:
         return str(e)
 
