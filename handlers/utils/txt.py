@@ -87,6 +87,49 @@ SUPPORTED_MODELS = {
 }
 
 
+def get_ai_chat_model() -> str:
+    """从 [ai] chat_model 读取 /chat 使用的模型；未配置或无效时回退 DEFAULT_MODEL。"""
+    try:
+        config = manager.config
+        if config and config.has_section("ai"):
+            m = str(config["ai"].get("chat_model", "")).strip()
+            if m:
+                return m
+    except Exception:
+        pass
+    return DEFAULT_MODEL
+
+
+def get_spam_models() -> list[str]:
+    """从 [ai] spam_models 读取入群 LLM 检测模型列表；支持 ; 或 , 分隔。"""
+    try:
+        config = manager.config
+        if config and config.has_section("ai"):
+            raw = str(config["ai"].get("spam_models", "")).strip()
+            if raw:
+                parts = [p.strip() for p in raw.replace(",", ";").split(";") if p.strip()]
+                if parts:
+                    return parts
+    except Exception:
+        pass
+    return ["openai/gpt-oss-120b", "gemini-3.1-flash-lite-preview", "openai/gpt-oss-20b", "gemma-4-31b-it"]
+
+
+def get_image_optimize_models() -> list[str]:
+    """从 [ai] image_optimize_models 读取 /image 提示词优化模型列表；支持 ; 或 , 分隔。"""
+    try:
+        config = manager.config
+        if config and config.has_section("ai"):
+            raw = str(config["ai"].get("image_optimize_models", "")).strip()
+            if raw:
+                parts = [p.strip() for p in raw.replace(",", ";").split(";") if p.strip()]
+                if parts:
+                    return parts
+    except Exception:
+        pass
+    return ["deepseek-r1", "gemini-flash"]
+
+
 async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict[str, Any]:
     """
     发送API请求到LLM提供商并处理常见错误情况
@@ -303,7 +346,10 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
     ]
 
     # Always use the default model in the basic version (advanced per-user model selection removed).
-    model_name = DEFAULT_MODEL
+    model_name = get_ai_chat_model()
+    if model_name not in SUPPORTED_MODELS:
+        logger.warning(f"Configured chat_model={model_name} not in SUPPORTED_MODELS, falling back to {DEFAULT_MODEL}")
+        model_name = DEFAULT_MODEL
     model_input_length = SUPPORTED_MODELS[model_name].input_length
 
     rdb = await manager.get_redis()
@@ -368,7 +414,7 @@ async def chat_completions(messages: List[Dict[str, Any]], model_name: Optional[
         return
 
     if not model_name:
-        model_name = DEFAULT_MODEL
+        model_name = get_ai_chat_model()
 
     proxy_token = config["ai"]["proxy_token"]
 

@@ -277,9 +277,15 @@ imgproxy_source_url_encryption_key = <key>
 proxy_host = <AI 代理地址>
 proxy_token = <代理 token>
 # administrator / manage_group 为旧版 /chat 高级权限管理遗留（基础版 /chat 已不再使用）
+chat_model = deepseek-r1
+spam_models = openai/gpt-oss-120b;gemini-3.1-flash-lite-preview;openai/gpt-oss-20b;gemma-4-31b-it
+image_optimize_models = deepseek-r1;gemini-flash
+# chat_model 用于 /chat 基础会话（必须是 SUPPORTED_MODELS 中的 key，见 handlers/utils/txt.py）
+# spam_models 用于新成员入群的 LLM 垃圾检测（handlers/member_captcha/security.py + utils/llm.py），支持多模型 ; 分隔 fallback
+# image_optimize_models 用于 /image 命令的提示词 LLM 自动优化
 ```
 
-供 `/chat`（基础 30min 会话）等 AI 相关功能使用。仅需 proxy_* 即可。
+所有 LLM 相关功能（`/chat`、入群 captcha 的 LLM spam 检查、` /image` 提示词优化）共享 `[ai]` 下的 proxy_host/proxy_token 配置，仅模型不同。模型均可在 main.ini 中配置（不配置则使用代码内置默认值）。
 
 ```ini
 [advertising]

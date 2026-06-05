@@ -9,6 +9,9 @@ SETTINGS_TEMPLATE = {
         "proxy_token": "",
         "administrator": 0,  # admin user id
         "manage_group": 0,  # manage group id
+        "chat_model": "deepseek-r1",  # 用于 /chat 命令（必须是 txt.py SUPPORTED_MODELS 的 key）
+        "spam_models": "openai/gpt-oss-120b;gemini-3.1-flash-lite-preview;openai/gpt-oss-20b;gemma-4-31b-it",  # 入群 LLM 垃圾检测，多模型 ; 分隔 fallback
+        "image_optimize_models": "deepseek-r1;gemini-flash",  # /image 提示词 LLM 优化，多模型 ; 分隔 fallback
     },
     "image": {
         "users": [],  # allowed users(id list)

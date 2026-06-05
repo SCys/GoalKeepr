@@ -21,7 +21,7 @@ from manager import manager
 from utils import comfy_api
 from utils.comfy_workflow import WORKFLOWS
 
-from ..utils import strip_text_prefix, chat_completions
+from ..utils import strip_text_prefix, chat_completions, get_image_optimize_models
 
 logger = manager.logger
 
@@ -134,8 +134,7 @@ REDIS_RETRY_INTERVAL = 2  # 2s
 REDIS_KEY_PREFIX = "image:"
 TASK_LOCK_TTL = 180  # 3分钟，避免任务并发重复处理
 
-# 图像生成配置
-IMAGE_OPTIMIZE_MODELS = ["deepseek-r1", "gemini-flash"]
+# 图像生成配置（LLM 优化模型从 [ai] image_optimize_models 读取，回退见 get_image_optimize_models）
 DEFAULT_SIZE = "836x1216"
 DEFAULT_STEP = 16
 DEFAULT_MODEL = "zimage"
@@ -447,7 +446,7 @@ class PromptProcessor:
         if "," in prompt:
             return prompt, reply_content
 
-        for model in IMAGE_OPTIMIZE_MODELS:
+        for model in get_image_optimize_models():
             try:
                 optimized_prompt = await chat_completions(
                     [

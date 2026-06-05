@@ -4,14 +4,7 @@ from typing import Any, List, Tuple
 import orjson as json
 from loguru import logger
 
-from ..utils import chat_completions
-
-SPAM_MODELS = [
-    "openai/gpt-oss-120b",
-    "gemini-3.1-flash-lite-preview", 
-    "openai/gpt-oss-20b",
-    "gemma-4-31b-it",
-]
+from ..utils import chat_completions, get_spam_models
 
 
 def _user_fullname(user: Any) -> str:
@@ -65,7 +58,7 @@ async def check_spams_with_llm(
         messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": members_str}]
 
         result = None
-        for model in SPAM_MODELS:
+        for model in get_spam_models():
             try:
                 result = await asyncio.wait_for(
                     chat_completions(
