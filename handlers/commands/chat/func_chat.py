@@ -5,19 +5,7 @@ from telethon import events
 
 from manager import manager
 
-from .func_adv import operations_admin, operations_person
-from .func_user import check_user_permission, increase_user_count
 from ...utils import count_tokens, tg_generate_text
-
-"""
-user info as hash in redis, key prefix is chat:user:{{ user_id }}.
-
-include hash:
-- disabled: bool (default False)
-- count: integer (default 0)
-- quota: integer (default -1, means no limit)
-- last: datetime string (default '1970-01-01T00:00:00Z')
-"""
 
 DELETED_AFTER = 5
 OUTPUT_MAX_LENGTH = 3500
@@ -28,6 +16,13 @@ logger = manager.logger
 
 @manager.register("message", pattern=r"(?i)^/chat(\s|$)|^/chat@\w+")
 async def chat(event: events.NewMessage.Event):
+    """Basic /chat with 30-minute conversation TTL (reset/simplified version).
+
+    Usage:
+      /chat <prompt>
+      (or reply to a message, optionally with extra text after /chat)
+      /chat reset   -> clear current session history for this user
+    """
     chat_entity = await event.get_chat()
     user = await event.get_sender()
 
@@ -57,42 +52,37 @@ async def chat(event: events.NewMessage.Event):
         await event.reply("System error: Redis is missed.")
         return
 
-    if not await check_user_permission(rdb, event.chat_id, user.id):
-        logger.warning(f"{prefix} user {user.id} in chat {event.chat_id} has no permission")
+    # Minimal subcommand support: only "reset" for the basic 30min session.
+    parts = text.split(" ", 1)
+    subcommand = parts[0].strip().lower() if parts else ""
+
+    if subcommand == "reset":
+        await rdb.delete(f"chat:history:{user.id}")
         await manager.reply(
             event,
-            "你还没有权限使用这个功能。| You don't have permission to use this feature.",
+            "会话已经重置\nYour chat history has been reset.",
             auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
         )
-        await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER * 2))
+        await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
         return
-
-    try:
-        parts = text.split(" ", 1)
-        subcommand = parts[0]
-
-        if await operations_person(rdb, chat_entity, event, user, subcommand, parts):
-            await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
-            return
-
-        if await operations_admin(rdb, chat_entity, event, user, subcommand, parts):
-            await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
-            return
-    except Exception:
-        logger.exception(f"{prefix} operations error")
 
     if len(text) < 3:
         logger.warning(f"{prefix} message too short, ignored")
         return
 
     try:
-        text_resp = await tg_generate_text(chat_entity.id if hasattr(chat_entity, "id") else event.chat_id, user.id, text)
+        text_resp = await tg_generate_text(
+            chat_entity.id if hasattr(chat_entity, "id") else event.chat_id, user.id, text
+        )
         if not text_resp:
             logger.warning(f"{prefix} generate text error, ignored")
             return
     except Exception as e:
         logger.exception(f"{prefix} generate text failed")
-        text_resp = f"生成回复失败，请稍后再试。| Failed to generate response, please try again later.\n ```{e}```"
+        text_resp = (
+            "生成回复失败，请稍后再试。| Failed to generate response, please try again later.\n"
+            f"```{e}```"
+        )
 
     success = False
     try:
@@ -125,5 +115,6 @@ async def chat(event: events.NewMessage.Event):
         await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
         return
 
-    await increase_user_count(rdb, user.id)
+    # Delete the trigger command message (group hygiene, same as other admin commands).
+    await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
     logger.info(f"{prefix} do chat command, send token {count_tokens(text)}, response token {count_tokens(text_resp)}")

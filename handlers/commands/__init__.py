@@ -12,8 +12,8 @@ from .whoami import whoami
 # from .sdxl import sdxl
 # from .image import image
 
-# text completion
-# from .chat import chat, chat_admin_settings_callback
+# text completion (basic 30min TTL session only)
+from .chat import chat
 
 # setting
 from .group_setting import group_setting_command, group_setting_callback

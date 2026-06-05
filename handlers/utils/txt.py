@@ -24,8 +24,8 @@ class ModelDescription:
     rate_daily: float
 
 
-PROMPT_SYSTEM = None
-CONVERSATION_TTL = 3600
+BASIC_SYSTEM_PROMPT = "You are a helpful assistant in a Telegram chat. Keep responses concise and useful."
+CONVERSATION_TTL = 1800
 DEFAULT_MODEL = "deepseek-r1"
 SUPPORTED_MODELS = {
     "gemini-pro": ModelDescription(
@@ -295,59 +295,34 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
 
     proxy_token = config["ai"]["proxy_token"]
 
-    # default prompts
-    prompt_system = PROMPT_SYSTEM
+    # Basic fixed system prompt for the simplified 30min TTL session feature.
+    # (No per-user/global overrides in the reset basic version.)
+    prompt_system = BASIC_SYSTEM_PROMPT
     chat_history = [
-        # last message
         {"role": "user", "content": prompt},
     ]
 
-    # first key as default model
+    # Always use the default model in the basic version (advanced per-user model selection removed).
     model_name = DEFAULT_MODEL
     model_input_length = SUPPORTED_MODELS[model_name].input_length
 
     rdb = await manager.get_redis()
     if rdb:
-        # 获取全局设置
-        settings_global = await rdb.get("chat:settings:global")
-        settings_global = loads(settings_global) if settings_global else {}
-
-        # global disabled flag
-        if settings_global.get("disabled", False):
-            return "系统正在维护中...|System is under maintenance..."
-
-        # 每个用户独立的对话设置
-        settings_person = await rdb.get(f"chat:settings:{member_id}")
-        settings_person = loads(settings_person) if settings_person else {}
-
-        prompt_system_person = settings_person.get("prompt_system")
-        if prompt_system_person:
-            prompt_system = str(prompt_system_person).strip()
-
-        # Select model based on user and global settings
-        model_person = settings_person.get("model")
-        model_global = settings_global.get("model")
-
-        if model_person in SUPPORTED_MODELS:
-            model_name = model_person
-        elif model_global in SUPPORTED_MODELS:
-            model_name = model_global
-
-        # fallback to default model
-        if not model_name or model_name not in SUPPORTED_MODELS:
-            model_name = DEFAULT_MODEL
-
+        # No global "disabled", no per-user settings/model/prompt (simplified).
         model_input_length = SUPPORTED_MODELS[model_name].input_length
         truncate_input = min(model_input_length * 0.99, model_input_length - 1024)
 
-        # 从Redis获取之前的对话历史
+        # Load previous conversation history (per-user, 30min TTL).
         prev_chat_history = await rdb.get(f"chat:history:{member_id}")
         if prev_chat_history:
-            # convert prev_chat_history to list
             prev_chat_history = loads(prev_chat_history)
+            # Drop any leading system message from previous saves to avoid duplicate systems
+            # (we will re-insert the current BASIC_SYSTEM_PROMPT).
+            if prev_chat_history and prev_chat_history[0].get("role") == "system":
+                prev_chat_history = prev_chat_history[1:]
             chat_history = [*prev_chat_history, *chat_history]
 
-            # 限制Tokens数字，并且删除多余的历史记录
+            # Limit by tokens and drop oldest excess (reuse original truncation logic).
             tokens = 0
             for i, msg in enumerate(chat_history):
                 tokens += count_tokens(msg["content"])
@@ -355,6 +330,7 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
                     chat_history = chat_history[0 : i - 1]
                     break
 
+    # Insert the basic system prompt (always present for the basic feature).
     if prompt_system:
         chat_history.insert(0, {"role": "system", "content": prompt_system})
 
@@ -362,7 +338,7 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
     url = f"{host}/v1/chat/completions"
     data = {
         "model": model_name,
-        "max_tokens": 4096,  # 设置一个合理的固定输出token限制
+        "max_tokens": 4096,  # fixed reasonable output limit
         "messages": chat_history,
     }
 
@@ -374,7 +350,7 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
         text = response_data["choices"][0]["message"]["content"]
 
         if rdb:
-            # 保存到Redis，确保保存对话历史
+            # Save full history (incl. system) back with the 30min TTL.
             chat_history.append({"role": "assistant", "content": text})
             await rdb.set(f"chat:history:{member_id}", dumps(chat_history), ex=CONVERSATION_TTL)
 
