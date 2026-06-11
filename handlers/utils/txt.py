@@ -145,10 +145,9 @@ async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict
     # 根据模型类型设置不同的超时时间
     model_name = data.get("model", DEFAULT_MODEL)
 
-    # Some proxies/vLLM versions inject stream_options without stream=True,
-    # which causes a 400 validation error. Normalize to prevent that.
-    if "stream_options" in data and not data.get("stream"):
-        data["stream"] = False
+    # Some proxies inject stream_options without stream=True, causing vLLM 400.
+    # Explicitly set stream=False for non-streaming callers to prevent this.
+    data.setdefault("stream", False)
     
     # 默认超时设置
     timeout_config = ClientTimeout(
