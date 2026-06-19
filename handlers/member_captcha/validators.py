@@ -81,7 +81,7 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
                 f"Welcome to the group, please wait for admin to unmute you.",
                 parse_mode="markdown",
                 auto_deleted_at=now + timedelta(seconds=DELETED_AFTER),
-            )
+            ) or logger.error(f"{log_prefix} | 静默通知发送失败")
             logger.info(f"{log_prefix} | 静默处理 | 新成员加入")
             return True
 
@@ -93,7 +93,7 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
                     f"Welcome to the group, you are muted for 1 week.",
                     parse_mode="markdown",
                     auto_deleted_at=now + timedelta(seconds=DELETED_AFTER),
-                )
+                ) or logger.error(f"{log_prefix} | 静默1周通知发送失败")
                 logger.info(f"{log_prefix} | 静默1周 | 新成员加入")
                 return True
             else:
@@ -108,7 +108,7 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
                     f"Welcome to the group, you are muted for 2 weeks.",
                     parse_mode="markdown",
                     auto_deleted_at=now + timedelta(seconds=DELETED_AFTER),
-                )
+                ) or logger.error(f"{log_prefix} | 静默2周通知发送失败")
                 logger.info(f"{log_prefix} | 静默2周 | 新成员加入")
                 return True
             else:

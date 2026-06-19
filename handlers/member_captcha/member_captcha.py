@@ -183,13 +183,17 @@ async def member_captcha(event: events.ChatAction.Event):
     )
 
     # 发送验证消息
-    captcha_msg = await manager.client.send_message(
-        chat,
-        message_content,
-        buttons=buttons,
-        parse_mode="md",
-    )
-    logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg.id}")
+    try:
+        captcha_msg = await manager.client.send_message(
+            chat,
+            message_content,
+            buttons=buttons,
+            parse_mode="md",
+        )
+        logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg.id}")
+    except Exception as e:
+        logger.error(f"{log_context.log_prefix} | 验证消息发送失败 | {e}")
+        return
 
     # ★ 统计：验证次数
     await stats_incr(rdb_stats, FIELD_VERIFICATIONS, chat.id)
