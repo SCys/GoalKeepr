@@ -36,7 +36,10 @@ async def member_captcha(event: events.ChatAction.Event):
         logger.warning(f"chat_member 事件无用户信息 chat_id={event.chat_id}")
         return
 
-    await event.delete()
+    try:
+        await event.delete()
+    except Exception as e:
+        logger.warning(f"删除入群消息失败 chat_id={event.chat_id}: {e}")
 
     action_message: Optional[types.MessageService] = event.action_message
     if not action_message:
