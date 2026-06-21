@@ -117,7 +117,9 @@ def get_spam_models() -> list[str]:
                     return parts
     except Exception:
         pass
-    return ["openai/gpt-oss-120b", "gemini-3.1-flash-lite-preview", "openai/gpt-oss-20b", "gemma-4-31b-it"]
+    # 默认使用的模型列表，按优先级顺序排列
+    logger.info("Using default spam models")
+    return ["gemini-3.1-flash-lite", "gemma-4-31b-it"]
 
 
 def get_image_optimize_models() -> list[str]:
