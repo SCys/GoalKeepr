@@ -1,6 +1,6 @@
 [project]
 name = "goal-keepr"
-version = "0.2.0"
+version = "0.2.2"
 description = "A telegram bot manage your group."
 readme = "README.md"
 requires-python = ">=3.10"
