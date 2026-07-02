@@ -236,9 +236,20 @@ proxy = socks5://127.0.0.1:1080  ; 可选，连接代理（socks5/http）
 [telegram]
 admin = <管理员 TG 用户 ID，用于限制部分管理能力>
 
+[web]
+enabled = true
+host = 127.0.0.1
+port = 8080
+cookie_secure = false
+session_ttl = 86400
+
 [redis]
 dsn = redis://localhost:6379/0
 ```
+
+网站后台使用 Telegram Login 登录，不需要 Telegram webhook。后端会先校验 Telegram Login 签名，再将登录用户的 Telegram numeric user ID 与 `[telegram] admin` 比对；不匹配、未配置或配置为空时都会拒绝进入后台。
+
+首次部署网站后台前，需要在 BotFather 对机器人执行 `/setdomain`，把网站域名绑定到该 bot。若通过 HTTPS 对外提供后台，将 `[web] cookie_secure` 设为 `true`。
 
 配置 Redis 后，会使用 Redis 处理延迟删消息、入群验证会话等；未配置则使用内置 SQLite。
 

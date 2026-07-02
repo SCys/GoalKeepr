@@ -2,7 +2,15 @@ SETTINGS_TEMPLATE = {
     "default": {"debug": False},
     "telegram": {
         "token": "",  # telegram robot token
+        "admin": "",  # global admin Telegram user id
         "proxy": "",  # 可选，Telegram 连接代理，如 socks5://127.0.0.1:1080
+    },
+    "web": {
+        "enabled": False,  # enable website admin panel
+        "host": "127.0.0.1",
+        "port": 8080,
+        "cookie_secure": False,  # set true when served over HTTPS
+        "session_ttl": 86400,
     },
     "ai": {
         "proxy_host": "",

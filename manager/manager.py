@@ -71,6 +71,9 @@ class Manager:
     # running status
     is_running = False
 
+    # optional website admin server
+    web_server: Any = None
+
     _redis_warned = False
 
     logger = logger
@@ -226,17 +229,27 @@ class Manager:
         me = await self.client.get_me(input_peer=False)
         logger.info(f"bot started as {self.username(me)}")
 
-        if "admin" in self.config["telegram"]:
-            admin = int(self.config["telegram"]["admin"])
+        admin_raw = self.config["telegram"].get("admin", "").strip()
+        if admin_raw.isdigit():
+            admin = int(admin_raw)
             try:
                 await self.send(admin, "bot is started")
             except Exception as e:
                 logger.debug(f"admin notification failed: {e}")
-            
+
+        if self.config["web"].getboolean("enabled", False):
+            from web_admin import AdminWebServer
+
+            self.web_server = AdminWebServer(self, me.username or "")
+            await self.web_server.start()
+
         await self.client.run_until_disconnected()
 
     async def stop(self):
         self.is_running = False
+        if self.web_server is not None:
+            await self.web_server.stop()
+            self.web_server = None
         if self.http_session and not self.http_session.closed:
             await self.http_session.close()
         await database.close()
@@ -442,8 +455,8 @@ class Manager:
         return True
 
     async def notification(self, content: str):
-        if "admin" in self.config["telegram"]:
-            admin = self.config["telegram"]["admin"]
+        admin = self.config["telegram"].get("admin", "").strip()
+        if admin.isdigit():
             await self.client.send_message(admin, content)
 
     async def get_redis(self):
