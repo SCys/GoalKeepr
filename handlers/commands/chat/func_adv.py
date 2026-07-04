@@ -316,7 +316,7 @@ async def operations_admin(
             for i in user_chat_history:
                 tokens += count_tokens(i["content"])
             user_chat_history_tokens_size = tokens
-            user_chat_history_expired_at = await rdb.ttl(f"chat:history:{user.id}")
+            user_chat_history_expired_at = await rdb.ttl(f"chat:history:{target_user_id}")
 
             # setup user_cached_history_detail
             user_cached_history_detail = (
