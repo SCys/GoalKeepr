@@ -2,6 +2,8 @@ from typing import Optional, Union
 
 from redis.asyncio import Redis
 
+PENDING_KEY_PREFIX = "group_setting:pending:"
+
 SETTINGS_KEY_PREFIX = "group:settings:"
 
 SETTINGS_DEFAULT_VALUE = {
@@ -9,11 +11,12 @@ SETTINGS_DEFAULT_VALUE = {
 }
 
 NEW_MEMBER_CHECK_METHODS = {
-    "ban": "认证剔除",
-    "silence": "手动解封",
-    "none": "无作为",
-    "sleep_1week": "静默1周",
-    "sleep_2weeks": "静默2周",
+    "ban":            "认证剔除",
+    "silence":        "手动解封",
+    "none":           "无作为",
+    "sleep_1week":    "静默1周",
+    "sleep_2weeks":   "静默2周",
+    "sleep_custom":   "自定义静默",
 }
 
 

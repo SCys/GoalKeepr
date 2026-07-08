@@ -6,19 +6,19 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "aiosqlite>=0.22.1",
-    "aiohttp>=3.13.2",
+    "aiohttp>=3.14.1",
     "redis>=5.0.0",
     "beautifulsoup4>=4.14.3",
-    "cryptography>=46.0.3",
+    "cryptography>=48.0.1",
     "edge-tts>=7.2.7",
     "loguru>=0.7.3",
-    "orjson>=3.11.5",
+    "orjson>=3.11.6",
     "pydub>=0.25.1",
     "telegramify-markdown>=0.5.4",
     "telethon>=1.36.0",
     "PySocks>=1.7.1",  # Telegram 代理（socks5/http）时 Telethon 需要
     "tiktoken>=0.12.0",
-    "translators>=6.0.2",
+    "translators>=6.0.2,<6.0.4",
     "setuptools>=82.0.0",
 ]
 
@@ -27,6 +27,6 @@ asyncio_mode = "auto"
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
+    "pytest>=9.0.3",
     "pytest-asyncio>=0.25.0",
 ]
