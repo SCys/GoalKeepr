@@ -11,7 +11,7 @@ from loguru import logger
 
 from manager import manager
 from .config import VerificationMode, DELETED_AFTER, MEMBER_CHECK_WAIT_TIME
-from .exceptions import LogContext, PermissionError
+from .exceptions import LogContext
 from .session import CaptchaSession
 from .validators import (
     validate_basic_conditions,
@@ -118,10 +118,8 @@ async def member_captcha(event: events.ChatAction.Event):
 
     # 静默模式：SILENCE（永久限制，管理员手动解封）
     if new_member_check_method == VerificationMode.SILENCE:
-        try:
-            await restrict_member_permissions(chat, user)
-        except PermissionError as e:
-            logger.error(f"{log_context.log_prefix} | 权限不足 | 无法限制用户: {e}")
+        if not await restrict_member_permissions(chat, user):
+            logger.error(f"{log_context.log_prefix} | 权限不足 | 无法限制用户")
             return
         logger.info(f"{log_context.log_prefix} | 权限限制成功")
         await handle_silence_mode(chat, user.id, _full_name(user), new_member_check_method, log_context.log_prefix, now)
@@ -139,10 +137,8 @@ async def member_captcha(event: events.ChatAction.Event):
         logger.warning(f"{log_context.log_prefix} | 未知处理方式: {new_member_check_method}，使用默认验证码流程")
 
     # 收紧新成员权限，禁止发送消息
-    try:
-        await restrict_member_permissions(chat, user)
-    except PermissionError as e:
-        logger.error(f"{log_context.log_prefix} | 权限不足 | 无法限制用户: {e}")
+    if not await restrict_member_permissions(chat, user):
+        logger.error(f"{log_context.log_prefix} | 权限不足 | 无法限制用户")
         return
 
     logger.info(f"{log_context.log_prefix} | 权限限制成功")
