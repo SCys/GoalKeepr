@@ -41,15 +41,20 @@ async def member_captcha(event: events.ChatAction.Event):
     except Exception as e:
         logger.warning(f"删除入群消息失败 chat_id={event.chat_id}: {e}")
 
+    # action_message 仅在有服务消息的入群事件上存在。
+    # 成员列表隐藏时 Telegram 只推 UpdateChannelParticipant，无 service message，
+    # 此时 action_message 为 None，仍需按 user_joined/user_added 处理。
     action_message: Optional[types.MessageService] = event.action_message
-    if not action_message:
-        # logger.warning(f"chat_member 事件无 action_message chat_id={event.chat_id} user_id={user.id} {event}")
-        return
-
-    action = action_message.action
-    if not isinstance(action, (types.MessageActionChatJoinedByLink, types.MessageActionChatAddUser)):
-        # logger.debug(f"chat_member 事件非加入事件 chat_id={event.chat_id} user_id={user.id} action={action} {event}")
-        return
+    if action_message is not None:
+        action = action_message.action
+        join_actions = (
+            types.MessageActionChatJoinedByLink,
+            types.MessageActionChatAddUser,
+            types.MessageActionChatJoinedByRequest,
+        )
+        if not isinstance(action, join_actions):
+            # 非入群类服务消息（改标题、置顶等）直接忽略
+            return
 
     # 只处理新成员加入事件（不处理成员离开、被踢等事件）
     if not event.user_joined and not event.user_added:
@@ -66,7 +71,11 @@ async def member_captcha(event: events.ChatAction.Event):
     log_context = LogContext(chat, user.id, user.username, _full_name(user))
 
     # ★ 频率控制 + 去重检查（最早执行）
-    now = action_message.date
+    now = (
+        action_message.date
+        if action_message is not None
+        else getattr(event, "date", None)
+    ) or datetime.now(timezone.utc)
     event_uid = _event_dedup_uid(event, now)
 
     should_proceed, captcha_data = await CaptchaSession.check_and_record(

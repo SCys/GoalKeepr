@@ -45,18 +45,28 @@ async def get_verification_method(chat_id: int) -> str:
     获取群组的验证方法配置
 
     Args:
-        chat_id: 群组ID
+        chat_id: 群组ID（裸 ID 或 -100 形式均可，settings_get 会兼容）
 
     Returns:
         str: 验证方法
     """
     rdb = await manager.get_redis()
     if not rdb:
-        logger.warning("Redis connection failed")
+        logger.warning("Redis connection failed, fallback verification method to ban")
         return VerificationMode.BAN
 
     result = await settings_get(rdb, chat_id, "new_member_check_method", VerificationMode.BAN)
-    return str(result)
+    method = str(result) if result is not None else VerificationMode.BAN
+    if method == VerificationMode.BAN:
+        logger.debug(f"chat {chat_id} verification method default/ban")
+    else:
+        logger.info(f"chat {chat_id} verification method from settings: {method}")
+    return method
+
+
+def _silence_notify_target(chat: Any) -> Any:
+    """发送通知时优先用实体对象，避免裸 channel id 被 Telethon 当成 user id。"""
+    return chat if not isinstance(chat, int) else chat
 
 
 async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, check_method: str, log_prefix: str, now: datetime) -> bool:
@@ -73,10 +83,11 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
     Returns:
         bool: 是否成功处理
     """
+    notify_chat = _silence_notify_target(chat)
     try:
         if check_method == VerificationMode.SILENCE:
             await manager.send(
-                chat.id,
+                notify_chat,
                 f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，请管理员手动解封。"
                 f"Welcome to the group, please wait for admin to unmute you.",
                 parse_mode="markdown",
@@ -88,7 +99,7 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
         elif check_method == VerificationMode.SLEEP_1WEEK:
             if await restrict_member_permissions(chat, member_id, timedelta(days=7)):
                 await manager.send(
-                    chat.id,
+                    notify_chat,
                     f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，已静默1周。"
                     f"Welcome to the group, you are muted for 1 week.",
                     parse_mode="markdown",
@@ -103,7 +114,7 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
         elif check_method == VerificationMode.SLEEP_2WEEKS:
             if await restrict_member_permissions(chat, member_id, timedelta(days=14)):
                 await manager.send(
-                    chat.id,
+                    notify_chat,
                     f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，已静默2周。"
                     f"Welcome to the group, you are muted for 2 weeks.",
                     parse_mode="markdown",
@@ -126,12 +137,13 @@ async def handle_silence_mode(chat: Any, member_id: int, member_fullname: str, c
                 return False
             if await restrict_member_permissions(chat, member_id, timedelta(days=days)):
                 await manager.send(
-                    chat.id,
+                    notify_chat,
                     f"新成员 [{member_fullname}](tg://user?id={member_id}) 加入群组，"
                     f"已被静默 {int(days)} 天。\n"
                     f"Welcome, you are muted for {int(days)} days.",
                     parse_mode="markdown",
-                )
+                    auto_deleted_at=now + timedelta(seconds=DELETED_AFTER),
+                ) or logger.error(f"{log_prefix} | 自定义静默通知发送失败")
                 logger.info(f"{log_prefix} | 自定义静默 {int(days)} 天 | 新成员加入")
                 return True
             else:
