@@ -825,14 +825,25 @@ async def worker():
     """图像生成工作进程"""
     try:
         logger.info("image worker is started")
+        redis_unavailable_logged = False
 
         while True:
             try:
                 rdb = await manager.get_redis()
                 if not rdb:
-                    logger.warning("redis is not ready, ignored")
+                    # Log once while Redis is down; resume message on recovery.
+                    # Avoids flooding logs every REDIS_RETRY_INTERVAL.
+                    if not redis_unavailable_logged:
+                        logger.warning(
+                            "redis is not ready, image worker idle until redis is available"
+                        )
+                        redis_unavailable_logged = True
                     await asyncio.sleep(REDIS_RETRY_INTERVAL)
                     continue
+
+                if redis_unavailable_logged:
+                    logger.info("redis is ready, image worker resuming")
+                    redis_unavailable_logged = False
 
                 tasks = await Task.all_tasks(rdb)
                 if not tasks:
