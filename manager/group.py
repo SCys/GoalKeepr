@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from redis.asyncio import Redis
 
@@ -55,6 +55,61 @@ def settings_chat_id_candidates(chat_id: int) -> list[int]:
         _add(-cid)
 
     return candidates
+
+
+def chat_peer_id(chat: Any) -> int:
+    """
+    从 chat 实体或 int 得到稳定 peer id（超级群为 -100...）。
+
+    优先 utils.get_peer_id；失败时回退到 chat.id / 原 int。
+    """
+    if isinstance(chat, int):
+        return int(chat)
+    try:
+        from telethon import utils
+
+        return int(utils.get_peer_id(chat))
+    except Exception:
+        return int(getattr(chat, "id", chat))
+
+
+async def resolve_chat_entity(client: Any, chat_id: int):
+    """
+    解析群实体。裸 channel id 若直接 get_entity 会被当成 User peer，
+    因此按候选 id 与 PeerChannel/PeerChat 依次尝试。
+    """
+    from telethon.tl import types
+
+    errors: list[str] = []
+    for cid in settings_chat_id_candidates(chat_id):
+        try:
+            return await client.get_entity(cid)
+        except Exception as e:
+            errors.append(f"id={cid}:{e}")
+
+    # 显式按 channel/chat peer 再试，避免裸正数被 resolve 成 PeerUser
+    bare_candidates: list[int] = []
+    for cid in settings_chat_id_candidates(chat_id):
+        text = str(cid)
+        if text.startswith("-100") and len(text) > 4:
+            bare_candidates.append(int(text[4:]))
+        elif cid > 0:
+            bare_candidates.append(cid)
+        elif cid < 0 and not text.startswith("-100"):
+            bare_candidates.append(-cid)
+
+    seen_bare: set[int] = set()
+    for bare in bare_candidates:
+        if bare in seen_bare:
+            continue
+        seen_bare.add(bare)
+        for peer in (types.PeerChannel(bare), types.PeerChat(bare)):
+            try:
+                return await client.get_entity(peer)
+            except Exception as e:
+                errors.append(f"{peer.__class__.__name__}({bare}):{e}")
+
+    raise ValueError(f"cannot resolve chat {chat_id}: {'; '.join(errors)}")
 
 
 def _settings_redis_keys(chat_id: int) -> list[str]:

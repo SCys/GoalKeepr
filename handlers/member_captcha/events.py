@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from manager import manager
+from manager.group import resolve_chat_entity
 from .config import DEFAULT_BAN_DAYS
 from .stats import stats_incr, FIELD_FAILED
 
@@ -12,16 +13,16 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
     获取群组和成员实体，检查权限，然后踢出成员。
 
     根据 reason 决定踢出时长:
-      - "advertising" → 30 天封禁
+      - "advertising" → 30 天封禁（不调度 unban_member）
       - "llm"         → 60 秒封禁（需调度 unban_member）
       - 其他           → 60 秒封禁（需调度 unban_member）
 
     Returns:
-      True  — 成功踢出（已调度 unban_member 或已永久封禁）
+      True  — 成功踢出
       False — 未踢出（用户是管理员/已解禁/权限获取失败）
     """
     try:
-        chat = await client.get_entity(chat_id)
+        chat = await resolve_chat_entity(client, chat_id)
     except Exception as e:
         logger.warning(f"chat {chat_id} get failed: {e}")
         return False
@@ -38,7 +39,7 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
         logger.info(f"{prefix} member {member_id} is admin/creator, skip kick")
         return False
 
-    if getattr(perms, 'send_messages', False):
+    if getattr(perms, "send_messages", False):
         logger.info(f"{prefix} member {member_id} already accepted, skip kick")
         return False
 
@@ -46,20 +47,27 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
 
     if reason == "advertising":
         await client.edit_permissions(
-            chat, member_id,
+            chat,
+            member_id,
             view_messages=False,
             until_date=timedelta(days=DEFAULT_BAN_DAYS),
         )
         logger.info(f"{prefix} member {member_id} banned {DEFAULT_BAN_DAYS} days for advertising")
         return True
 
-    # llm 或 default → 60s 封禁 + 调度 unban
+    # llm 或 default → 60s 封禁；调用方负责调度 unban_member
     await client.edit_permissions(
-        chat, member_id,
+        chat,
+        member_id,
         view_messages=False,
         until_date=timedelta(seconds=60),
     )
     return True
+
+
+def _should_schedule_unban(reason: str) -> bool:
+    """广告 30 天封禁不应在 60s 后自动解封。"""
+    return reason != "advertising"
 
 
 @manager.register_event("new_member_check")
@@ -74,11 +82,18 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
     finally:
         await manager.lazy_session_delete(chat_id, member_id, "safety_timeout_check")
         if kicked:
-            await manager.lazy_session(
-                chat_id, message_id, member_id, "unban_member",
-                datetime.now() + timedelta(seconds=60),
+            if _should_schedule_unban(reason):
+                await manager.lazy_session(
+                    chat_id,
+                    message_id,
+                    member_id,
+                    "unban_member",
+                    datetime.now() + timedelta(seconds=60),
+                )
+            logger.info(
+                f"chat {chat_id} msg {message_id} member {member_id} is kicked by timeout "
+                f"(reason={reason}, unban={_should_schedule_unban(reason)})"
             )
-            logger.info(f"chat {chat_id} msg {message_id} member {member_id} is kicked by timeout")
             rdb = await manager.get_redis()
             await stats_incr(rdb, FIELD_FAILED, chat_id, member_id)
 
@@ -86,7 +101,7 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
 @manager.register_event("unban_member")
 async def unban_member(client, chat_id: int, message_id: int, member_id: int):
     try:
-        chat = await client.get_entity(chat_id)
+        chat = await resolve_chat_entity(client, chat_id)
     except Exception as e:
         logger.warning(f"bot get chat {chat_id} failed: {e}")
         return
@@ -124,10 +139,17 @@ async def safety_timeout_check(client, chat_id: int, message_id: int, member_id:
         kicked = await _kick_member(client, chat_id, member_id, reason)
     finally:
         if kicked:
-            await manager.lazy_session(
-                chat_id, message_id, member_id, "unban_member",
-                datetime.now() + timedelta(seconds=60),
+            if _should_schedule_unban(reason):
+                await manager.lazy_session(
+                    chat_id,
+                    message_id,
+                    member_id,
+                    "unban_member",
+                    datetime.now() + timedelta(seconds=60),
+                )
+            logger.info(
+                f"chat {chat_id} msg {message_id} member {member_id} is kicked by safety timeout "
+                f"(reason={reason}, unban={_should_schedule_unban(reason)})"
             )
-            logger.info(f"chat {chat_id} msg {message_id} member {member_id} is kicked by safety timeout")
             rdb = await manager.get_redis()
             await stats_incr(rdb, FIELD_FAILED, chat_id, member_id)

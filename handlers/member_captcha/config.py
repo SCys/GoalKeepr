@@ -35,6 +35,10 @@ CAPTCHA_TTL_EXTENDED = 60 * 60 * 24 * 7             # 提升 TTL: 7天
 CAPTCHA_JOIN_THRESHOLD_KICK = 30                    # 24h 内超过此次数就 Kick
 CAPTCHA_JOIN_THRESHOLD_RESET = 1                    # 降到此次数恢复默认 TTL
 CAPTCHA_DEDUP_TTL = 10                              # 去重锁 TTL: 10秒（防止同事件重复处理）
+# 同一用户短时间内的多条入群更新合并窗口。
+# Telegram 常对一次入群同时推送 service message 与 UpdateChannelParticipant，
+# event_uid 不同会导致重复静默/验证码；此锁按 chat+user 合并。
+CAPTCHA_JOIN_COALESCE_TTL = 5
 CAPTCHA_MAX_RETRY = 3                               # 验证最大重试次数，超过则 Kick
 
 # 验证模式

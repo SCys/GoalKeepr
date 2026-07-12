@@ -20,6 +20,7 @@ from .config import (
     CAPTCHA_JOIN_THRESHOLD_KICK,
     CAPTCHA_JOIN_THRESHOLD_RESET,
     CAPTCHA_DEDUP_TTL,
+    CAPTCHA_JOIN_COALESCE_TTL,
 )
 
 
@@ -55,6 +56,11 @@ class CaptchaSession:
         """构建单条入群事件的去重锁 key"""
         return f"{CAPTCHA_REDIS_KEY_PREFIX}-dedup-{chat_id}-{user_id}-{event_uid}"
 
+    @staticmethod
+    def make_coalesce_key(chat_id: int, user_id: int) -> str:
+        """构建短时入群合并锁 key（压制同一次入群的多条 Telegram 更新）。"""
+        return f"{CAPTCHA_REDIS_KEY_PREFIX}-join-coalesce-{chat_id}-{user_id}"
+
     # ------------------------------------------------------------------
     # 核心：入群频率检查 + 去重
     # ------------------------------------------------------------------
@@ -75,9 +81,10 @@ class CaptchaSession:
             - should_proceed=False → 应 Kick（频率过高）或重复事件
 
         去重逻辑:
-          用 SETNX 原子锁防止同一条入群事件被并发重复处理。
-          锁 TTL=10s，足够覆盖单次事件处理周期。
-          event_uid 应来自 action_message.id 等稳定字段，避免把同一用户短时间再次入群误判为重复事件。
+          1) join coalesce：同一用户短窗口内只处理一次入群（合并 service message
+             与 UpdateChannelParticipant 等双推送）
+          2) event_uid SETNX：防止同一条更新被并发重复处理
+          event_uid 应来自 action_message.id 等稳定字段。
         """
         if now is None:
             now = datetime.now(timezone.utc)
@@ -93,6 +100,17 @@ class CaptchaSession:
             # 理论上入口会传入稳定事件 ID；缺失时用事件时间兜底，避免退回“按用户去重”的粗粒度。
             event_uid = f"ts:{now.isoformat()}"
         dedup_key = CaptchaSession.make_dedup_key(chat_id, user_id, event_uid)
+        coalesce_key = CaptchaSession.make_coalesce_key(chat_id, user_id)
+
+        # 0) 入群合并锁：压制同一次入群的多条 Telegram 更新（不同 event_uid）
+        coalesced = await rdb.set(
+            coalesce_key, event_uid, nx=True, ex=CAPTCHA_JOIN_COALESCE_TTL
+        )
+        if not coalesced:
+            logger.debug(
+                f"入群合并锁命中，跳过并发/双推送 chat={chat_id} user={user_id} event={event_uid}"
+            )
+            return False, {"state": "duplicate"}
 
         # 1) 去重锁：SETNX 原子操作
         acquired = await rdb.set(dedup_key, "1", nx=True, ex=CAPTCHA_DEDUP_TTL)

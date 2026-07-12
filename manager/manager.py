@@ -210,7 +210,8 @@ class Manager:
 
             @wraps(func)
             async def _wrapper(*args, **kwargs):
-                return func(*args, **kwargs)
+                # 必须 await 异步 handler，否则返回未调度的 coroutine
+                return await func(*args, **kwargs)
 
             return _wrapper
 
@@ -272,7 +273,7 @@ class Manager:
                 user_id = member.id
 
             perms = await self.client.get_permissions(chat_id, user_id)
-            return perms.is_admin or perms.is_creator
+            return not perms or perms.is_admin or perms.is_creator
         except Exception as e:
             logger.error(f"check admin failed: {e}")
         return False

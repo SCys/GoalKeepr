@@ -54,17 +54,34 @@ class TestCheckAndRecord:
         assert second is False
         assert data["state"] == "duplicate"
 
-    async def test_different_event_uid_passes(self, fake_redis, captcha_session):
-        """Same user, same time, but different event_uid → allowed."""
+    async def test_different_event_uid_coalesced_within_window(self, fake_redis, captcha_session):
+        """同一用户短窗口内不同 event_uid（service message + participant update）应合并。"""
         first, _ = await captcha_session.check_and_record(
             CHAT_ID, USER_ID, NOW, event_uid="msg:1"
         )
         assert first is True
 
-        second, _ = await captcha_session.check_and_record(
+        second, data = await captcha_session.check_and_record(
+            CHAT_ID, USER_ID, NOW, event_uid="pts:99"
+        )
+        assert second is False
+        assert data["state"] == "duplicate"
+
+    async def test_rejoin_after_coalesce_window(self, fake_redis, captcha_session):
+        """合并窗口结束后，用户再次入群应允许处理。"""
+        first, _ = await captcha_session.check_and_record(
+            CHAT_ID, USER_ID, NOW, event_uid="msg:1"
+        )
+        assert first is True
+
+        # 模拟 coalesce TTL 过期
+        await fake_redis.delete(captcha_session.make_coalesce_key(CHAT_ID, USER_ID))
+
+        second, data = await captcha_session.check_and_record(
             CHAT_ID, USER_ID, NOW, event_uid="msg:2"
         )
         assert second is True
+        assert data["join_count"] == "2"
 
     async def test_throttled_after_many_joins(self, fake_redis, captcha_session):
         """Reaching CAPTCHA_JOIN_THRESHOLD_KICK (30) should throttle."""
@@ -132,7 +149,8 @@ class TestFlagging:
         await captcha_session.check_and_record(CHAT_ID, USER_ID, NOW, event_uid="msg:1")
         await captcha_session.flag(CHAT_ID, USER_ID, "advertising")
 
-        # Rejoin with new event
+        # 模拟踢出后稍后重新入群（合并窗口已过）
+        await fake_redis.delete(captcha_session.make_coalesce_key(CHAT_ID, USER_ID))
         should_proceed, data = await captcha_session.check_and_record(
             CHAT_ID, USER_ID, NOW, event_uid="msg:2"
         )
@@ -174,6 +192,7 @@ class TestAnswerAndRetry:
         await captcha_session.record_retry(CHAT_ID, USER_ID)
         await captcha_session.record_retry(CHAT_ID, USER_ID)
 
+        await fake_redis.delete(captcha_session.make_coalesce_key(CHAT_ID, USER_ID))
         await captcha_session.check_and_record(CHAT_ID, USER_ID, NOW, event_uid="msg:2")
 
         session = await captcha_session.get(CHAT_ID, USER_ID)
