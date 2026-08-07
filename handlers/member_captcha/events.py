@@ -19,7 +19,10 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
 
     Returns:
       True  — 成功踢出
-      False — 未踢出（用户是管理员/已解禁/权限获取失败）
+      False — 未踢出（管理员/已通过验证/已被 ban/已离开/权限获取失败）
+
+    重要：若成员已被 /sb、管理员拒绝、广告检测等封禁（view_messages=False），
+    不得再次 edit_permissions，否则会把永久/30 天 ban 覆盖成 60s。
     """
     try:
         chat = await resolve_chat_entity(client, chat_id)
@@ -37,6 +40,15 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
 
     if perms.is_admin or perms.is_creator:
         logger.info(f"{prefix} member {member_id} is admin/creator, skip kick")
+        return False
+
+    if getattr(perms, "has_left", False):
+        logger.info(f"{prefix} member {member_id} already left, skip kick")
+        return False
+
+    # 已被 ban（/sb、管理员 X、广告等）—— 不要覆盖 ban 时长
+    if getattr(perms, "is_banned", False) or getattr(perms, "view_messages", True) is False:
+        logger.info(f"{prefix} member {member_id} already banned, skip kick")
         return False
 
     if getattr(perms, "send_messages", False):

@@ -171,6 +171,35 @@ async def delete_callback_map(chat_id: int, msg_id: int) -> None:
     await rdb.delete(key)
 
 
+# 与成员验证相关的 lazy session 类型
+CAPTCHA_TIMEOUT_TYPES = ("new_member_check", "safety_timeout_check")
+# 包含自动解封任务（管理员永久封禁 / 广告 30 天封禁时必须一并取消）
+MEMBER_JOB_TYPES_WITH_UNBAN = CAPTCHA_TIMEOUT_TYPES + ("unban_member",)
+
+
+async def cancel_pending_member_jobs(
+    chat_id: int,
+    member_id: int,
+    *,
+    cancel_unban: bool = True,
+    delete_captcha_session: bool = True,
+) -> None:
+    """
+    取消某成员上挂起的验证超时 / 兜底 /（可选）自动解封任务。
+
+    任何「管理员已处理」或「长期封禁」路径都必须调用，否则：
+      - new_member_check 会把永久/30 天 ban 改写成 60s 并再调度 unban
+      - 已有 unban_member 会在几分钟内解开 /sb 等永久封禁
+    """
+    types = MEMBER_JOB_TYPES_WITH_UNBAN if cancel_unban else CAPTCHA_TIMEOUT_TYPES
+    for job_type in types:
+        await manager.lazy_session_delete(chat_id, member_id, job_type)
+
+    if delete_captcha_session:
+        from .session import CaptchaSession
+        await CaptchaSession.delete(chat_id, member_id)
+
+
 async def accepted_member(chat: Any, msg: Any, user: Any):
     """接受新成员，恢复其权限并发送欢迎消息。"""
     chat_id = chat.id if hasattr(chat, "id") else chat
@@ -222,5 +251,7 @@ async def accepted_member(chat: Any, msg: Any, user: Any):
         logger.error(f"{prefix} | 欢迎消息发送失败 | {e}")
         return
     await manager.delete_message(chat, reply)
-    await manager.lazy_session_delete(chat_id, user.id, "new_member_check")
-    await manager.lazy_session_delete(chat_id, user.id, "safety_timeout_check")
+    # 取消超时踢人；保留 session 频率计数（若调用方尚未删除）
+    await cancel_pending_member_jobs(
+        chat_id, user.id, cancel_unban=True, delete_captcha_session=False
+    )

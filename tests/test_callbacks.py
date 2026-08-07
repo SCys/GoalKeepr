@@ -230,7 +230,7 @@ class TestSelfVerification:
         mock_manager.lazy_session.assert_awaited()  # schedules unban
 
     async def test_admin_operation_accept(self, mock_manager, fake_redis):
-        """Admin clicks accept → member is accepted."""
+        """Admin clicks accept → member is accepted; timeout sessions cancelled."""
         from handlers.member_captcha.callbacks import handle_admin_operation
 
         msg = _make_msg()
@@ -245,9 +245,15 @@ class TestSelfVerification:
             )
             assert result is True
             mock_accept.assert_awaited()
+            deleted_types = {
+                call.args[2] for call in mock_manager.lazy_session_delete.await_args_list
+            }
+            assert "new_member_check" in deleted_types
+            assert "safety_timeout_check" in deleted_types
+            assert "unban_member" in deleted_types
 
     async def test_admin_operation_reject(self, mock_manager, fake_redis):
-        """Admin clicks reject → member is banned."""
+        """Admin clicks reject → 30d ban; must cancel timeout kick/unban sessions."""
         from handlers.member_captcha.callbacks import handle_admin_operation
 
         msg = _make_msg()
@@ -261,6 +267,15 @@ class TestSelfVerification:
         )
         assert result is True
         mock_manager.client.edit_permissions.assert_awaited()  # banned
+        # Regression: without cancelling new_member_check, timeout overwrites
+        # the 30-day ban with a 60s kick and schedules unban_member.
+        deleted_types = {
+            call.args[2] for call in mock_manager.lazy_session_delete.await_args_list
+        }
+        assert "new_member_check" in deleted_types
+        assert "safety_timeout_check" in deleted_types
+        assert "unban_member" in deleted_types
+        mock_manager.lazy_session.assert_not_awaited()
 
     async def test_self_verification_no_session(self, mock_manager, fake_redis):
         """No CaptchaSession → verification should fail gracefully."""

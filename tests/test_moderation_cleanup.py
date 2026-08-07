@@ -1,0 +1,96 @@
+"""Tests: cancel_pending_member_jobs + /k /sb interaction with captcha jobs."""
+from __future__ import annotations
+
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+
+CHAT_ID = -100123456
+USER_ID = 424242
+
+
+@pytest.mark.asyncio
+async def test_cancel_pending_member_jobs_cancels_all(mock_manager, fake_redis):
+    from handlers.member_captcha.helpers import cancel_pending_member_jobs
+    from handlers.member_captcha.session import CaptchaSession
+
+    await CaptchaSession.check_and_record(CHAT_ID, USER_ID)
+    assert await CaptchaSession.get(CHAT_ID, USER_ID) is not None
+
+    await cancel_pending_member_jobs(CHAT_ID, USER_ID)
+
+    deleted = {c.args[2] for c in mock_manager.lazy_session_delete.await_args_list}
+    assert deleted == {"new_member_check", "safety_timeout_check", "unban_member"}
+    assert await CaptchaSession.get(CHAT_ID, USER_ID) is None
+
+
+@pytest.mark.asyncio
+async def test_cancel_pending_can_keep_unban_and_session(mock_manager, fake_redis):
+    from handlers.member_captcha.helpers import cancel_pending_member_jobs
+    from handlers.member_captcha.session import CaptchaSession
+
+    await CaptchaSession.check_and_record(CHAT_ID, USER_ID)
+
+    await cancel_pending_member_jobs(
+        CHAT_ID, USER_ID, cancel_unban=False, delete_captcha_session=False
+    )
+
+    deleted = {c.args[2] for c in mock_manager.lazy_session_delete.await_args_list}
+    assert deleted == {"new_member_check", "safety_timeout_check"}
+    assert "unban_member" not in deleted
+    assert await CaptchaSession.get(CHAT_ID, USER_ID) is not None
+
+
+@pytest.mark.asyncio
+async def test_sb_cancels_captcha_and_unban(mock_manager):
+    """Permanent ban must cancel captcha timeout + any scheduled unban."""
+    from handlers.commands.sb import ban_member
+
+    chat = SimpleNamespace(id=CHAT_ID, title="g")
+    event = SimpleNamespace(id=1, reply=AsyncMock(return_value=SimpleNamespace(id=99)))
+    admin = SimpleNamespace(id=1, username="admin", first_name="A", last_name="")
+    member = SimpleNamespace(id=USER_ID, username="u", first_name="U", last_name="")
+
+    mock_manager.client.edit_permissions = AsyncMock()
+    mock_manager.username = lambda u: getattr(u, "username", None) or "x"
+
+    # ban_member 内部 from helpers import，patch 源模块即可
+    with patch(
+        "handlers.member_captcha.helpers.cancel_pending_member_jobs",
+        new_callable=AsyncMock,
+    ) as mock_cancel:
+        result = await ban_member(chat, event, admin, member)
+
+    mock_cancel.assert_awaited_once_with(CHAT_ID, USER_ID)
+    mock_manager.client.edit_permissions.assert_awaited()
+    # /sb must NOT schedule unban
+    mock_manager.lazy_session.assert_not_awaited()
+    assert result is not None
+
+
+@pytest.mark.asyncio
+async def test_k_cancels_then_schedules_own_unban(mock_manager):
+    """Soft kick cancels captcha jobs, then schedules its own 300s unban only."""
+    from handlers.commands.k import kick_member
+
+    chat = SimpleNamespace(id=CHAT_ID, title="g")
+    event = SimpleNamespace(id=7, reply=AsyncMock(return_value=SimpleNamespace(id=99)))
+    admin = SimpleNamespace(id=1, username="admin", first_name="A", last_name="")
+    member = SimpleNamespace(id=USER_ID, username="u", first_name="U", last_name="")
+
+    mock_manager.client.edit_permissions = AsyncMock()
+    mock_manager.username = lambda u: getattr(u, "username", None) or "x"
+
+    with patch(
+        "handlers.member_captcha.helpers.cancel_pending_member_jobs",
+        new_callable=AsyncMock,
+    ) as mock_cancel:
+        result = await kick_member(chat, event, admin, member)
+
+    mock_cancel.assert_awaited_once_with(CHAT_ID, USER_ID)
+    mock_manager.client.edit_permissions.assert_awaited()
+    mock_manager.lazy_session.assert_awaited_once()
+    assert mock_manager.lazy_session.await_args.args[3] == "unban_member"
+    assert result is not None

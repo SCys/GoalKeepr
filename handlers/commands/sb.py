@@ -56,7 +56,10 @@ async def sb(event: events.NewMessage.Event):
 
 async def ban_member(chat, event, administrator, member):
     """
-    将用户放入黑名单
+    将用户永久拉黑。
+
+    必须取消挂起的验证超时与任何 unban_member：
+    否则 new_member_check 会把永久 ban 改成 60s，或已有 unban 任务会自动解封。
     """
     if member is None:
         return
@@ -64,9 +67,12 @@ async def ban_member(chat, event, administrator, member):
     id = member.id
     prefix = f"chat {chat.id} msg {event.id}"
 
-    # 剔除以后就在黑名单中
+    # 永久 ban：清掉验证超时 + 自动解封任务
+    from handlers.member_captcha.helpers import cancel_pending_member_jobs
+    await cancel_pending_member_jobs(chat.id, id)
+
     try:
-        # edit_permissions(view_messages=False) bans the user.
+        # edit_permissions(view_messages=False) bans the user (no until_date = permanent).
         await manager.client.edit_permissions(chat, member, view_messages=False)
     except Exception as e:
         logger.warning(f"{prefix} failed to ban user {id}: {e}")

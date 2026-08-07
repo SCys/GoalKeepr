@@ -12,7 +12,14 @@ from loguru import logger
 from manager import manager
 from .config import SUPPORT_GROUP_TYPES, CallbackOperation, DEFAULT_BAN_DAYS, DELETED_AFTER, CAPTCHA_MAX_RETRY, get_chat_type
 from .exceptions import LogContext
-from .helpers import accepted_member, build_captcha_message, get_callback_map, store_callback_map, delete_callback_map
+from .helpers import (
+    accepted_member,
+    build_captcha_message,
+    cancel_pending_member_jobs,
+    get_callback_map,
+    store_callback_map,
+    delete_callback_map,
+)
 from .stats import stats_incr, FIELD_SUCCESS, FIELD_FAILED, FIELD_VERIFICATIONS
 
 
@@ -91,10 +98,13 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
         if op == CallbackOperation.ACCEPT:
             await manager.delete_message(chat, msg)
             await delete_callback_map(chat.id, msg.id)
-            from .session import CaptchaSession
-            await manager.lazy_session_delete(chat.id, member_id, "safety_timeout_check")
-            await CaptchaSession.delete(chat.id, member_id)
+            # 先取消超时任务（保留 session 以便 accepted_member 记 cost）
+            await cancel_pending_member_jobs(
+                chat.id, member_id, delete_captcha_session=False
+            )
             await accepted_member(chat, msg, user)
+            from .session import CaptchaSession
+            await CaptchaSession.delete(chat.id, member_id)
             logger.info(f"{log_prefix} | admin accepted member | {member_info}")
             await stats_incr(rdb, FIELD_SUCCESS, chat.id, member_id)
             return True
@@ -102,9 +112,8 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
         elif op == CallbackOperation.REJECT:
             await manager.delete_message(chat, msg)
             await delete_callback_map(chat.id, msg.id)
-            from .session import CaptchaSession
-            await manager.lazy_session_delete(chat.id, member_id, "safety_timeout_check")
-            await CaptchaSession.delete(chat.id, member_id)
+            # 必须取消 new_member_check / unban：否则超时会把 30 天封禁改成 60s 并自动解封
+            await cancel_pending_member_jobs(chat.id, member_id)
             await manager.client.edit_permissions(
                 chat, member_id,
                 view_messages=False,
@@ -148,20 +157,21 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
 
             # 检查是否有安全检查标记
             flagged_reason = await CaptchaSession.is_flagged(chat.id, operator.id)
-            await manager.lazy_session_delete(chat.id, operator.id, "safety_timeout_check")
-            await CaptchaSession.delete(chat.id, operator.id)
 
             if flagged_reason == "advertising":
+                # 30 天封禁：取消超时踢人 + 任何已有 unban，不可自动解封
+                await cancel_pending_member_jobs(chat.id, operator.id)
                 await manager.client.edit_permissions(
                     chat, operator.id,
                     view_messages=False,
                     until_date=timedelta(days=DEFAULT_BAN_DAYS),
                 )
-                await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
                 logger.warning(f"{log_prefix} | advertising detected | member banned | ban_days:{DEFAULT_BAN_DAYS}")
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
                 return True
             elif flagged_reason == "llm":
+                # 60s 软踢：先清超时任务，再单独调度 unban
+                await cancel_pending_member_jobs(chat.id, operator.id)
                 await manager.client.edit_permissions(
                     chat, operator.id,
                     view_messages=False,
@@ -171,12 +181,16 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                     chat.id, msg.id, operator.id, "unban_member",
                     datetime.now(timezone.utc) + timedelta(seconds=60),
                 )
-                await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
                 logger.warning(f"{log_prefix} | LLM detected spam | member kicked")
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
                 return True
 
+            # 正常通过：先取消超时任务，记 cost 后再清 session
+            await cancel_pending_member_jobs(
+                chat.id, operator.id, delete_captcha_session=False
+            )
             await accepted_member(chat, msg, operator)
+            await CaptchaSession.delete(chat.id, operator.id)
             logger.info(f"{log_prefix} | verification passed | member accepted")
             await stats_incr(rdb, FIELD_SUCCESS, chat.id, operator.id)
             return True
@@ -188,8 +202,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
             if retry_count >= CAPTCHA_MAX_RETRY:
                 await manager.delete_message(chat, msg)
                 await delete_callback_map(chat.id, msg.id)
-                await CaptchaSession.delete(chat.id, operator.id)
-                await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
+                await cancel_pending_member_jobs(chat.id, operator.id)
                 await manager.client.edit_permissions(
                     chat, operator.id,
                     view_messages=False,
@@ -199,7 +212,6 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                     chat.id, msg.id, operator.id, "unban_member",
                     datetime.now(timezone.utc) + timedelta(seconds=60),
                 )
-                await manager.lazy_session_delete(chat.id, operator.id, "safety_timeout_check")
                 logger.warning(
                     f"{log_prefix} | retry limit exceeded, kicking | "
                     f"retry={retry_count} max={CAPTCHA_MAX_RETRY}"
