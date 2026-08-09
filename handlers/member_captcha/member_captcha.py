@@ -119,7 +119,7 @@ async def member_captcha(event: events.ChatAction.Event):
     # 获取验证方法配置
     new_member_check_method = await get_verification_method(chat.id)
 
-    logger.info(f"{log_context.log_prefix} | 新成员加入 | 时间:{now} | 处理方式:{new_member_check_method} | {event}")
+    logger.info(f"{log_context.log_prefix} | 新成员加入 | 时间:{now} | 处理方式:{new_member_check_method}")
 
     if new_member_check_method == VerificationMode.NONE:
         logger.info(f"{log_context.log_prefix} | 无作为 | 新成员加入")
