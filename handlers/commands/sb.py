@@ -72,8 +72,17 @@ async def ban_member(chat, event, administrator, member):
     await cancel_pending_member_jobs(chat.id, id)
 
     try:
-        # edit_permissions(view_messages=False) bans the user (no until_date = permanent).
-        await manager.client.edit_permissions(chat, member, view_messages=False)
+        session = await manager.create_session()
+        url = f"https://api.telegram.org/bot{manager.config['telegram']['token']}/banChatMember"
+        payload = {
+            "chat_id": chat.id,
+            "user_id": id,
+            "revoke_messages": True,
+        }
+        async with session.post(url, json=payload) as response:
+            result = await response.json()
+            if response.status != 200 or not result.get("ok"):
+                raise RuntimeError(result.get("description", f"HTTP {response.status}"))
     except Exception as e:
         logger.warning(f"{prefix} failed to ban user {id}: {e}")
         return

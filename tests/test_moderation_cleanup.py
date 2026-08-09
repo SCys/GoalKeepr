@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -53,7 +53,12 @@ async def test_sb_cancels_captcha_and_unban(mock_manager):
     admin = SimpleNamespace(id=1, username="admin", first_name="A", last_name="")
     member = SimpleNamespace(id=USER_ID, username="u", first_name="U", last_name="")
 
-    mock_manager.client.edit_permissions = AsyncMock()
+    response = SimpleNamespace(status=200, json=AsyncMock(return_value={"ok": True}))
+    request = MagicMock()
+    request.__aenter__ = AsyncMock(return_value=response)
+    request.__aexit__ = AsyncMock(return_value=False)
+    session = SimpleNamespace(post=MagicMock(return_value=request))
+    mock_manager.create_session = AsyncMock(return_value=session)
     mock_manager.username = lambda u: getattr(u, "username", None) or "x"
 
     # ban_member 内部 from helpers import，patch 源模块即可
@@ -64,7 +69,11 @@ async def test_sb_cancels_captcha_and_unban(mock_manager):
         result = await ban_member(chat, event, admin, member)
 
     mock_cancel.assert_awaited_once_with(CHAT_ID, USER_ID)
-    mock_manager.client.edit_permissions.assert_awaited()
+    session.post.assert_called_once_with(
+        "https://api.telegram.org/bot123:test/banChatMember",
+        json={"chat_id": CHAT_ID, "user_id": USER_ID, "revoke_messages": True},
+    )
+    mock_manager.client.edit_permissions.assert_not_called()
     # /sb must NOT schedule unban
     mock_manager.lazy_session.assert_not_awaited()
     assert result is not None
