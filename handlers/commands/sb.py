@@ -75,7 +75,7 @@ async def ban_member(chat, event, administrator, member):
         session = await manager.create_session()
         url = f"https://api.telegram.org/bot{manager.config['telegram']['token']}/banChatMember"
         payload = {
-            "chat_id": chat.id,
+            "chat_id": event.chat_id,
             "user_id": id,
             "revoke_messages": True,
         }

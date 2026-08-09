@@ -8,6 +8,7 @@ import pytest
 
 
 CHAT_ID = -100123456
+BOT_API_CHAT_ID = -1001085650365
 USER_ID = 424242
 
 
@@ -49,7 +50,11 @@ async def test_sb_cancels_captcha_and_unban(mock_manager):
     from handlers.commands.sb import ban_member
 
     chat = SimpleNamespace(id=CHAT_ID, title="g")
-    event = SimpleNamespace(id=1, reply=AsyncMock(return_value=SimpleNamespace(id=99)))
+    event = SimpleNamespace(
+        id=1,
+        chat_id=BOT_API_CHAT_ID,
+        reply=AsyncMock(return_value=SimpleNamespace(id=99)),
+    )
     admin = SimpleNamespace(id=1, username="admin", first_name="A", last_name="")
     member = SimpleNamespace(id=USER_ID, username="u", first_name="U", last_name="")
 
@@ -71,7 +76,7 @@ async def test_sb_cancels_captcha_and_unban(mock_manager):
     mock_cancel.assert_awaited_once_with(CHAT_ID, USER_ID)
     session.post.assert_called_once_with(
         "https://api.telegram.org/bot123:test/banChatMember",
-        json={"chat_id": CHAT_ID, "user_id": USER_ID, "revoke_messages": True},
+        json={"chat_id": BOT_API_CHAT_ID, "user_id": USER_ID, "revoke_messages": True},
     )
     mock_manager.client.edit_permissions.assert_not_called()
     # /sb must NOT schedule unban
