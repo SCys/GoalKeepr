@@ -1,6 +1,7 @@
 import re
 from datetime import timedelta
 
+import telegramify_markdown
 from telethon import events
 
 from manager import manager
@@ -8,29 +9,61 @@ from manager import manager
 from ...utils import count_tokens, tg_generate_text
 
 DELETED_AFTER = 5
-OUTPUT_MAX_LENGTH = 3500
 RE_CLEAR = re.compile(r"(?i)^/chat(?:@[a-zA-Z0-9_]+)?(?:\s|$)")
 
 logger = manager.logger
 
 
 async def _reply_response(event, text_resp: str, prefix: str) -> bool:
-    """Reply in Telegram-sized chunks, falling back per chunk if Markdown fails."""
-    for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH):
-        part = text_resp[i : i + OUTPUT_MAX_LENGTH]
+    """Send raw Markdown as Rich Messages through the Bot API."""
+    sent_chunks = 0
+    try:
+        session = await manager.create_session()
+        token = manager.config["telegram"]["token"]
+        url = f"https://api.telegram.org/bot{token}/sendRichMessage"
+        chunks = telegramify_markdown.telegramify_rich(text_resp, mode="html")
+        if not chunks:
+            raise ValueError("empty Rich Message response")
+
+        for chunk in chunks:
+            payload = {
+                "chat_id": event.chat_id,
+                "rich_message": chunk.to_dict(),
+            }
+            if event.id is not None:
+                payload["reply_parameters"] = {"message_id": event.id}
+            async with session.post(url, json=payload) as response:
+                result = await response.json()
+                if response.status != 200 or not result.get("ok"):
+                    raise RuntimeError(result.get("description", f"HTTP {response.status}"))
+            sent_chunks += 1
+    except Exception:
+        logger.exception(f"{prefix} Rich Message reply failed")
+        if sent_chunks:
+            return False
+
+        logger.warning(f"{prefix} no Rich Message chunk was sent, falling back to plain Bot API")
         try:
-            await event.reply(part, parse_mode="md")
+            session = await manager.create_session()
+            token = manager.config["telegram"]["token"]
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            payload = {
+                "chat_id": event.chat_id,
+                "text": text_resp,
+            }
+            if event.id is not None:
+                payload["reply_parameters"] = {"message_id": event.id}
+            async with session.post(url, json=payload) as response:
+                result = await response.json()
+                if response.status != 200 or not result.get("ok"):
+                    raise RuntimeError(result.get("description", f"HTTP {response.status}"))
         except Exception:
-            logger.exception(f"{prefix} invalid text format (markdown), fallback to plain")
-            try:
-                await event.reply(part, link_preview=False)
-            except Exception:
-                logger.exception(f"{prefix} reply failed")
-                return False
+            logger.exception(f"{prefix} plain Bot API reply failed")
+            return False
     return True
 
 
-@manager.register("message", pattern=r"(?i)^/chat(\s|$)|^/chat@\w+")
+@manager.register("message", pattern=r"(?i)^/chat(?:\s|$)|^/chat@[a-zA-Z0-9_]+(?:\s|$)")
 async def chat(event: events.NewMessage.Event):
     """Basic /chat with 30-minute conversation TTL (reset/simplified version).
 

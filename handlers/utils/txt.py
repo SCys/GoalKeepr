@@ -3,7 +3,6 @@ from typing import Dict, List, Optional, Any, Union
 import asyncio
 import time
 
-import telegramify_markdown
 from aiohttp import ClientTimeout, ClientResponse, ClientError, ServerTimeoutError, ClientConnectorError
 from aiohttp.client_exceptions import ClientResponseError, ClientPayloadError, ServerDisconnectedError
 from orjson import dumps, loads
@@ -380,7 +379,7 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
             chat_history.append({"role": "assistant", "content": text})
             await rdb.set(f"chat:history:{member_id}", dumps(chat_history), ex=CONVERSATION_TTL)
 
-        return telegramify_markdown.markdownify(text + f"\n\nPowered by *{display_name}*")
+        return text + f"\n\nPowered by **{display_name}**"
     except ValueError as e:
         return str(e)
 
