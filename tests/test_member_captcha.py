@@ -113,6 +113,10 @@ async def test_advertising_member_is_banned_without_captcha(monkeypatch, mock_ma
         AsyncMock(return_value=VerificationMode.BAN),
     )
     monkeypatch.setattr(member_captcha_module, "restrict_member_permissions", AsyncMock(return_value=True))
+    mark_restricted = AsyncMock()
+    monkeypatch.setattr(member_captcha_module.CaptchaSession, "mark_restricted", mark_restricted)
+    clear_restricted = AsyncMock()
+    monkeypatch.setattr(member_captcha_module.CaptchaSession, "clear_restricted", clear_restricted)
     monkeypatch.setattr(member_captcha_module, "create_verification_session", AsyncMock(return_value=SimpleNamespace()))
     monkeypatch.setattr(member_captcha_module.asyncio, "sleep", AsyncMock())
     monkeypatch.setattr(
@@ -134,6 +138,8 @@ async def test_advertising_member_is_banned_without_captcha(monkeypatch, mock_ma
     await member_captcha_module.member_captcha(FakeJoinEvent(chat, user))
 
     flag.assert_awaited_once_with(chat.id, user.id, "advertising")
+    mark_restricted.assert_awaited_once_with(chat.id, user.id)
+    clear_restricted.assert_awaited_once_with(chat.id, user.id)
     cancel_jobs.assert_awaited_once_with(chat.id, user.id, delete_captcha_session=False)
     mock_manager.client.edit_permissions.assert_awaited_once_with(
         chat,
@@ -149,3 +155,48 @@ async def test_advertising_member_is_banned_without_captcha(monkeypatch, mock_ma
     )
     build_message.assert_not_awaited()
     mock_manager.client.send_message.assert_not_awaited()
+
+
+async def test_ban_mode_marks_captcha_restriction(monkeypatch, mock_manager):
+    member_captcha_module = importlib.import_module("handlers.member_captcha.member_captcha")
+
+    monkeypatch.setattr(member_captcha_module, "validate_basic_conditions", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        member_captcha_module.CaptchaSession,
+        "check_and_record",
+        AsyncMock(return_value=(True, {})),
+    )
+    monkeypatch.setattr(member_captcha_module, "stats_incr", AsyncMock())
+    monkeypatch.setattr(member_captcha_module, "record_group", AsyncMock())
+    monkeypatch.setattr(
+        member_captcha_module,
+        "get_verification_method",
+        AsyncMock(return_value=VerificationMode.BAN),
+    )
+    monkeypatch.setattr(member_captcha_module, "restrict_member_permissions", AsyncMock(return_value=True))
+    mark_restricted = AsyncMock()
+    monkeypatch.setattr(member_captcha_module.CaptchaSession, "mark_restricted", mark_restricted)
+    monkeypatch.setattr(member_captcha_module, "create_verification_session", AsyncMock(return_value=SimpleNamespace()))
+    monkeypatch.setattr(member_captcha_module.asyncio, "sleep", AsyncMock())
+    monkeypatch.setattr(
+        member_captcha_module.manager,
+        "chat_member_permissions",
+        AsyncMock(return_value=SimpleNamespace(has_left=False)),
+    )
+    monkeypatch.setattr(member_captcha_module, "get_member_info_for_check", AsyncMock(return_value=[]))
+    monkeypatch.setattr(member_captcha_module, "perform_security_checks", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        member_captcha_module,
+        "build_captcha_message",
+        AsyncMock(return_value=("captcha", [], {"icon": "x", "answer": "x", "options": "[]", "callback_map": {}})),
+    )
+    monkeypatch.setattr(member_captcha_module.CaptchaSession, "record_answer", AsyncMock())
+    monkeypatch.setattr(member_captcha_module, "store_callback_map", AsyncMock())
+    monkeypatch.setattr(member_captcha_module.manager, "delete_message", AsyncMock())
+    mock_manager.client.send_message = AsyncMock(return_value=SimpleNamespace(id=100))
+
+    chat = _fake_chat()
+    user = _fake_user()
+    await member_captcha_module.member_captcha(FakeJoinEvent(chat, user))
+
+    mark_restricted.assert_awaited_once_with(chat.id, user.id)

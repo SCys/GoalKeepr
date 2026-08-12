@@ -46,10 +46,14 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
         logger.info(f"{prefix} member {member_id} already left, skip kick")
         return False
 
-    # 已被 ban（/sb、管理员 X、广告等）—— 不要覆盖 ban 时长
+    # Telegram 可能把默认验证码限制也表示为 is_banned/view_messages=False。
+    # 只有本流程记录的限制才能在超时后转为临时踢出；其他封禁不能覆盖。
     if getattr(perms, "is_banned", False) or getattr(perms, "view_messages", True) is False:
-        logger.info(f"{prefix} member {member_id} already banned, skip kick")
-        return False
+        from .session import CaptchaSession
+
+        if not await CaptchaSession.is_restricted(chat_id, member_id):
+            logger.info(f"{prefix} member {member_id} already banned, skip kick")
+            return False
 
     if getattr(perms, "send_messages", False):
         logger.info(f"{prefix} member {member_id} already accepted, skip kick")

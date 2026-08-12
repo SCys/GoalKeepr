@@ -161,6 +161,16 @@ class TestFlagging:
         reason = await captcha_session.is_flagged(CHAT_ID, USER_ID)
         assert reason is None, "flag should be cleared on rejoin"
 
+    async def test_rejoin_clears_captcha_restriction(self, fake_redis, captcha_session):
+        await captcha_session.check_and_record(CHAT_ID, USER_ID, NOW, event_uid="msg:1")
+        await captcha_session.mark_restricted(CHAT_ID, USER_ID)
+        assert await captcha_session.is_restricted(CHAT_ID, USER_ID) is True
+
+        await fake_redis.delete(captcha_session.make_coalesce_key(CHAT_ID, USER_ID))
+        await captcha_session.check_and_record(CHAT_ID, USER_ID, NOW, event_uid="msg:2")
+
+        assert await captcha_session.is_restricted(CHAT_ID, USER_ID) is False
+
 
 @pytest.mark.usefixtures("mock_manager")
 class TestAnswerAndRetry:

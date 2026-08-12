@@ -9,14 +9,14 @@ import pytest
 
 
 def _restricted_perms():
-    """Captcha-restricted: can view, cannot send (not yet banned)."""
+    """Captcha restriction as reported by Telegram in BAN mode."""
     return SimpleNamespace(
         is_admin=False,
         is_creator=False,
-        is_banned=False,
+        is_banned=True,
         has_left=False,
         send_messages=False,
-        view_messages=True,
+        view_messages=False,
     )
 
 
@@ -48,6 +48,7 @@ async def test_advertising_timeout_does_not_schedule_unban(monkeypatch, mock_man
     from handlers.member_captcha.session import CaptchaSession
 
     monkeypatch.setattr(CaptchaSession, "is_flagged", AsyncMock(return_value="advertising"))
+    monkeypatch.setattr(CaptchaSession, "is_restricted", AsyncMock(return_value=True))
 
     await new_member_check(mock_manager.client, -1001445219041, 10, 42)
 
@@ -73,11 +74,14 @@ async def test_default_timeout_schedules_unban(monkeypatch, mock_manager):
     from handlers.member_captcha.session import CaptchaSession
 
     monkeypatch.setattr(CaptchaSession, "is_flagged", AsyncMock(return_value=None))
+    monkeypatch.setattr(CaptchaSession, "is_restricted", AsyncMock(return_value=True))
 
     await new_member_check(mock_manager.client, -1001445219041, 10, 42)
 
     mock_manager.lazy_session.assert_awaited()
     assert mock_manager.lazy_session.await_args.args[3] == "unban_member"
+    kwargs = mock_manager.client.edit_permissions.await_args.kwargs
+    assert kwargs.get("until_date") == timedelta(seconds=60)
 
 
 @pytest.mark.asyncio
@@ -96,6 +100,7 @@ async def test_timeout_skips_already_banned_no_unban(monkeypatch, mock_manager):
     from handlers.member_captcha.session import CaptchaSession
 
     monkeypatch.setattr(CaptchaSession, "is_flagged", AsyncMock(return_value=None))
+    monkeypatch.setattr(CaptchaSession, "is_restricted", AsyncMock(return_value=False))
 
     await new_member_check(mock_manager.client, -1001445219041, 10, 42)
 

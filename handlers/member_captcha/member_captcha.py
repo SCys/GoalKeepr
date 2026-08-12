@@ -151,6 +151,7 @@ async def member_captcha(event: events.ChatAction.Event):
         return
 
     logger.info(f"{log_context.log_prefix} | 权限限制成功")
+    await CaptchaSession.mark_restricted(chat.id, user.id)
 
     # ★ 兜底：程序在 restrict → captcha 之间崩溃时，到期后检查并踢出未验证成员
     await manager.lazy_session(
@@ -182,6 +183,7 @@ async def member_captcha(event: events.ChatAction.Event):
         logger.warning(f"{log_context.log_prefix} | 安全检查未通过 | reason:{security_reason}")
         await CaptchaSession.flag(chat.id, user.id, security_reason)
         if security_reason == "advertising":
+            await CaptchaSession.clear_restricted(chat.id, user.id)
             await cancel_pending_member_jobs(
                 chat.id,
                 user.id,

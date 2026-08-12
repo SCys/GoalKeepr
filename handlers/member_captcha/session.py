@@ -187,7 +187,15 @@ class CaptchaSession:
         })
         # 新入群，清除上一轮入群的临时数据（标记、重试次数、验证码答案等），
         # 让本次入群获得全新评估。频率计数器保留不变。
-        await rdb.hdel(session_key, "flagged_reason", "retry_count", "last_icon", "last_answer", "last_options")
+        await rdb.hdel(
+            session_key,
+            "flagged_reason",
+            "captcha_restricted",
+            "retry_count",
+            "last_icon",
+            "last_answer",
+            "last_options",
+        )
         await rdb.expire(session_key, new_ttl)
 
         if new_state == "throttled":
@@ -291,6 +299,41 @@ class CaptchaSession:
         if raw is None:
             return None
         return raw.decode() if isinstance(raw, bytes) else raw
+
+    # ------------------------------------------------------------------
+    # 默认 BAN 验证限制标记
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def mark_restricted(chat_id: int, user_id: int) -> None:
+        """记录当前限制由默认验证码流程施加。"""
+        rdb = await manager.get_redis()
+        if not rdb:
+            return
+
+        session_key = CaptchaSession.make_key(chat_id, user_id)
+        await rdb.hset(session_key, "captcha_restricted", "1")
+
+    @staticmethod
+    async def is_restricted(chat_id: int, user_id: int) -> bool:
+        """当前限制是否由默认验证码流程施加。"""
+        rdb = await manager.get_redis()
+        if not rdb:
+            return False
+
+        session_key = CaptchaSession.make_key(chat_id, user_id)
+        raw = await rdb.hget(session_key, "captcha_restricted")
+        return raw == b"1" or raw == "1"
+
+    @staticmethod
+    async def clear_restricted(chat_id: int, user_id: int) -> None:
+        """清除默认验证码限制标记。"""
+        rdb = await manager.get_redis()
+        if not rdb:
+            return
+
+        session_key = CaptchaSession.make_key(chat_id, user_id)
+        await rdb.hdel(session_key, "captcha_restricted")
 
     # ------------------------------------------------------------------
     # 读取 session
