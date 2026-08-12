@@ -22,7 +22,9 @@ def get_chat_type(chat: Any) -> str:
 # 时间配置 (秒)
 DELETED_AFTER = 30  # 消息自动删除时间
 MEMBER_CHECK_WAIT_TIME = 3  # 等待其他机器人检查的时间
-LLM_CHECK_TIMEOUT = 20  # LLM检查超时时间
+LLM_CHECK_TIMEOUT = 20  # LLM检查总超时时间
+LLM_MODEL_TIMEOUT = 9  # 单个模型超时时间；为 fallback 留出总预算
+LLM_MAX_TOKENS = 1000  # 垃圾检测输出上限，保留足够空间输出错误原因
 EVENT_EXPIRY_SECONDS = 60  # 事件过期时间
 
 # 封禁配置

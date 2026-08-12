@@ -1,10 +1,12 @@
 import asyncio
+from time import monotonic
 from typing import Any, List, Tuple
 
 import orjson as json
 from loguru import logger
 
 from ..utils import chat_completions, get_spam_models
+from ..member_captcha.config import LLM_MAX_TOKENS, LLM_MODEL_TIMEOUT
 
 
 def _user_fullname(user: Any) -> str:
@@ -59,19 +61,23 @@ async def check_spams_with_llm(
 
         result = None
         for model in get_spam_models():
+            model_started = monotonic()
             try:
                 result = await asyncio.wait_for(
                     chat_completions(
                         messages,
                         model,
-                        max_tokens=3200,
+                        max_tokens=LLM_MAX_TOKENS,
                         temperature=0.1,
                         response_format={"type": "json_object"},
                     ),
-                    timeout=12,
+                    timeout=LLM_MODEL_TIMEOUT,
                 )
             except asyncio.TimeoutError as e:
-                logger.error(f"check_spams_with_llm timeout for model {model}: {e}")
+                logger.error(
+                    f"check_spams_with_llm timeout for model {model} "
+                    f"after {monotonic() - model_started:.2f}s: {e}"
+                )
                 continue
 
             except ValueError as e:
@@ -84,6 +90,11 @@ async def check_spams_with_llm(
 
             if not result:
                 continue
+
+            logger.info(
+                f"check_spams_with_llm model {model} returned "
+                f"in {monotonic() - model_started:.2f}s"
+            )
 
             result = result.strip().replace("```json", "").replace("```", "")
 
