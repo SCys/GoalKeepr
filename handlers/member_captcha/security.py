@@ -105,10 +105,11 @@ async def perform_security_checks(
         SecurityCheckError: 安全检查过程中发生错误
     """
     try:
+        # TODO 性能问题暂时搁置
         # LLM检查
-        llm_found_spam = await _perform_llm_check(user, session, check_list, log_context, now)
-        if llm_found_spam:
-            return "llm"
+        # llm_found_spam = await _perform_llm_check(user, session, check_list, log_context, now)
+        # if llm_found_spam:
+        #     return "llm"
 
         # 广告检查
         adv_found = await _perform_advertising_check(
