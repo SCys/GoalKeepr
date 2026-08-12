@@ -94,3 +94,58 @@ async def test_custom_sleep_mode_restricts_for_configured_days(monkeypatch, mock
     assert result is True
     restrict.assert_awaited_once_with(chat, 42, timedelta(days=10))
     send.assert_awaited_once()
+
+
+async def test_advertising_member_is_banned_without_captcha(monkeypatch, mock_manager):
+    member_captcha_module = importlib.import_module("handlers.member_captcha.member_captcha")
+
+    monkeypatch.setattr(member_captcha_module, "validate_basic_conditions", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        member_captcha_module.CaptchaSession,
+        "check_and_record",
+        AsyncMock(return_value=(True, {})),
+    )
+    monkeypatch.setattr(member_captcha_module, "stats_incr", AsyncMock())
+    monkeypatch.setattr(member_captcha_module, "record_group", AsyncMock())
+    monkeypatch.setattr(
+        member_captcha_module,
+        "get_verification_method",
+        AsyncMock(return_value=VerificationMode.BAN),
+    )
+    monkeypatch.setattr(member_captcha_module, "restrict_member_permissions", AsyncMock(return_value=True))
+    monkeypatch.setattr(member_captcha_module, "create_verification_session", AsyncMock(return_value=SimpleNamespace()))
+    monkeypatch.setattr(member_captcha_module.asyncio, "sleep", AsyncMock())
+    monkeypatch.setattr(
+        member_captcha_module.manager,
+        "chat_member_permissions",
+        AsyncMock(return_value=SimpleNamespace(has_left=False)),
+    )
+    monkeypatch.setattr(member_captcha_module, "get_member_info_for_check", AsyncMock(return_value=[]))
+    monkeypatch.setattr(member_captcha_module, "perform_security_checks", AsyncMock(return_value="advertising"))
+    flag = AsyncMock()
+    monkeypatch.setattr(member_captcha_module.CaptchaSession, "flag", flag)
+    cancel_jobs = AsyncMock()
+    monkeypatch.setattr(member_captcha_module, "cancel_pending_member_jobs", cancel_jobs)
+    build_message = AsyncMock()
+    monkeypatch.setattr(member_captcha_module, "build_captcha_message", build_message)
+
+    chat = _fake_chat()
+    user = _fake_user()
+    await member_captcha_module.member_captcha(FakeJoinEvent(chat, user))
+
+    flag.assert_awaited_once_with(chat.id, user.id, "advertising")
+    cancel_jobs.assert_awaited_once_with(chat.id, user.id, delete_captcha_session=False)
+    mock_manager.client.edit_permissions.assert_awaited_once_with(
+        chat,
+        user.id,
+        view_messages=False,
+        until_date=timedelta(days=30),
+    )
+    member_captcha_module.stats_incr.assert_any_await(
+        mock_manager.get_redis.return_value,
+        "failed",
+        chat.id,
+        user.id,
+    )
+    build_message.assert_not_awaited()
+    mock_manager.client.send_message.assert_not_awaited()

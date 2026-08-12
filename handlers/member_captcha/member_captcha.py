@@ -10,7 +10,7 @@ from telethon import events, types
 from loguru import logger
 
 from manager import manager
-from .config import VerificationMode, DELETED_AFTER, MEMBER_CHECK_WAIT_TIME
+from .config import DEFAULT_BAN_DAYS, VerificationMode, DELETED_AFTER, MEMBER_CHECK_WAIT_TIME
 from .exceptions import LogContext
 from .session import CaptchaSession
 from .validators import (
@@ -20,9 +20,9 @@ from .validators import (
     create_verification_session,
 )
 from .security import restrict_member_permissions, get_member_info_for_check, perform_security_checks
-from .helpers import build_captcha_message, store_callback_map
+from .helpers import build_captcha_message, cancel_pending_member_jobs, store_callback_map
 from .callbacks import process_callback_query
-from .stats import stats_incr, record_group, FIELD_GROUP_JOINS, FIELD_VERIFICATIONS
+from .stats import stats_incr, record_group, FIELD_FAILED, FIELD_GROUP_JOINS, FIELD_VERIFICATIONS
 
 
 @manager.register("chat_member")
@@ -176,11 +176,29 @@ async def member_captcha(event: events.ChatAction.Event):
     # 收集需要检查的文本
     check_list = await get_member_info_for_check(user, session)
 
-    # 执行安全检查（不踢人，标记会话供验证通过后处理）
+    # 执行安全检查；广告命中直接长期封禁，其他结果保留验证码流程。
     security_reason = await perform_security_checks(user, session, check_list, log_context, now)
     if security_reason:
         logger.warning(f"{log_context.log_prefix} | 安全检查未通过 | reason:{security_reason}")
         await CaptchaSession.flag(chat.id, user.id, security_reason)
+        if security_reason == "advertising":
+            await cancel_pending_member_jobs(
+                chat.id,
+                user.id,
+                delete_captcha_session=False,
+            )
+            await manager.client.edit_permissions(
+                chat,
+                user.id,
+                view_messages=False,
+                until_date=timedelta(days=DEFAULT_BAN_DAYS),
+            )
+            await stats_incr(rdb_stats, FIELD_FAILED, chat.id, user.id)
+            logger.warning(
+                f"{log_context.log_prefix} | advertising detected | "
+                f"member banned | ban_days:{DEFAULT_BAN_DAYS}"
+            )
+            return
 
     # 生成验证码消息（返回文字 + Telethon buttons + 答案元数据）
     message_content, buttons, answer_meta = await build_captcha_message(user, now)
