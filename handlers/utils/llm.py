@@ -64,11 +64,11 @@ async def check_spams_with_llm(
                     chat_completions(
                         messages,
                         model,
-                        max_tokens=1024,
-                        temperature=0.5,
+                        max_tokens=3200,
+                        temperature=0.1,
                         response_format={"type": "json_object"},
                     ),
-                    timeout=7,
+                    timeout=12,
                 )
             except asyncio.TimeoutError as e:
                 logger.error(f"check_spams_with_llm timeout for model {model}: {e}")
