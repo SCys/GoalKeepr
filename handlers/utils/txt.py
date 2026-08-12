@@ -26,63 +26,28 @@ class ModelDescription:
 
 BASIC_SYSTEM_PROMPT = "You are a helpful assistant in a Telegram chat. Keep responses concise and useful."
 CONVERSATION_TTL = 1800
-DEFAULT_MODEL = "deepseek-r1"
+DEFAULT_MODEL = "step-3.7-flash"
 SUPPORTED_MODELS = {
-    "gemini-pro": ModelDescription(
-        name="Gemini 2.5 Pro",
+    "gemini-3.6-flash": ModelDescription(
+        name="Gemini 3.6 Flash",
         input_length=1048576,
         output_length=65535,
         rate_minute=10,
-        rate_daily=500,
+        rate_daily=1500,
     ),
-    "gemini-flash": ModelDescription(
-        name="Gemini 2.5 Flash",
+    "gemini-3.1-flash-lite": ModelDescription(
+        name="Gemini 3.1 Flash Lite",
         input_length=1048576,
         output_length=65535,
         rate_minute=10,
-        rate_daily=500,
+        rate_daily=4500,
     ),
-    "gemini-flash-lite": ModelDescription(
-        name="Gemini 2.5 Flash Lite",
+    "step-3.7-flash": ModelDescription(
+        name="Gemini 3.7 Flash",
         input_length=1048576,
         output_length=65535,
         rate_minute=10,
-        rate_daily=500,
-    ),
-    "llama-4": ModelDescription(
-        name="Meta Llama 4 Maverick",
-        input_length=128000,  # 128k
-        output_length=4096,  # 4k
-        rate_minute=5,
-        rate_daily=1000,
-    ),
-    "deepseek-r1": ModelDescription(
-        name="DeepSeek R1 0528",
-        input_length=163840,  # 164k
-        output_length=163840,  # 164k
-        rate_minute=5,
-        rate_daily=1000,
-    ),
-    "grok": ModelDescription(
-        name="Grok 3",
-        input_length=131072,
-        output_length=65536,
-        rate_minute=5,
-        rate_daily=1000,
-    ),
-    "qwen3": ModelDescription(
-        name="Qwen 3.2 235B A22",
-        input_length=40960,  # 41k
-        output_length=40960,  # 41k
-        rate_minute=5,
-        rate_daily=1000,
-    ),
-    "gemma-3": ModelDescription(
-        name="Gemma 3 27b",
-        input_length=96000,  # 96k
-        output_length=8192,  # 8k
-        rate_minute=5,
-        rate_daily=1000,
+        rate_daily=3500,
     ),
 }
 
