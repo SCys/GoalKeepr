@@ -9,9 +9,25 @@ from ...utils import count_tokens, tg_generate_text
 
 DELETED_AFTER = 5
 OUTPUT_MAX_LENGTH = 3500
-RE_CLEAR = re.compile(r"(?i)/chat(@[a-zA-Z0-9]+\s?)?")
+RE_CLEAR = re.compile(r"(?i)^/chat(?:@[a-zA-Z0-9_]+)?(?:\s|$)")
 
 logger = manager.logger
+
+
+async def _reply_response(event, text_resp: str, prefix: str) -> bool:
+    """Reply in Telegram-sized chunks, falling back per chunk if Markdown fails."""
+    for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH):
+        part = text_resp[i : i + OUTPUT_MAX_LENGTH]
+        try:
+            await event.reply(part, parse_mode="md")
+        except Exception:
+            logger.exception(f"{prefix} invalid text format (markdown), fallback to plain")
+            try:
+                await event.reply(part, link_preview=False)
+            except Exception:
+                logger.exception(f"{prefix} reply failed")
+                return False
+    return True
 
 
 @manager.register("message", pattern=r"(?i)^/chat(\s|$)|^/chat@\w+")
@@ -33,13 +49,13 @@ async def chat(event: events.NewMessage.Event):
         return
 
     text = event.text or ""
-    if text.startswith("/chat"):
+    if RE_CLEAR.match(text):
         text = RE_CLEAR.sub("", text, 1).strip()
 
     reply_msg = await event.get_reply_message()
     if reply_msg and reply_msg.text:
         text = f"{reply_msg.text}\n{text}"
-        if text.startswith("/chat"):
+        if RE_CLEAR.match(text):
             text = RE_CLEAR.sub("", text, 1).strip()
 
     if not text:
@@ -75,41 +91,27 @@ async def chat(event: events.NewMessage.Event):
             chat_entity.id if hasattr(chat_entity, "id") else event.chat_id, user.id, text
         )
         if not text_resp:
-            logger.warning(f"{prefix} generate text error, ignored")
-            return
-    except Exception as e:
-        logger.exception(f"{prefix} generate text failed")
-        text_resp = (
-            "生成回复失败，请稍后再试。| Failed to generate response, please try again later.\n"
-            f"```{e}```"
-        )
-
-    success = False
-    try:
-        if len(text_resp) > OUTPUT_MAX_LENGTH:
-            for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH):
-                part = text_resp[i : i + OUTPUT_MAX_LENGTH]
-                await event.reply(part, parse_mode="md")
-        else:
-            await event.reply(text_resp, parse_mode="md")
-        success = True
-    except Exception:
-        logger.exception(f"{prefix} invalid text format (markdown), fallback to plain")
-        try:
-            if len(text_resp) > OUTPUT_MAX_LENGTH:
-                for i in range(0, len(text_resp), OUTPUT_MAX_LENGTH):
-                    part = text_resp[i : i + OUTPUT_MAX_LENGTH]
-                    await event.reply(part, link_preview=False)
-            else:
-                await event.reply(text_resp, link_preview=False)
-            success = True
-        except Exception as e2:
-            logger.exception(f"{prefix} reply failed")
+            logger.warning(f"{prefix} generate text returned no response")
             await manager.reply(
                 event,
                 "生成回复失败，请稍后再试。| Failed to generate response, please try again later.",
                 auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
             )
+            await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
+            return
+    except Exception:
+        logger.exception(f"{prefix} generate text failed")
+        text_resp = (
+            "生成回复失败，请稍后再试。| Failed to generate response, please try again later.\n"
+        )
+
+    success = await _reply_response(event, text_resp, prefix)
+    if not success:
+        await manager.reply(
+            event,
+            "生成回复失败，请稍后再试。| Failed to generate response, please try again later.",
+            auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
+        )
 
     if not success:
         await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
