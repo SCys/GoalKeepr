@@ -102,6 +102,8 @@ class FakeJoinEvent:
     chat_id = MARKED_CHANNEL_ID
     user_joined = True
     user_added = False
+    user_left = False
+    user_kicked = False
     date = NOW
     original_update = SimpleNamespace(pts=123)
     # 模拟成员列表隐藏：无 service message

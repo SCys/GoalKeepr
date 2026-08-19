@@ -78,8 +78,7 @@ async def test_sb_cancels_captcha_and_unban(mock_manager):
         "https://api.telegram.org/bot123:test/banChatMember",
         json={"chat_id": BOT_API_CHAT_ID, "user_id": USER_ID, "revoke_messages": True},
     )
-    mock_manager.client.kick_participant.assert_awaited_once_with(chat, member)
-    mock_manager.client.edit_permissions.assert_not_called()
+    mock_manager.client.edit_permissions.assert_awaited_once_with(chat, member, view_messages=False, until_date=None)
     # /sb must NOT schedule unban
     mock_manager.lazy_session.assert_not_awaited()
     assert result is not None

@@ -71,13 +71,12 @@ async def ban_member(chat, event, administrator, member):
     from handlers.member_captcha.helpers import cancel_pending_member_jobs
     await cancel_pending_member_jobs(chat.id, id)
 
-    # Telethon 的 kick 会执行 ban + unban，因此必须先移除成员，再通过
-    # Bot API 永久封禁，避免后续 kick 把刚建立的永久 ban 解开。
+    # 使用 Telethon edit_permissions 永久封禁成员（禁止查看消息/移出群组并加入黑名单）
     try:
-        await manager.client.kick_participant(chat, member)
+        await manager.client.edit_permissions(chat, member, view_messages=False, until_date=None)
     except Exception as e:
-        # 成员可能已经离开群组；仍继续执行永久 ban，确保加入黑名单。
-        logger.warning(f"{prefix} failed to kick user {id} before ban: {e}")
+        # 成员可能已经离开群组；仍继续执行 Bot API 封禁，确保加入黑名单
+        logger.warning(f"{prefix} failed to edit permissions for user {id} before ban: {e}")
 
     try:
         session = await manager.create_session()

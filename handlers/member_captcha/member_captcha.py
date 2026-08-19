@@ -56,10 +56,22 @@ async def member_captcha(event: events.ChatAction.Event):
             # 非入群类服务消息（改标题、置顶等）直接忽略
             return
 
-    # 只处理新成员加入事件（不处理成员离开、被踢等事件）
+    # 只处理新成员加入事件（显式过滤离开、被踢等事件）
+    if event.user_left or event.user_kicked:
+        logger.debug(f"chat_member 事件为成员离开/被踢 chat_id={event.chat_id} user_id={user.id}")
+        return
+
     if not event.user_joined and not event.user_added:
         logger.debug(f"chat_member 事件非新成员加入 chat_id={event.chat_id} user_id={user.id} {event}")
         return
+
+    # 若为 UpdateChannelParticipant 更新，进一步检查新成员状态（避免管理员踢人/封禁触发的伪加入）
+    original_update = getattr(event, "original_update", None)
+    if isinstance(original_update, types.UpdateChannelParticipant):
+        new_participant = getattr(original_update, "new_participant", None)
+        if isinstance(new_participant, (types.ChannelParticipantBanned, types.ChannelParticipantLeft)):
+            logger.debug(f"chat_member UpdateChannelParticipant 为离开/封禁状态 chat_id={event.chat_id} user_id={user.id}")
+            return
 
     # 基本条件验证（内部会按 get_chat_type(chat) 判断群组类型）
     validation_error = await validate_basic_conditions(event, chat, user)

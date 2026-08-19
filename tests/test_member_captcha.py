@@ -35,6 +35,8 @@ class FakeJoinEvent:
     def __init__(self, chat, user):
         self._chat = chat
         self._user = user
+        self.user_left = False
+        self.user_kicked = False
         self.delete = AsyncMock()
 
     async def get_chat(self):
@@ -200,3 +202,52 @@ async def test_ban_mode_marks_captcha_restriction(monkeypatch, mock_manager):
     await member_captcha_module.member_captcha(FakeJoinEvent(chat, user))
 
     mark_restricted.assert_awaited_once_with(chat.id, user.id)
+
+
+async def test_kicked_or_left_event_ignored(monkeypatch, mock_manager):
+    """踢人或离开事件不得触发入群验证逻辑。"""
+    member_captcha_module = importlib.import_module("handlers.member_captcha.member_captcha")
+
+    mock_validate = AsyncMock()
+    monkeypatch.setattr(member_captcha_module, "validate_basic_conditions", mock_validate)
+
+    chat = _fake_chat()
+    user = _fake_user()
+    event = FakeJoinEvent(chat, user)
+    event.user_kicked = True
+    event.user_joined = False
+
+    await member_captcha_module.member_captcha(event)
+    mock_validate.assert_not_awaited()
+
+
+async def test_update_channel_participant_banned_ignored(monkeypatch, mock_manager):
+    """UpdateChannelParticipant 带有 Banned / Left 状态时应直接忽略。"""
+    member_captcha_module = importlib.import_module("handlers.member_captcha.member_captcha")
+
+    mock_validate = AsyncMock()
+    monkeypatch.setattr(member_captcha_module, "validate_basic_conditions", mock_validate)
+
+    chat = _fake_chat()
+    user = _fake_user()
+    event = FakeJoinEvent(chat, user)
+    event.action_message = None
+    event.user_joined = False
+    event.user_added = True
+    event.original_update = types.UpdateChannelParticipant(
+        channel_id=123,
+        date=NOW,
+        actor_id=1,
+        user_id=42,
+        qts=1,
+        new_participant=types.ChannelParticipantBanned(
+            peer=types.PeerUser(user_id=42),
+            kicked_by=1,
+            date=NOW,
+            banned_rights=types.ChatBannedRights(until_date=None, view_messages=True),
+        ),
+    )
+
+    await member_captcha_module.member_captcha(event)
+    mock_validate.assert_not_awaited()
+
