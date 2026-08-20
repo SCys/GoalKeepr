@@ -172,11 +172,15 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
             elif flagged_reason == "llm":
                 # 60s 软踢：先清超时任务，再单独调度 unban
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                await manager.client.edit_permissions(
-                    chat, operator.id,
-                    view_messages=False,
-                    until_date=timedelta(seconds=60),
-                )
+                try:
+                    await manager.client.kick_participant(chat, operator.id)
+                except Exception as e:
+                    logger.warning(f"{log_prefix} kick_participant failed: {e}")
+                    await manager.client.edit_permissions(
+                        chat, operator.id,
+                        view_messages=False,
+                        until_date=timedelta(seconds=60),
+                    )
                 await manager.lazy_session(
                     chat.id, msg.id, operator.id, "unban_member",
                     datetime.now(timezone.utc) + timedelta(seconds=60),
@@ -203,11 +207,15 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                 await manager.delete_message(chat, msg)
                 await delete_callback_map(chat.id, msg.id)
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                await manager.client.edit_permissions(
-                    chat, operator.id,
-                    view_messages=False,
-                    until_date=timedelta(seconds=60),
-                )
+                try:
+                    await manager.client.kick_participant(chat, operator.id)
+                except Exception as e:
+                    logger.warning(f"{log_prefix} kick_participant failed: {e}")
+                    await manager.client.edit_permissions(
+                        chat, operator.id,
+                        view_messages=False,
+                        until_date=timedelta(seconds=60),
+                    )
                 await manager.lazy_session(
                     chat.id, msg.id, operator.id, "unban_member",
                     datetime.now(timezone.utc) + timedelta(seconds=60),

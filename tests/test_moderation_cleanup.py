@@ -95,6 +95,7 @@ async def test_k_cancels_then_schedules_own_unban(mock_manager):
     member = SimpleNamespace(id=USER_ID, username="u", first_name="U", last_name="")
 
     mock_manager.client.edit_permissions = AsyncMock()
+    mock_manager.client.kick_participant = AsyncMock()
     mock_manager.username = lambda u: getattr(u, "username", None) or "x"
 
     with patch(
@@ -104,7 +105,7 @@ async def test_k_cancels_then_schedules_own_unban(mock_manager):
         result = await kick_member(chat, event, admin, member)
 
     mock_cancel.assert_awaited_once_with(CHAT_ID, USER_ID)
-    mock_manager.client.edit_permissions.assert_awaited()
+    mock_manager.client.kick_participant.assert_awaited_once_with(chat, member)
     mock_manager.lazy_session.assert_awaited_once()
     assert mock_manager.lazy_session.await_args.args[3] == "unban_member"
     assert result is not None

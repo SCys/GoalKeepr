@@ -74,13 +74,18 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
         logger.info(f"{prefix} member {member_id} banned {DEFAULT_BAN_DAYS} days for advertising")
         return True
 
-    # llm 或 default → 踢出成员 (view_messages=False)
-    await client.edit_permissions(
-        chat,
-        member_id,
-        view_messages=False,
-        until_date=timedelta(seconds=60),
-    )
+    # llm 或 default → 真正踢出成员（从群组中移除）
+    try:
+        await client.kick_participant(chat, member_id)
+        logger.info(f"{prefix} member {member_id} kicked from chat")
+    except Exception as e:
+        logger.warning(f"{prefix} kick_participant failed, fallback to edit_permissions: {e}")
+        await client.edit_permissions(
+            chat,
+            member_id,
+            view_messages=False,
+            until_date=timedelta(seconds=60),
+        )
     return True
 
 

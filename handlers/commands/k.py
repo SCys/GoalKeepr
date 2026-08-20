@@ -78,9 +78,8 @@ async def kick_member(chat, event, administrator, member):
     await cancel_pending_member_jobs(chat.id, id)
 
     try:
-        # 软踢：view_messages=False，稍后 unban_member 恢复
-        await manager.client.edit_permissions(chat, member, view_messages=False)
-        
+        # 踢出成员：从群组移除
+        await manager.client.kick_participant(chat, member)
     except Exception as e:
         logger.warning(f"{prefix} user {id} kick failed: {e}")
         return

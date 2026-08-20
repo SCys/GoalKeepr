@@ -180,8 +180,8 @@ class TestSelfVerification:
             operator, "test"
         )
         assert result is True
-        # Should have been kicked (edit_permissions called with view_messages=False)
-        mock_manager.client.edit_permissions.assert_awaited()
+        # Should have been kicked (kick_participant called)
+        mock_manager.client.kick_participant.assert_awaited()
 
     async def test_advertising_flag_bans(self, mock_manager, fake_redis):
         """User who got advertising flag → ban 30 days even with correct answer."""

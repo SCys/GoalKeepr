@@ -69,6 +69,7 @@ async def test_default_timeout_schedules_unban(monkeypatch, mock_manager):
     chat = SimpleNamespace(id=-1001445219041, title="g")
     mock_manager.client.get_entity = AsyncMock(return_value=chat)
     mock_manager.client.get_permissions = AsyncMock(return_value=_restricted_perms())
+    mock_manager.client.kick_participant = AsyncMock()
     mock_manager.client.edit_permissions = AsyncMock()
     mock_manager.lazy_session = AsyncMock()
     mock_manager.lazy_session_delete = AsyncMock()
@@ -80,10 +81,9 @@ async def test_default_timeout_schedules_unban(monkeypatch, mock_manager):
 
     await new_member_check(mock_manager.client, -1001445219041, 10, 42)
 
+    mock_manager.client.kick_participant.assert_awaited_once_with(chat, 42)
     mock_manager.lazy_session.assert_awaited()
     assert mock_manager.lazy_session.await_args.args[3] == "unban_member"
-    kwargs = mock_manager.client.edit_permissions.await_args.kwargs
-    assert kwargs.get("until_date") == timedelta(seconds=60)
 
 @pytest.mark.asyncio
 async def test_timeout_skips_already_banned_no_unban(monkeypatch, mock_manager):
