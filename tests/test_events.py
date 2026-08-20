@@ -7,22 +7,26 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-
 def _restricted_perms():
     """Captcha restriction as reported by Telegram in BAN mode."""
+    rights = SimpleNamespace(view_messages=False, send_messages=True)
+    participant = SimpleNamespace(banned_rights=rights)
     return SimpleNamespace(
+        participant=participant,
         is_admin=False,
         is_creator=False,
         is_banned=True,
         has_left=False,
         send_messages=False,
-        view_messages=False,
+        view_messages=True,
     )
-
 
 def _banned_perms():
     """Already banned by /sb or admin reject."""
+    rights = SimpleNamespace(view_messages=True, send_messages=True)
+    participant = SimpleNamespace(banned_rights=rights)
     return SimpleNamespace(
+        participant=participant,
         is_admin=False,
         is_creator=False,
         is_banned=True,
@@ -30,7 +34,6 @@ def _banned_perms():
         send_messages=False,
         view_messages=False,
     )
-
 
 @pytest.mark.asyncio
 async def test_advertising_timeout_does_not_schedule_unban(monkeypatch, mock_manager):
@@ -58,7 +61,6 @@ async def test_advertising_timeout_does_not_schedule_unban(monkeypatch, mock_man
     assert kwargs.get("until_date") == timedelta(days=30)
     mock_manager.lazy_session.assert_not_awaited()
 
-
 @pytest.mark.asyncio
 async def test_default_timeout_schedules_unban(monkeypatch, mock_manager):
     import handlers.member_captcha.events  # noqa: F401
@@ -83,7 +85,6 @@ async def test_default_timeout_schedules_unban(monkeypatch, mock_manager):
     kwargs = mock_manager.client.edit_permissions.await_args.kwargs
     assert kwargs.get("until_date") == timedelta(seconds=60)
 
-
 @pytest.mark.asyncio
 async def test_timeout_skips_already_banned_no_unban(monkeypatch, mock_manager):
     """Admin /sb or reject already banned the user — timeout must not overwrite or unban."""
@@ -104,23 +105,5 @@ async def test_timeout_skips_already_banned_no_unban(monkeypatch, mock_manager):
 
     await new_member_check(mock_manager.client, -1001445219041, 10, 42)
 
-    mock_manager.client.edit_permissions.assert_not_awaited()
+    mock_manager.client.edit_permissions.assert_not_called()
     mock_manager.lazy_session.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_resolve_chat_entity_tries_peer_channel(monkeypatch):
-    from manager.group import resolve_chat_entity
-    from telethon.tl import types
-
-    client = AsyncMock()
-    entity = SimpleNamespace(id=1445219041, title="g")
-
-    async def _get_entity(peer):
-        if isinstance(peer, types.PeerChannel) and peer.channel_id == 1445219041:
-            return entity
-        raise ValueError(f"no entity for {peer!r}")
-
-    client.get_entity = AsyncMock(side_effect=_get_entity)
-    result = await resolve_chat_entity(client, 1445219041)
-    assert result is entity

@@ -46,13 +46,16 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
         logger.info(f"{prefix} member {member_id} already left, skip kick")
         return False
 
-    # Telegram 可能把默认验证码限制也表示为 is_banned/view_messages=False。
-    # 只有本流程记录的限制才能在超时后转为临时踢出；其他封禁不能覆盖。
-    if getattr(perms, "is_banned", False) or getattr(perms, "view_messages", True) is False:
-        from .session import CaptchaSession
+    # 检查是否已经被管理员封禁（已被移出群或禁止查看消息 view_messages=False）
+    # 注意：验证码初始阶段只禁言（send_messages=False），不能误判为已封禁。
+    participant = getattr(perms, "participant", None)
+    banned_rights = getattr(participant, "banned_rights", None)
+    is_view_banned = banned_rights and getattr(banned_rights, "view_messages", False) is True
 
+    if is_view_banned:
+        from .session import CaptchaSession
         if not await CaptchaSession.is_restricted(chat_id, member_id):
-            logger.info(f"{prefix} member {member_id} already banned, skip kick")
+            logger.info(f"{prefix} member {member_id} already banned by admin/view_banned, skip kick")
             return False
 
     if getattr(perms, "send_messages", False):
@@ -71,7 +74,7 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
         logger.info(f"{prefix} member {member_id} banned {DEFAULT_BAN_DAYS} days for advertising")
         return True
 
-    # llm 或 default → 60s 封禁；调用方负责调度 unban_member
+    # llm 或 default → 踢出成员 (view_messages=False)
     await client.edit_permissions(
         chat,
         member_id,
