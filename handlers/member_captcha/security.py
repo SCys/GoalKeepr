@@ -108,23 +108,27 @@ async def _perform_llm_check(
         llm_start_time = datetime.now()
         logger.debug(f"{log_context.log_prefix} | starting LLM check")
 
-        spams_result = await asyncio.wait_for(
+        eval_results = await asyncio.wait_for(
             check_spams_with_llm([user], session, check_list, now), timeout=LLM_CHECK_TIMEOUT
         )
 
-        if spams_result and len(spams_result) > 0:
-            # 过滤掉不需要的内容
-            spams_result = [item for item in spams_result if item[0] == user.id]
+        llm_cost_time = (datetime.now() - llm_start_time).total_seconds()
 
-            if spams_result:
-                llm_cost_time = datetime.now() - llm_start_time
-                logger.warning(
-                    f"{log_context.log_prefix} | LLM detected spam | "
-                    f"reason:{spams_result[0][1]} | "
-                    f"elapsed:{llm_cost_time.total_seconds():.2f}s"
+        if eval_results:
+            user_eval = next((item for item in eval_results if item.id == user.id), None)
+            if user_eval:
+                logger.info(
+                    f"{log_context.log_prefix} | LLM评估评分:{user_eval.score}/100 | "
+                    f"违规:{user_eval.is_spam} | "
+                    f"原因:{user_eval.reason} | "
+                    f"耗时:{llm_cost_time:.2f}s"
                 )
-                session.banned = True
-                return True
+                if user_eval.is_spam:
+                    session.banned = True
+                    return True
+                return False
+
+        logger.debug(f"{log_context.log_prefix} | LLM check clean | elapsed:{llm_cost_time:.2f}s")
     except asyncio.TimeoutError:
         logger.warning(f"{log_context.log_prefix} | LLM check timed out")
     except Exception as e:

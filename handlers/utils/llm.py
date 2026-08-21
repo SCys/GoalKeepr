@@ -1,6 +1,7 @@
 import asyncio
+from dataclasses import dataclass
 from time import monotonic
-from typing import Any, List, Tuple
+from typing import Any, List, Optional
 
 import orjson as json
 from loguru import logger
@@ -8,20 +9,25 @@ from loguru import logger
 from ..utils import chat_completions, get_spam_models
 from ..member_captcha.config import LLM_MAX_TOKENS, LLM_MODEL_TIMEOUT
 
+@dataclass
+class LLMUserEvaluation:
+    id: int
+    score: int
+    is_spam: bool
+    reason: str
 
 def _user_fullname(user: Any) -> str:
     first = getattr(user, "first_name", None) or ""
     last = getattr(user, "last_name", None) or ""
     return f"{first} {last}".strip() or ""
 
-
 async def check_spams_with_llm(
     members: List[Any],
     session=None,
     additional_strings=None,
     now=None,
-) -> List[Tuple[int, str]]:
-    """members 为具 .user 的对象或 User，兼容 Telethon。"""
+) -> List[LLMUserEvaluation]:
+    """members 为具 .user 的对象或 User，兼容 Telethon。返回每个用户的评估结果列表。"""
     try:
         members_data = []
         for member in members:
@@ -47,26 +53,26 @@ async def check_spams_with_llm(
 
         system_prompt = (
             "你是一个专业的 Telegram 群组安全与垃圾信息（SPAM）识别专家。\n"
-            "任务：分析给出的 Telegram 用户资料（用户名、昵称、Bio 简介），准确识别出恶意广告、黑灰产、违规引流号，并严防误杀普通正常用户。\n\n"
-            "【判定依据与评分标准 (0~100 分)】：\n"
-            "1. 严禁误杀：普通英文/中文昵称（例如包含 Deep, OP, Man, Bot, AI, Pro 等常见字母或词汇），只要没有实际违规引流内容，一律视为正常用户（score < 50，不要加入 spams）。\n"
+            "任务：分析给出的 Telegram 用户资料（用户名、昵称、Bio 简介），准确评估每个用户的垃圾/风险评分（0~100 分），识别恶意广告、黑灰产、违规引流号，并严防误杀普通正常用户。\n\n"
+            "【评分标准 (0~100 分)】：\n"
+            "1. 0 ~ 30 分（正常普通用户）：普通英文/中文昵称（例如包含 Deep, OP, Man, Bot, AI, Pro 等常见字母或词汇），只要没有实际违规引流内容，一律打低分（0~30分，is_spam=false）。\n"
             "2. username 允许为 null，没有 username 绝对不是扣分项。\n"
-            "3. 只有存在以下确凿恶意特征时，才判定为 SPAM（打分 score ≥ 80）：\n"
+            "3. 80 ~ 100 分（高危 SPAM，is_spam=true）：只有存在确凿恶意证据时才打高分，如：\n"
             "   - Bio 或昵称包含明确的引流广告（如微信号/QQ号/联系方式/Telegram群链接/外链等）；\n"
             "   - 包含博彩/赌博/色情/代开发票/办证/信用卡套现/兼职刷单/暴富等黑产特征词或话术；\n"
-            "   - 明显的批量营销机器人账号。\n\n"
+            "   - 明显的批量营销黑产机器人账号。\n\n"
             "【输出格式】：\n"
-            "仅输出 JSON 格式，不要包含任何多余文字：\n"
+            "请为输入的每一个用户输出评估结果，严格输出 JSON 结构：\n"
             "{\n"
-            '  "spams": [\n'
+            '  "evaluations": [\n'
             "    {\n"
             '      "id": <用户ID>,\n'
-            '      "score": <80~100的分数>,\n'
-            '      "reason": "<简明中文说明判定的具体违规理由>"\n'
+            '      "score": <0~100分整数>,\n'
+            '      "is_spam": <true或false，score>=80为true>,\n'
+            '      "reason": "<简明中文说明判定的具体依据或特征>"\n'
             "    }\n"
             "  ]\n"
-            "}\n"
-            "如果所有用户均为正常用户，则输出：{\"spams\": []}"
+            "}"
         )
 
         if additional_strings and len(additional_strings) > 0:
@@ -132,20 +138,57 @@ async def check_spams_with_llm(
             logger.warning("Empty data received from LLM response")
             return []
 
-        spams = data.get("spams", [])
-        if not spams or len(spams) == 0:
-            return []
+        eval_list: List[LLMUserEvaluation] = []
+        if isinstance(data, dict):
+            if "evaluations" in data and isinstance(data["evaluations"], list):
+                for item in data["evaluations"]:
+                    if isinstance(item, dict) and item.get("id"):
+                        score = item.get("score", 0)
+                        try:
+                            score = int(score)
+                        except (ValueError, TypeError):
+                            score = 0
+                        is_spam = item.get("is_spam", score >= 80)
+                        reason = item.get("reason", "正常用户")
+                        eval_list.append(
+                            LLMUserEvaluation(
+                                id=item["id"],
+                                score=score,
+                                is_spam=bool(is_spam),
+                                reason=str(reason),
+                            )
+                        )
+            elif "spams" in data and isinstance(data["spams"], list):
+                # 兼容旧格式 spams
+                spam_map = {}
+                for s in data["spams"]:
+                    if isinstance(s, dict) and s.get("id"):
+                        score = s.get("score", 85)
+                        reason = s.get("reason", "疑似SPAM")
+                        spam_map[s["id"]] = (score, reason)
+                for member in members_data:
+                    m_id = member["id"]
+                    if m_id in spam_map:
+                        sc, reas = spam_map[m_id]
+                        eval_list.append(
+                            LLMUserEvaluation(
+                                id=m_id,
+                                score=sc,
+                                is_spam=True,
+                                reason=reas,
+                            )
+                        )
+                    else:
+                        eval_list.append(
+                            LLMUserEvaluation(
+                                id=m_id,
+                                score=10,
+                                is_spam=False,
+                                reason="正常用户",
+                            )
+                        )
 
-        valid_spams = []
-        for member in spams:
-            if not isinstance(member, dict):
-                continue
-            m_id = member.get("id")
-            reason = member.get("reason")
-            score = member.get("score", 80)
-            if m_id and reason and isinstance(score, (int, float)) and score >= 80:
-                valid_spams.append((m_id, f"[{score}分] {reason}"))
-        return valid_spams
+        return eval_list
     except Exception as e:
         logger.exception(f"check_spams_with_llm error: {e}")
         return []
