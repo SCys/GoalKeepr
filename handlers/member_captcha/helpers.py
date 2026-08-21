@@ -254,6 +254,30 @@ async def accepted_member(chat: Any, msg: Any, user: Any):
         "Please read the rules carefully before sending the message in the group."
     )
 
+    from manager.group import settings_get
+
+    rdb = await manager.get_redis()
+    lurk_check = "off"
+    first_msg_check = "off"
+    if rdb:
+        lurk_check = await settings_get(rdb, chat_id, "lurk_check_5min", "off")
+        first_msg_check = await settings_get(rdb, chat_id, "first_msg_check", "off")
+
+    now = datetime.now(timezone.utc)
+    if lurk_check == "on":
+        content += (
+            "\n\n> 📌 **新手发言指引**：请在 **5 分钟内** 在群里发送任意一条消息打招呼完成破冰（防僵尸号挂机机制）。\n"
+            "> Please send a message in this group within **5 minutes** to complete verification."
+        )
+        if rdb:
+            await rdb.set(f"first_msg_watch:{chat_id}:{user_id}", "1", ex=300)
+        await manager.lazy_session(
+            chat_id, 0, user_id, "first_msg_timeout", now + timedelta(minutes=5)
+        )
+    elif first_msg_check == "on":
+        if rdb:
+            await rdb.set(f"first_msg_watch:{chat_id}:{user_id}", "1", ex=300)
+
     has_photo = await manager.has_profile_photo(user)
     try:
         if has_photo is False:

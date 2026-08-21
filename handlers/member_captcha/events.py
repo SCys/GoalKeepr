@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from manager import manager
 from manager.group import resolve_chat_entity
@@ -196,3 +196,62 @@ async def safety_timeout_check(client, chat_id: int, message_id: int, member_id:
             )
             rdb = await manager.get_redis()
             await stats_incr(rdb, FIELD_FAILED, chat_id, member_id)
+
+@manager.register_event("first_msg_timeout")
+async def first_msg_timeout(client, chat_id: int, message_id: int, member_id: int):
+    """5分钟内未发言，触发防僵尸潜水踢出。"""
+    rdb = await manager.get_redis()
+    if rdb:
+        watch_key = f"first_msg_watch:{chat_id}:{member_id}"
+        is_watching = await rdb.get(watch_key)
+        if not is_watching:
+            logger.debug(f"chat {chat_id} member {member_id} already spoke or watch ended, skip first_msg_timeout")
+            return
+        await rdb.delete(watch_key)
+
+        from manager.group import settings_get
+        lurk_check = await settings_get(rdb, chat_id, "lurk_check_5min", "off")
+        if lurk_check != "on":
+            logger.debug(f"chat {chat_id} lurk_check_5min is off, skip kick")
+            return
+
+    try:
+        chat = await resolve_chat_entity(client, chat_id)
+        perms = await client.get_permissions(chat, member_id)
+        if perms and (perms.is_admin or perms.is_creator or getattr(perms, "has_left", False)):
+            return
+    except Exception as e:
+        logger.warning(f"check perms before first_msg_timeout failed: {e}")
+        return
+
+    kicked = False
+    if await manager.kick_member(chat, member_id):
+        kicked = True
+    else:
+        kicked = await manager.hide_member(chat, member_id, timedelta(seconds=60))
+
+    if kicked:
+        now_dt = datetime.now(timezone.utc)
+        await manager.lazy_session(
+            chat_id,
+            0,
+            member_id,
+            "unban_member",
+            now_dt + timedelta(seconds=60),
+        )
+        logger.info(f"chat {chat_id} member {member_id} kicked due to 5min lurk timeout")
+        try:
+            user = await manager.get_user_info(member_id)
+            name = user.full_name if user else str(member_id)
+            notice = (
+                f"⏱️ 成员 [{name}](tg://user?id={member_id}) 入群 5 分钟未发言（触发防僵尸号机制），已被移出群组。\n\n"
+                f"> Member [{name}](tg://user?id={member_id}) was removed for being inactive within 5 minutes of joining. Welcome to rejoin anytime!"
+            )
+            await manager.send(
+                chat_id,
+                notice,
+                parse_mode="md",
+                auto_deleted_at=now_dt + timedelta(seconds=30),
+            )
+        except Exception as e:
+            logger.warning(f"send lurk timeout notice failed: {e}")

@@ -8,6 +8,8 @@ SETTINGS_KEY_PREFIX = "group:settings:"
 
 SETTINGS_DEFAULT_VALUE = {
     "new_member_check_method": "ban",
+    "first_msg_check": "off",
+    "lurk_check_5min": "off",
 }
 
 NEW_MEMBER_CHECK_METHODS = {

@@ -11,7 +11,6 @@ log = manager.logger
 
 SUPPORT_TYPES = ["private", "group", "supergroup", "channel"]
 
-
 def _method_display(method: str) -> str:
     """解析存储值，返回用户可读的显示名。"""
     if method.startswith("sleep_custom:"):
@@ -19,6 +18,45 @@ def _method_display(method: str) -> str:
         return f"自定义静默（{days}天）"
     return NEW_MEMBER_CHECK_METHODS.get(method, f"未知({method})")
 
+async def _render_setting_panel(rdb, chat_id: int):
+    """构建设置面板的文本与内联键盘。"""
+    new_member_check_method = await settings_get(rdb, chat_id, "new_member_check_method", VerificationMode.BAN)
+    new_member_check_method_name = _method_display(new_member_check_method or VerificationMode.BAN)
+
+    first_msg_check = await settings_get(rdb, chat_id, "first_msg_check", "off")
+    lurk_check_5min = await settings_get(rdb, chat_id, "lurk_check_5min", "off")
+
+    first_msg_status = "【已开启 🟢】" if first_msg_check == "on" else "【已关闭 ⚪】"
+    lurk_status = "【已开启 🟢】" if lurk_check_5min == "on" else "【已关闭 ⚪】"
+
+    text = "⚙️ **群组设置面板 | Group Settings**\n\n"
+    text += "📋 **当前配置**：\n"
+    text += f"🔹 **新成员入群处理**：`{new_member_check_method_name}`\n"
+    text += f"🔹 **首句安全审查**：{first_msg_status}\n"
+    text += f"🔹 **5分钟潜水检测**：{lurk_status}\n\n"
+    text += "👇 点击下方按钮修改设置："
+
+    first_msg_btn_text = f"首句审查: {'开启 🟢' if first_msg_check == 'on' else '关闭 ⚪'}"
+    lurk_btn_text = f"5分潜水: {'开启 🟢' if lurk_check_5min == 'on' else '关闭 ⚪'}"
+
+    keyboard = [
+        [
+            manager.inline_button("认证剔除", "su:nm:ban"),
+            manager.inline_button("手动解封", "su:nm:silence"),
+            manager.inline_button("无作为", "su:nm:none"),
+        ],
+        [
+            manager.inline_button("静默1周", "su:nm:sleep_1week"),
+            manager.inline_button("静默2周", "su:nm:sleep_2weeks"),
+            manager.inline_button("自定义静默", "su:nm:sleep_custom"),
+        ],
+        [
+            manager.inline_button(first_msg_btn_text, "su:tg:first_msg_check"),
+            manager.inline_button(lurk_btn_text, "su:tg:lurk_check_5min"),
+        ],
+        [manager.inline_button("取消", "su:_:cancel")],
+    ]
+    return text, keyboard
 
 @manager.register("message", pattern=r"(?i)^/group_setting(\s|$)|^/group_setting@\w+")
 async def group_setting_command(event: events.NewMessage.Event):
@@ -39,37 +77,16 @@ async def group_setting_command(event: events.NewMessage.Event):
         log.error("Redis connection failed")
         return
 
-    new_member_check_method = await settings_get(rdb, chat.id, "new_member_check_method", VerificationMode.BAN)
-    new_member_check_method_name = _method_display(new_member_check_method)
-
-    text = "⚙️ 群组设置面板\n\n"
-    text += "📋 当前配置：\n"
-    text += f"🔹 新成员处理方式：{new_member_check_method_name}({new_member_check_method})\n\n"
-    text += "👇 点击下方按钮修改设置"
-
-    keyboard = [
-        [
-            manager.inline_button("认证剔除", "su:nm:ban"),
-            manager.inline_button("手动解封", "su:nm:silence"),
-            manager.inline_button("无作为", "su:nm:none"),
-        ],
-        [
-            manager.inline_button("静默1周", "su:nm:sleep_1week"),
-            manager.inline_button("静默2周", "su:nm:sleep_2weeks"),
-            manager.inline_button("自定义静默", "su:nm:sleep_custom"),
-        ],
-        [manager.inline_button("取消", "su:_:cancel")],
-    ]
+    text, keyboard = await _render_setting_panel(rdb, chat.id)
 
     reply = await event.respond(
         text,
         buttons=keyboard,
-        link_preview=False,
-        silent=True,
+        parse_mode="md",
     )
-    log.info(f"群组 {chat.id} 调用设置命令")
-    await manager.delete_message(chat.id, reply.id, datetime.now() + timedelta(seconds=25))
 
+    log.info(f"群组 {chat.id} 调用设置命令")
+    await manager.delete_message(chat.id, reply.id, datetime.now() + timedelta(seconds=45))
 
 @manager.register("callback_query")
 async def group_setting_callback(event: events.CallbackQuery.Event):
@@ -84,13 +101,13 @@ async def group_setting_callback(event: events.CallbackQuery.Event):
     user = await event.get_sender()
     if not await manager.is_admin(chat, user):
         log.warning(f"用户 {user.id} 尝试修改群组设置，但不是管理员")
-        await event.answer()
+        await event.answer("⚠️ 只有群管理员可以修改设置", alert=True)
         return
 
     rdb = await manager.get_redis()
     if not rdb:
         log.error("Redis connection failed")
-        await event.answer()
+        await event.answer("Redis 连接失败")
         return
 
     try:
@@ -100,50 +117,59 @@ async def group_setting_callback(event: events.CallbackQuery.Event):
             return
 
         parts = data.split(":")
-        if len(parts) != 3 or parts[0] != "su" or parts[1] != "nm":
+        if len(parts) != 3 or parts[0] != "su":
             await event.answer()
             return
 
+        op_type = parts[1]
         value = parts[2]
 
-        # 自定义静默：进入两阶段输入流程
-        if value == "sleep_custom":
-            pending_key = f"{PENDING_KEY_PREFIX}{chat.id}"
-            await rdb.hset(pending_key, mapping={
-                "type":    "sleep_custom",
-                "msg_id":  str(msg.id),
-                "user_id": str(user.id),
-                "created": str(int(time.time())),
-            })
-            await rdb.expire(pending_key, 60)
+        if op_type == "tg":
+            # 开关切换：first_msg_check 或 lurk_check_5min
+            setting_key = value
+            curr_val = await settings_get(rdb, chat.id, setting_key, "off")
+            new_val = "off" if curr_val == "on" else "on"
+            await settings_set(rdb, chat.id, {setting_key: new_val})
+            log.info(f"群组 {chat.id} 切换设置: {setting_key} = {new_val}")
 
-            text = "⚙️ 自定义静默时长\n\n"
-            text += "请在回复中输入天数（1-365天）\n"
-            text += "发送数字即可，例如：7\n"
-            text += "\n⏱ 限时 60 秒，超时需重新操作"
-            await manager.edit_text(chat.id, msg.id, text)
-            await event.answer()
+            text, keyboard = await _render_setting_panel(rdb, chat.id)
+            await manager.edit_text(chat.id, msg.id, text, buttons=keyboard, parse_mode="md")
+            await event.answer(f"已更新为: {'开启' if new_val == 'on' else '关闭'}")
             return
 
-        key = "new_member_check_method"
-        await settings_set(rdb, chat.id, {key: value})
+        elif op_type == "nm":
+            # 自定义静默：进入两阶段输入流程
+            if value == "sleep_custom":
+                pending_key = f"{PENDING_KEY_PREFIX}{chat.id}"
+                await rdb.hset(pending_key, mapping={
+                    "type":    "sleep_custom",
+                    "msg_id":  str(msg.id),
+                    "user_id": str(user.id),
+                    "created": str(int(time.time())),
+                })
+                await rdb.expire(pending_key, 60)
 
-        new_member_check_method = await settings_get(rdb, chat.id, "new_member_check_method", VerificationMode.BAN)
-        new_member_check_method_name = _method_display(new_member_check_method)
+                text = "⚙️ **自定义静默时长**\n\n"
+                text += "请在回复中输入天数（1-365天）\n"
+                text += "发送数字即可，例如：`7`\n"
+                text += "\n⏱ 限时 60 秒，超时需重新操作"
+                await manager.edit_text(chat.id, msg.id, text, parse_mode="md")
+                await event.answer()
+                return
 
-        text = "✅ 设置已成功更新！\n\n"
-        text += "📋 当前群组配置：\n"
-        text += f"🔹 新成员处理方式：{new_member_check_method_name}\n"
-        text += "\n如需进一步调整，请再次使用 /group_setting 命令"
+            key = "new_member_check_method"
+            await settings_set(rdb, chat.id, {key: value})
+            log.info(f"群组 {chat.id} 更新设置: {key} = {value}")
 
-        log.info(f"群组 {chat.id} 更新设置: {key} = {value}")
-        await manager.edit_text(chat.id, msg.id, text)
-        await manager.delete_message(chat.id, msg.id, datetime.now() + timedelta(seconds=15))
+            text, keyboard = await _render_setting_panel(rdb, chat.id)
+            await manager.edit_text(chat.id, msg.id, text, buttons=keyboard, parse_mode="md")
+            await manager.delete_message(chat.id, msg.id, datetime.now() + timedelta(seconds=20))
+            await event.answer("入群验证方式已更新")
+            return
+
     except Exception as e:
         log.error(f"处理设置回调时出错: {e}")
-    finally:
         await event.answer()
-
 
 @manager.register("message")
 async def handle_pending_input(event: events.NewMessage.Event):
@@ -160,38 +186,34 @@ async def handle_pending_input(event: events.NewMessage.Event):
     if not raw:
         return
 
-    pending = {k.decode(): v.decode() for k, v in raw.items()}
-    if pending.get("type") != "sleep_custom":
+    saved = {k.decode(): v.decode() for k, v in raw.items()} if isinstance(list(raw.keys())[0], bytes) else raw
+
+    if str(user.id) != saved.get("user_id"):
         return
 
-    if str(user.id) != pending.get("user_id"):
-        await event.answer("不是本人操作，忽略", alert=True)
-        return
+    try:
+        await event.delete()
+    except Exception:
+        pass
 
-    reply_to = getattr(event.message, "reply_to_msg_id", None)
-    expected_msg_id = int(pending.get("msg_id", 0))
-    if reply_to != expected_msg_id:
-        return
+    await rdb.delete(pending_key)
 
-    text = (event.message.text or "").strip()
-    if not text.isdigit():
-        await event.respond("❌ 请输入有效数字（1-365）", reply_to=event.message.id, silent=True)
+    text = event.text.strip()
+    msg_id = int(saved.get("msg_id", 0))
+
+    if not text.isdigit() or not (1 <= int(text) <= 365):
+        err_text = f"❌ 输入无效「{text}」，必须是 1 到 365 之间的纯数字天数。请重新使用 /group_setting 设置。"
+        await manager.edit_text(chat.id, msg_id, err_text)
+        await manager.delete_message(chat.id, msg_id, datetime.now() + timedelta(seconds=10))
         return
 
     days = int(text)
-    if days < 1 or days > 365:
-        await event.respond("❌ 范围应为 1-365 天", reply_to=event.message.id, silent=True)
-        return
+    value = f"sleep_custom:{days}"
+    key = "new_member_check_method"
+    await settings_set(rdb, chat.id, {key: value})
 
-    method_value = f"sleep_custom:{days}"
-    await settings_set(rdb, chat.id, {"new_member_check_method": method_value})
-    await rdb.delete(pending_key)
+    log.info(f"群组 {chat.id} 通过两阶段输入更新设置: {key} = {value}")
 
-    confirm_text = (
-        f"✅ 设置已成功更新！\n\n"
-        f"📋 当前群组配置：\n"
-        f"🔹 新成员处理方式：{_method_display(method_value)}\n\n"
-        f"如需进一步调整，请再次使用 /group_setting 命令"
-    )
-    await manager.edit_text(chat.id, expected_msg_id, confirm_text)
-    await manager.delete_message(chat.id, event.message.id, datetime.now() + timedelta(seconds=5))
+    updated_text, keyboard = await _render_setting_panel(rdb, chat.id)
+    await manager.edit_text(chat.id, msg_id, updated_text, buttons=keyboard, parse_mode="md")
+    await manager.delete_message(chat.id, msg_id, datetime.now() + timedelta(seconds=20))
