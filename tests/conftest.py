@@ -263,6 +263,7 @@ def mock_manager(monkeypatch, fake_redis):
     mgr.kick_member = AsyncMock(return_value=True)
     mgr.get_user_info = AsyncMock(return_value=None)
     mgr.has_profile_photo = AsyncMock(return_value=True)
+    mgr.get_user_bio = AsyncMock(return_value=None)
     mgr.send_text = AsyncMock(return_value=1)
     mgr.send = AsyncMock(return_value=True)
     mgr.send_photo = AsyncMock(return_value=1)

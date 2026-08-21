@@ -33,23 +33,31 @@ async def restore_member_permissions(chat: Any, user: types.User) -> bool:
 
 async def get_member_info_for_check(user: types.User, session: Session) -> List[str]:
     """
-    获取需要检查的成员信息。user 需有 .user (first_name, last_name, username)。
+    获取需要检查的成员信息（支持无 username 用户）。
     """
-    strings_to_check = [f"{user.first_name} {user.last_name}".strip()]
+    first = getattr(user, "first_name", "") or ""
+    last = getattr(user, "last_name", "") or ""
+    strings_to_check = [f"{first} {last}".strip()]
 
-    if user.username:
+    if getattr(user, "username", None):
         session.member_username = user.username
 
+    # 1. 优先通过 Telegram API 直接获取 Bio（适用于有/无 username 的所有用户）
+    bio = await manager.get_user_bio(user)
+
+    # 2. 若 API 未获取到且有 username，尝试通过网页端作为备选获取
+    if not bio and getattr(user, "username", None):
         try:
-            # 检查用户bio
             user_info = await manager.get_user_extra_info(user.username)
             if user_info and user_info.get("bio"):
                 bio = user_info["bio"]
-                strings_to_check.append(bio)
-                session.member_bio = bio
-                logger.debug(f"fetched user bio: {bio}")
         except Exception as e:
-            logger.warning(f"failed to fetch extra info for user {user.username}: {e}")
+            logger.debug(f"fallback fetch extra info failed for user {user.username}: {e}")
+
+    if bio:
+        strings_to_check.append(bio)
+        session.member_bio = bio
+        logger.debug(f"fetched user bio: {bio}")
 
     return strings_to_check
 

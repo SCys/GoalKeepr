@@ -303,6 +303,18 @@ class Manager:
             logger.exception(f"chat member permissions check exception: {e}")
             return None
 
+    async def get_user_bio(self, user: Union[types.User, int]) -> Optional[str]:
+        """通过 Telegram API 直接获取用户的 Bio（简介），支持无 username 用户。"""
+        try:
+            from telethon.tl.functions.users import GetFullUserRequest
+            user_id = getattr(user, "id", user)
+            full = await self.client(GetFullUserRequest(user_id))
+            about = getattr(getattr(full, "full_user", None), "about", None)
+            return about.strip() if about else None
+        except Exception as e:
+            logger.debug(f"get_user_bio failed for {user}: {e}")
+            return None
+
     async def get_user_extra_info(self, username: str):
         url = f"https://t.me/{username}"
         headers = {
