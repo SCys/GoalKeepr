@@ -110,6 +110,35 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
             rdb = await manager.get_redis()
             await stats_incr(rdb, FIELD_FAILED, chat_id, member_id)
 
+            # 发送超时/被踢提示（30秒后自动删除，防止群消息混乱）
+            try:
+                now_dt = datetime.now(timezone.utc)
+                user = await manager.get_user_info(member_id)
+                name = user.full_name if user else str(member_id)
+                if reason == "llm":
+                    notice = (
+                        f"⚠️ 成员 [{name}](tg://user?id={member_id}) 验证超时且未通过 AI 安全评估，已被移出群组（60秒后解禁）。\n\n"
+                        f"> Member [{name}](tg://user?id={member_id}) verification timed out and failed AI security check."
+                    )
+                elif reason == "advertising":
+                    notice = (
+                        f"🚫 成员 [{name}](tg://user?id={member_id}) 触发广告规则，已被封禁 {DEFAULT_BAN_DAYS} 天。\n\n"
+                        f"> Member [{name}](tg://user?id={member_id}) was banned for {DEFAULT_BAN_DAYS} days due to advertising."
+                    )
+                else:
+                    notice = (
+                        f"⏱️ 成员 [{name}](tg://user?id={member_id}) 验证超时（未在30秒内完成操作），已被移出群组（60秒后解禁）。\n\n"
+                        f"> Member [{name}](tg://user?id={member_id}) verification timed out and has been removed."
+                    )
+                await manager.send(
+                    chat_id,
+                    notice,
+                    parse_mode="md",
+                    auto_deleted_at=now_dt + timedelta(seconds=30),
+                )
+            except Exception as e:
+                logger.warning(f"send timeout kick notice failed: {e}")
+
 
 @manager.register_event("unban_member")
 async def unban_member(client, chat_id: int, message_id: int, member_id: int):

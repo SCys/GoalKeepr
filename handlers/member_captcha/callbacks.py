@@ -165,12 +165,25 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                 await cancel_pending_member_jobs(chat.id, operator.id)
                 if not await manager.kick_member(chat, operator.id):
                     await manager.hide_member(chat, operator.id, timedelta(seconds=60))
+                now_utc = datetime.now(timezone.utc)
                 await manager.lazy_session(
                     chat.id, msg.id, operator.id, "unban_member",
-                    datetime.now(timezone.utc) + timedelta(seconds=60),
+                    now_utc + timedelta(seconds=60),
                 )
                 logger.warning(f"{log_prefix} | LLM detected spam | member kicked")
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
+
+                op_name = _user_full_name(operator) or str(operator.id)
+                notify_text = (
+                    f"⚠️ 成员 [{op_name}](tg://user?id={operator.id}) 经 AI 安全检测判定为疑似风险/引流账号，已被移出群组（60秒后解禁）。\n\n"
+                    f"> Member [{op_name}](tg://user?id={operator.id}) was flagged as potential spam by AI security check and removed (unbanned in 60s)."
+                )
+                await manager.send(
+                    chat,
+                    notify_text,
+                    parse_mode="md",
+                    auto_deleted_at=now_utc + timedelta(seconds=DELETED_AFTER),
+                )
                 return True
 
             # 正常通过：先取消超时任务，记 cost 后再清 session
@@ -188,6 +201,7 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
             # 递增重试次数，超过上限直接 Kick
             retry_count = await CaptchaSession.record_retry(chat.id, operator.id)
             if retry_count >= CAPTCHA_MAX_RETRY:
+                now_utc = datetime.now(timezone.utc)
                 await manager.delete_message(chat, msg)
                 await delete_callback_map(chat.id, msg.id)
                 await cancel_pending_member_jobs(chat.id, operator.id)
@@ -195,13 +209,25 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                     await manager.hide_member(chat, operator.id, timedelta(seconds=60))
                 await manager.lazy_session(
                     chat.id, msg.id, operator.id, "unban_member",
-                    datetime.now(timezone.utc) + timedelta(seconds=60),
+                    now_utc + timedelta(seconds=60),
                 )
                 logger.warning(
                     f"{log_prefix} | retry limit exceeded, kicking | "
                     f"retry={retry_count} max={CAPTCHA_MAX_RETRY}"
                 )
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
+
+                op_name = _user_full_name(operator) or str(operator.id)
+                notify_text = (
+                    f"⚠️ 成员 [{op_name}](tg://user?id={operator.id}) 验证码连续选择错误超限，已被移出群组（60秒后解禁）。\n\n"
+                    f"> Member [{op_name}](tg://user?id={operator.id}) exceeded verification retry limit and has been removed."
+                )
+                await manager.send(
+                    chat,
+                    notify_text,
+                    parse_mode="md",
+                    auto_deleted_at=now_utc + timedelta(seconds=DELETED_AFTER),
+                )
                 return True
 
             now = datetime.now(timezone.utc)

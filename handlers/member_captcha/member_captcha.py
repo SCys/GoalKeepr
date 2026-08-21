@@ -202,6 +202,16 @@ async def member_captcha(event: events.ChatAction.Event):
                 f"{log_context.log_prefix} | advertising detected | "
                 f"member banned | ban_days:{DEFAULT_BAN_DAYS}"
             )
+            notify_text = (
+                f"🚫 成员 [{log_context.member_fullname}](tg://user?id={user.id}) 命中了广告黑名单关键词，已被封禁 {DEFAULT_BAN_DAYS} 天。\n\n"
+                f"> Member [{log_context.member_fullname}](tg://user?id={user.id}) was banned for {DEFAULT_BAN_DAYS} days due to advertising detection."
+            )
+            await manager.send(
+                chat,
+                notify_text,
+                parse_mode="md",
+                auto_deleted_at=now + timedelta(seconds=DELETED_AFTER),
+            )
             return
 
     # 生成验证码消息（返回文字 + 按钮 + 答案元数据）
