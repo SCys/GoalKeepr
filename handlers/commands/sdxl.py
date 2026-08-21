@@ -75,14 +75,12 @@ async def sdxl(event: events.NewMessage.Event):
             await event.reply("task is failed: cloudflare worker return invalid json.")
             return
 
-    try:
-        await manager.client.send_file(
-            chat.id,
-            image_binary,
-            caption="---\n\rPower by Cloudflare AI",
-        )
-    except Exception:
-        logger.exception(f"{prefix} send image failed")
+    sent_id = await manager.send_photo(
+        chat.id,
+        image_binary,
+        caption="---\n\rPower by Cloudflare AI",
+    )
+    if sent_id is None:
         await event.reply("task is failed: send image failed.")
         return
 

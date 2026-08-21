@@ -243,14 +243,12 @@ async def main():
     # Cleanup stale Redis data from previous run
     await startup_cleanup()
 
-    # Start tasks
-    asyncio.create_task(txt2img_worker())
-    asyncio.create_task(worker_loop())
-    
     logger.info("主进程开始运行")
     try:
+        # Start tasks after manager status is ready
+        asyncio.create_task(txt2img_worker())
+        asyncio.create_task(worker_loop())
         await manager.start()
-        await manager.client.run_until_disconnected()
     except KeyboardInterrupt:
         logger.info("主进程收到退出信号，正在断开连接…")
     except asyncio.CancelledError:

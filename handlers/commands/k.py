@@ -39,7 +39,7 @@ async def k(event: events.NewMessage.Event):
             # We need to get entity to ban? edit_permissions accepts ID.
             # But we need User object for logging/name.
             try:
-                user = await manager.client.get_entity(user_id)
+                user = await manager.get_user_info(user_id)
                 resp = await kick_member(chat, event, sender, user)
                 await manager.delete_message(event.chat_id, resp, event.date + timedelta(seconds=DELETED_AFTER))
             except Exception as e:
@@ -77,11 +77,9 @@ async def kick_member(chat, event, administrator, member):
     from handlers.member_captcha.helpers import cancel_pending_member_jobs
     await cancel_pending_member_jobs(chat.id, id)
 
-    try:
-        # 踢出成员：从群组移除
-        await manager.client.kick_participant(chat, member)
-    except Exception as e:
-        logger.warning(f"{prefix} user {id} kick failed: {e}")
+    # 踢出成员：从群组移除
+    if not await manager.kick_member(chat, id):
+        logger.warning(f"{prefix} user {id} kick failed")
         return
 
     ts_free = datetime.now() + timedelta(seconds=BAN_MEMBER)

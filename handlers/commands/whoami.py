@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from telethon import events, utils, types
+from telethon import events
 from manager import manager
 
 logger = manager.logger
@@ -18,8 +18,8 @@ async def whoami(event: events.NewMessage.Event):
     if not user:
         return
 
-    # Telethon user: id, first_name, last_name, username
-    full_name = utils.get_display_name(user)
+    # 用户对象：id, first_name, last_name, username
+    full_name = f"{getattr(user, 'first_name', '') or ''} {getattr(user, 'last_name', None) or ''}".strip()
     user_url = f"https://t.me/{user.username}" if getattr(user, 'username', None) else "N/A"
 
     content = f"""ID：\t{user.id}\n完整名：\t{full_name}\n分享URL：{user_url}"""

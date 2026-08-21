@@ -157,8 +157,8 @@ class TestSelfVerification:
             operator, "test"
         )
         assert result is True
-        # Should have called edit_message to regenerate captcha
-        mock_manager.client.edit_message.assert_awaited()
+        # Should have edited message to regenerate captcha
+        mock_manager.edit_text.assert_awaited()
 
     async def test_retry_limit_kicks(self, mock_manager, fake_redis):
         """3 wrong attempts → user should be kicked."""
@@ -180,8 +180,8 @@ class TestSelfVerification:
             operator, "test"
         )
         assert result is True
-        # Should have been kicked (kick_participant called)
-        mock_manager.client.kick_participant.assert_awaited()
+        # Should have been kicked
+        mock_manager.kick_member.assert_awaited()
 
     async def test_advertising_flag_bans(self, mock_manager, fake_redis):
         """User who got advertising flag → ban 30 days even with correct answer."""
@@ -201,10 +201,10 @@ class TestSelfVerification:
         )
         assert result is True
 
-        # edit_permissions should have been called with ban (30 days)
+        # hide_member should have been called with ban (30 days)
         # We just check it was called (the exact args are validated by the
         # code itself; checking timedelta equality is fragile)
-        mock_manager.client.edit_permissions.assert_awaited()
+        mock_manager.hide_member.assert_awaited()
 
         # accepted_member should NOT have been called (user was banned)
         from handlers.member_captcha.callbacks import accepted_member
@@ -236,7 +236,7 @@ class TestSelfVerification:
         msg = _make_msg()
         chat = _make_chat()
 
-        mock_manager.client.get_entity = AsyncMock(return_value=_make_operator())
+        mock_manager.get_user_info = AsyncMock(return_value=_make_operator())
 
         with patch("handlers.member_captcha.callbacks.accepted_member", new=AsyncMock()) as mock_accept:
             result = await handle_admin_operation(
@@ -259,14 +259,14 @@ class TestSelfVerification:
         msg = _make_msg()
         chat = _make_chat()
 
-        mock_manager.client.get_entity = AsyncMock(return_value=_make_operator())
+        mock_manager.get_user_info = AsyncMock(return_value=_make_operator())
 
         result = await handle_admin_operation(
             chat, msg, f"{USER_ID}__{NOW.isoformat()}__X",
             "test"
         )
         assert result is True
-        mock_manager.client.edit_permissions.assert_awaited()  # banned
+        mock_manager.hide_member.assert_awaited()  # banned
         # Regression: without cancelling new_member_check, timeout overwrites
         # the 30-day ban with a 60s kick and schedules unban_member.
         deleted_types = {

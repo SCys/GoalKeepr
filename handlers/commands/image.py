@@ -14,7 +14,7 @@ import uuid
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 
-from telethon import events, types, Button, errors
+from telethon import events
 from orjson import dumps, loads
 
 from manager import manager
@@ -783,9 +783,8 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
                 imgproxy_salt,
                 imgproxy_encryption_key if imgproxy_encryption_key else None
             )
-            # Telethon Buttons
             if image_url:
-                reply_buttons = [Button.url("Original|原始图片", image_url)]
+                reply_buttons = [manager.url_button("Original|原始图片", image_url)]
         except Exception as e:
             logger.warning(f"{prefix} imgproxy config error: {e}, skipping imgproxy URL")
             reply_buttons = None
@@ -793,14 +792,15 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
         caption = f"Size: {size} Step: {step} Cost: {cost.total_seconds():.1f}s\n\n{task.msg.reply_content}"[:1023]
         
         # Send Photo
-        # Telethon send_file(entity, file, caption=..., buttons=...)
-        await manager.client.send_file(
+        sent_id = await manager.send_photo(
             task.msg.chat_id,
-            file=img_raw,
+            img_raw,
             caption=caption,
             buttons=reply_buttons,
-            reply_to=task.msg.message_id
+            reply_to=task.msg.message_id,
         )
+        if sent_id is None:
+            raise RuntimeError("send_photo failed")
 
         logger.info(f"{prefix} completed task {task.task_id} image is sent, cost: {cost.total_seconds():.1f}s")
         

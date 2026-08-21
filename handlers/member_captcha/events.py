@@ -65,27 +65,16 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
     logger.info(f"{prefix} member {member_id} timeout kick (reason={reason})")
 
     if reason == "advertising":
-        await client.edit_permissions(
-            chat,
-            member_id,
-            view_messages=False,
-            until_date=timedelta(days=DEFAULT_BAN_DAYS),
-        )
+        await manager.hide_member(chat, member_id, timedelta(days=DEFAULT_BAN_DAYS))
         logger.info(f"{prefix} member {member_id} banned {DEFAULT_BAN_DAYS} days for advertising")
         return True
 
     # llm 或 default → 真正踢出成员（从群组中移除）
-    try:
-        await client.kick_participant(chat, member_id)
+    if await manager.kick_member(chat, member_id):
         logger.info(f"{prefix} member {member_id} kicked from chat")
-    except Exception as e:
-        logger.warning(f"{prefix} kick_participant failed, fallback to edit_permissions: {e}")
-        await client.edit_permissions(
-            chat,
-            member_id,
-            view_messages=False,
-            until_date=timedelta(seconds=60),
-        )
+    else:
+        logger.warning(f"{prefix} kick_participant failed, fallback to hide_member")
+        await manager.hide_member(chat, member_id, timedelta(seconds=60))
     return True
 
 
@@ -145,22 +134,10 @@ async def unban_member(client, chat_id: int, message_id: int, member_id: int):
     except Exception as e:
         logger.warning(f"{prefix} check member {member_id} perms before unban failed: {e}")
 
-    try:
-        await client.edit_permissions(
-            chat,
-            member_id,
-            view_messages=True,
-            send_messages=True,
-            send_media=True,
-            send_stickers=True,
-            send_gifs=True,
-            send_games=True,
-            send_inline=True,
-            embed_link_previews=True,
-        )
+    if await manager.unban_member_full(chat, member_id):
         logger.info(f"{prefix} member {member_id} is unbanned")
-    except Exception as e:
-        logger.warning(f"{prefix} member {member_id} unbanned error {e}")
+    else:
+        logger.warning(f"{prefix} member {member_id} unbanned error")
 
 
 # 兜底超时检查：程序在 restrict → captcha 之间崩溃时，该 session 到期后执行。

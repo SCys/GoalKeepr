@@ -143,11 +143,10 @@ async def test_advertising_member_is_banned_without_captcha(monkeypatch, mock_ma
     mark_restricted.assert_awaited_once_with(chat.id, user.id)
     clear_restricted.assert_awaited_once_with(chat.id, user.id)
     cancel_jobs.assert_awaited_once_with(chat.id, user.id, delete_captcha_session=False)
-    mock_manager.client.edit_permissions.assert_awaited_once_with(
+    mock_manager.hide_member.assert_awaited_once_with(
         chat,
         user.id,
-        view_messages=False,
-        until_date=timedelta(days=30),
+        timedelta(days=30),
     )
     member_captcha_module.stats_incr.assert_any_await(
         mock_manager.get_redis.return_value,

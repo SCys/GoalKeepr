@@ -4,8 +4,6 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Optional, Tuple, List, Any, Dict
 
-from telethon import Button
-
 from manager import manager
 from .security import restore_member_permissions
 
@@ -16,10 +14,23 @@ def _user_full_name(user: Any) -> str:
     return f"{first} {last}".strip() or ""
 
 
+def _get_icon_descriptions(key: str) -> Tuple[str, str]:
+    """解析图标的中文和英文描述。"""
+    if "|" in key:
+        parts = key.split("|", 1)
+        return parts[0].strip(), parts[1].strip()
+    if key in ("A", "B", "O"):
+        return f"字母 {key}", f"Letter {key}"
+    if key == "1/2":
+        return "二分之一 (1/2)", "One half (1/2)"
+    return key, key
+
 WELCOME_TEXT = (
-    "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，点击 *%(icon)s* 按钮后才能发言。\n\n *30秒* 内不操作即会被送走。\n\n"
-    "Welcome [%(title)s](tg://user?id=%(user_id)d). \n\n"
-    "You would be allowed to send the message after choosing the right option for [*%(icon)s*] through pressing the correct button"
+    "**🛡️ 新成员入群验证 | Member Verification**\n\n"
+    "欢迎 [%(title)s](tg://user?id=%(user_id)d) ，请点击下方代表【**%(zh_desc)s**】的图标按钮完成验证。\n\n"
+    "> ⏱️ **30秒** 内未完成验证或多次选错将被移出群组。\n\n"
+    "Welcome [%(title)s](tg://user?id=%(user_id)d).\n"
+    "> Please click the button representing **%(en_desc)s** to verify and start chatting."
 )
 
 ICONS = {
@@ -83,7 +94,7 @@ async def build_captcha_message(
     msg_timestamp: datetime,
 ) -> Tuple[str, List[List[Any]], Dict[str, str]]:
     """
-    构建新用户验证信息的文字与 Telethon 内联按钮（二维列表，供 send_message(buttons=) 使用）。
+    构建新用户验证信息的文字与内联按钮（二维列表，按钮由 manager.inline_button 构建）。
     member 需有 .user (id, first_name, last_name) 或自身为 User。
 
     返回:
@@ -101,7 +112,9 @@ async def build_captcha_message(
 
     ts_str = str(msg_timestamp)
     items = random.sample(list(ICONS.items()), k=5)
-    button_user_ok_key, button_user_ok_emoji = random.choice(items)
+    random.shuffle(items)
+    correct_idx = random.randint(0, len(items) - 1)
+    button_user_ok_key, button_user_ok_emoji = items[correct_idx]
 
     # Use a hash map to avoid exceeding Telethon's 64-byte callback data limit
     callback_map: Dict[str, str] = {}
@@ -111,25 +124,32 @@ async def build_captcha_message(
         callback_map[h] = data_str
         return h.encode("utf-8")
 
+    # 按钮 value 使用纯索引（0, 1, 2, 3, 4），彻底脱敏真实内容
     row_user = [
-        Button.inline(emoji, _short_callback("__".join([str(member_id), ts_str, key])))
-        for key, emoji in items
+        manager.inline_button(emoji, _short_callback("__".join([str(member_id), ts_str, str(idx)])))
+        for idx, (key, emoji) in enumerate(items)
     ]
-    random.shuffle(row_user)
 
     row_admin = [
-        Button.inline("✔", _short_callback("__".join([str(member_id), ts_str, "O"]))),
-        Button.inline("❌", _short_callback("__".join([str(member_id), ts_str, "X"]))),
+        manager.inline_button("✔", _short_callback("__".join([str(member_id), ts_str, "O"]))),
+        manager.inline_button("❌", _short_callback("__".join([str(member_id), ts_str, "X"]))),
     ]
 
-    content = WELCOME_TEXT % {"title": member_name, "user_id": member_id, "icon": button_user_ok_emoji}
+    zh_desc, en_desc = _get_icon_descriptions(button_user_ok_key)
+    content = WELCOME_TEXT % {
+        "title": member_name,
+        "user_id": member_id,
+        "zh_desc": zh_desc,
+        "en_desc": en_desc,
+    }
     buttons = [row_user, row_admin]
 
     # 构建答案元数据
-    all_options = [{"key": k, "emoji": v} for k, v in items]
+    all_options = [{"index": idx, "key": k, "emoji": v} for idx, (k, v) in enumerate(items)]
     answer_meta = {
         "icon": button_user_ok_emoji,
-        "answer": button_user_ok_key,
+        "answer": str(correct_idx),
+        "answer_key": button_user_ok_key,
         "options": json.dumps(all_options, ensure_ascii=False),
         "callback_map": callback_map,
     }
@@ -234,9 +254,9 @@ async def accepted_member(chat: Any, msg: Any, user: Any):
         "Please read the rules carefully before sending the message in the group."
     )
 
+    has_photo = await manager.has_profile_photo(user)
     try:
-        photos = await manager.client.get_profile_photos(user, limit=1)
-        if not photos:
+        if has_photo is False:
             content += (
                 "\n\n请设置头像或显示头像，能够更好体现个性。\n\n"
                 "Please choose your appropriate fancy profile photo and set it available in public. "
@@ -245,12 +265,11 @@ async def accepted_member(chat: Any, msg: Any, user: Any):
     except Exception:
         logger.exception("get profile photos error")
 
-    try:
-        reply = await manager.client.send_message(chat, content, parse_mode="md")
-    except Exception as e:
-        logger.error(f"{prefix} | 欢迎消息发送失败 | {e}")
+    reply_id = await manager.send_text(chat_id, content, parse_mode="md")
+    if reply_id is None:
+        logger.error(f"{prefix} | 欢迎消息发送失败")
         return
-    await manager.delete_message(chat, reply)
+    await manager.delete_message(chat_id, reply_id)
     # 取消超时踢人；保留 session 频率计数（若调用方尚未删除）
     await cancel_pending_member_jobs(
         chat_id, user.id, cancel_unban=True, delete_captcha_session=False

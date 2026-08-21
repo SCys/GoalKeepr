@@ -27,17 +27,13 @@ async def reply_tts(msg, content: str, show_original=False, lang="zh-CN"):
     audio.export(output, codec="opus", format="ogg", parameters=["-strict", "-2"])
     voice_bytes = output.getvalue()
 
-    entity = getattr(msg, "chat_id", None) or msg
+    chat_id = getattr(msg, "chat_id", None) or msg
     reply_to = getattr(msg, "id", None)
     if show_original:
-        await manager.client.send_file(
-            entity, voice_bytes, voice_note=True, reply_to=reply_to, caption=content
-        )
+        sent = await manager.send_voice(chat_id, voice_bytes, caption=content, reply_to=reply_to)
     else:
-        await manager.client.send_file(
-            entity, voice_bytes, voice_note=True, reply_to=reply_to, silent=True
-        )
-    return True
+        sent = await manager.send_voice(chat_id, voice_bytes, reply_to=reply_to, silent=True)
+    return sent is not None
 
 
 async def edge_ext(source: str, lang="zh-CN"):

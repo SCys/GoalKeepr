@@ -39,12 +39,12 @@ class TestRestrictMemberPermissions:
 
         result = await restrict_member_permissions(chat, user)
         assert result is True
-        mock_manager.client.edit_permissions.assert_awaited_once()
+        mock_manager.mute_member.assert_awaited_once()
 
     async def test_restrict_failure_returns_false(self, mock_manager):
         from handlers.member_captcha.security import restrict_member_permissions
 
-        mock_manager.client.edit_permissions.side_effect = Exception("no permission")
+        mock_manager.mute_member.return_value = False
 
         chat = _make_user(user_id=-100999, first_name="Chat")
         user = _make_user()
@@ -62,12 +62,12 @@ class TestRestoreMemberPermissions:
 
         result = await restore_member_permissions(chat, user)
         assert result is True
-        mock_manager.client.edit_permissions.assert_awaited_once()
+        mock_manager.unmute_member.assert_awaited_once()
 
     async def test_restore_failure_returns_false(self, mock_manager):
         from handlers.member_captcha.security import restore_member_permissions
 
-        mock_manager.client.edit_permissions.side_effect = Exception("fail")
+        mock_manager.unmute_member.return_value = False
         chat = _make_user(user_id=-100999, first_name="Chat")
         user = _make_user()
 

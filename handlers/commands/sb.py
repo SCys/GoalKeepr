@@ -35,7 +35,7 @@ async def sb(event: events.NewMessage.Event):
     if isinstance(reply.action, types.MessageActionChatAddUser):
         for user_id in reply.action.users:
             try:
-                user = await manager.client.get_entity(user_id)
+                user = await manager.get_user_info(user_id)
                 resp = await ban_member(chat, event, sender, user)
                 await manager.delete_message(event.chat_id, resp, event.date + timedelta(seconds=DELETED_AFTER))
             except Exception as e:
@@ -71,12 +71,10 @@ async def ban_member(chat, event, administrator, member):
     from handlers.member_captcha.helpers import cancel_pending_member_jobs
     await cancel_pending_member_jobs(chat.id, id)
 
-    # 使用 Telethon edit_permissions 永久封禁成员（禁止查看消息/移出群组并加入黑名单）
-    try:
-        await manager.client.edit_permissions(chat, member, view_messages=False, until_date=None)
-    except Exception as e:
+    # 永久封禁成员（禁止查看消息/移出群组并加入黑名单）
+    if not await manager.hide_member(chat, id, None):
         # 成员可能已经离开群组；仍继续执行 Bot API 封禁，确保加入黑名单
-        logger.warning(f"{prefix} failed to edit permissions for user {id} before ban: {e}")
+        logger.warning(f"{prefix} failed to edit permissions for user {id} before ban")
 
     try:
         session = await manager.create_session()

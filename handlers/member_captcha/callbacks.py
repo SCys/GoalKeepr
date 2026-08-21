@@ -85,10 +85,9 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
         except ValueError:
             logger.warning(f"{log_prefix} | invalid member_id format: {member_id}")
             return False
-        try:
-            user = await manager.client.get_entity(member_id)
-        except Exception as e:
-            logger.error(f"{log_prefix} | failed to fetch member | member_id:{member_id} | {e}")
+        user = await manager.get_user_info(member_id)
+        if user is None:
+            logger.error(f"{log_prefix} | failed to fetch member | member_id:{member_id}")
             return False
 
         member_info = f"target:{member_id}"
@@ -114,11 +113,7 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
             await delete_callback_map(chat.id, msg.id)
             # 必须取消 new_member_check / unban：否则超时会把 30 天封禁改成 60s 并自动解封
             await cancel_pending_member_jobs(chat.id, member_id)
-            await manager.client.edit_permissions(
-                chat, member_id,
-                view_messages=False,
-                until_date=timedelta(days=DEFAULT_BAN_DAYS),
-            )
+            await manager.hide_member(chat, member_id, timedelta(days=DEFAULT_BAN_DAYS))
             logger.warning(f"{log_prefix} | admin rejected member | {member_info} | ban_days:{DEFAULT_BAN_DAYS}")
             await stats_incr(rdb, FIELD_FAILED, chat.id, member_id)
             return True
@@ -161,26 +156,15 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
             if flagged_reason == "advertising":
                 # 30 天封禁：取消超时踢人 + 任何已有 unban，不可自动解封
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                await manager.client.edit_permissions(
-                    chat, operator.id,
-                    view_messages=False,
-                    until_date=timedelta(days=DEFAULT_BAN_DAYS),
-                )
+                await manager.hide_member(chat, operator.id, timedelta(days=DEFAULT_BAN_DAYS))
                 logger.warning(f"{log_prefix} | advertising detected | member banned | ban_days:{DEFAULT_BAN_DAYS}")
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
                 return True
             elif flagged_reason == "llm":
                 # 60s 软踢：先清超时任务，再单独调度 unban
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                try:
-                    await manager.client.kick_participant(chat, operator.id)
-                except Exception as e:
-                    logger.warning(f"{log_prefix} kick_participant failed: {e}")
-                    await manager.client.edit_permissions(
-                        chat, operator.id,
-                        view_messages=False,
-                        until_date=timedelta(seconds=60),
-                    )
+                if not await manager.kick_member(chat, operator.id):
+                    await manager.hide_member(chat, operator.id, timedelta(seconds=60))
                 await manager.lazy_session(
                     chat.id, msg.id, operator.id, "unban_member",
                     datetime.now(timezone.utc) + timedelta(seconds=60),
@@ -207,15 +191,8 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                 await manager.delete_message(chat, msg)
                 await delete_callback_map(chat.id, msg.id)
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                try:
-                    await manager.client.kick_participant(chat, operator.id)
-                except Exception as e:
-                    logger.warning(f"{log_prefix} kick_participant failed: {e}")
-                    await manager.client.edit_permissions(
-                        chat, operator.id,
-                        view_messages=False,
-                        until_date=timedelta(seconds=60),
-                    )
+                if not await manager.kick_member(chat, operator.id):
+                    await manager.hide_member(chat, operator.id, timedelta(seconds=60))
                 await manager.lazy_session(
                     chat.id, msg.id, operator.id, "unban_member",
                     datetime.now(timezone.utc) + timedelta(seconds=60),
@@ -227,9 +204,9 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
                 return True
 
-            msg_date = getattr(msg, "date", None) or datetime.now(timezone.utc)
-            content, buttons, answer_meta = await build_captcha_message(operator, msg_date)
-            await manager.client.edit_message(chat, msg.id, content, parse_mode="md", buttons=buttons)
+            now = datetime.now(timezone.utc)
+            content, buttons, answer_meta = await build_captcha_message(operator, now)
+            await manager.edit_text(chat.id, msg.id, content, parse_mode="md", buttons=buttons)
 
             await CaptchaSession.record_answer(
                 chat.id, operator.id,
@@ -246,12 +223,12 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
             await manager.lazy_session_delete(chat.id, operator.id, "new_member_check")
             await manager.lazy_session(
                 chat.id, msg.id, operator.id, "new_member_check",
-                msg_date + timedelta(seconds=DELETED_AFTER),
+                now + timedelta(seconds=DELETED_AFTER),
             )
             # 推迟消息自动删除时间
             await manager.delete_message(
                 chat, msg,
-                msg_date + timedelta(seconds=DELETED_AFTER),
+                now + timedelta(seconds=DELETED_AFTER),
             )
 
             logger.info(f"{log_prefix} | verification failed | regenerated captcha | chosen={chosen_key} correct={correct_answer}")

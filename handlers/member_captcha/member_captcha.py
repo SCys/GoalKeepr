@@ -104,12 +104,7 @@ async def member_captcha(event: events.ChatAction.Event):
             join_count = captcha_data.get("join_count", "?")
             logger.warning(f"{log_context.log_prefix} | 频率限制Kick | " f"24h内第{join_count}次入群 | state={state}")
             try:
-                await manager.client.edit_permissions(
-                    chat,
-                    user.id,
-                    view_messages=False,
-                    until_date=timedelta(seconds=60),
-                )
+                await manager.hide_member(chat, user.id, timedelta(seconds=60))
                 # 60s 后自动 unban，让用户可重新加入
                 await manager.lazy_session(
                     chat.id,
@@ -201,12 +196,7 @@ async def member_captcha(event: events.ChatAction.Event):
                 user.id,
                 delete_captcha_session=False,
             )
-            await manager.client.edit_permissions(
-                chat,
-                user.id,
-                view_messages=False,
-                until_date=timedelta(days=DEFAULT_BAN_DAYS),
-            )
+            await manager.hide_member(chat, user.id, timedelta(days=DEFAULT_BAN_DAYS))
             await stats_incr(rdb_stats, FIELD_FAILED, chat.id, user.id)
             logger.warning(
                 f"{log_context.log_prefix} | advertising detected | "
@@ -214,7 +204,7 @@ async def member_captcha(event: events.ChatAction.Event):
             )
             return
 
-    # 生成验证码消息（返回文字 + Telethon buttons + 答案元数据）
+    # 生成验证码消息（返回文字 + 按钮 + 答案元数据）
     message_content, buttons, answer_meta = await build_captcha_message(user, now)
 
     # ★ 记录验证码答案到 CaptchaSession
@@ -227,17 +217,16 @@ async def member_captcha(event: events.ChatAction.Event):
     )
 
     # 发送验证消息
-    try:
-        captcha_msg = await manager.client.send_message(
-            chat,
-            message_content,
-            buttons=buttons,
-            parse_mode="md",
-        )
-        logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg.id}")
-    except Exception as e:
-        logger.error(f"{log_context.log_prefix} | 验证消息发送失败 | {e}")
+    captcha_msg_id = await manager.send_text(
+        chat.id,
+        message_content,
+        buttons=buttons,
+        parse_mode="md",
+    )
+    if captcha_msg_id is None:
+        logger.error(f"{log_context.log_prefix} | 验证消息发送失败")
         return
+    logger.info(f"{log_context.log_prefix} | 验证消息已发送 | msg_id={captcha_msg_id}")
 
     # ★ 统计：验证次数
     await stats_incr(rdb_stats, FIELD_VERIFICATIONS, chat.id)
@@ -246,12 +235,12 @@ async def member_captcha(event: events.ChatAction.Event):
     await manager.lazy_session_delete(chat.id, user.id, "safety_timeout_check")
 
     # 存储 callback_map 供回调时解码 MD5 哈希
-    await store_callback_map(chat.id, captcha_msg.id, answer_meta["callback_map"], ttl=DELETED_AFTER + 15)
+    await store_callback_map(chat.id, captcha_msg_id, answer_meta["callback_map"], ttl=DELETED_AFTER + 15)
 
     # 调度超时检查：DELETED_AFTER 秒后若用户未通过验证则 Kick
     await manager.lazy_session(
         chat.id,
-        captcha_msg.id,
+        captcha_msg_id,
         user.id,
         "new_member_check",
         now + timedelta(seconds=DELETED_AFTER),
@@ -259,8 +248,8 @@ async def member_captcha(event: events.ChatAction.Event):
 
     # 设置验证消息自动删除
     await manager.delete_message(
-        chat,
-        captcha_msg,
+        chat.id,
+        captcha_msg_id,
         now + timedelta(seconds=DELETED_AFTER),
     )
     logger.debug(f"{log_context.log_prefix} | 设置验证消息自动删除 | 时长:{DELETED_AFTER}秒")

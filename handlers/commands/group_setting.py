@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import time
 
-from telethon import events, Button
+from telethon import events
 
 from manager import manager
 from manager.group import NEW_MEMBER_CHECK_METHODS, PENDING_KEY_PREFIX, settings_get, settings_set
@@ -49,16 +49,16 @@ async def group_setting_command(event: events.NewMessage.Event):
 
     keyboard = [
         [
-            Button.inline("认证剔除", b"su:nm:ban"),
-            Button.inline("手动解封", b"su:nm:silence"),
-            Button.inline("无作为", b"su:nm:none"),
+            manager.inline_button("认证剔除", "su:nm:ban"),
+            manager.inline_button("手动解封", "su:nm:silence"),
+            manager.inline_button("无作为", "su:nm:none"),
         ],
         [
-            Button.inline("静默1周", b"su:nm:sleep_1week"),
-            Button.inline("静默2周", b"su:nm:sleep_2weeks"),
-            Button.inline("自定义静默", b"su:nm:sleep_custom"),
+            manager.inline_button("静默1周", "su:nm:sleep_1week"),
+            manager.inline_button("静默2周", "su:nm:sleep_2weeks"),
+            manager.inline_button("自定义静默", "su:nm:sleep_custom"),
         ],
-        [Button.inline("取消", b"su:_:cancel")],
+        [manager.inline_button("取消", "su:_:cancel")],
     ]
 
     reply = await event.respond(
@@ -121,7 +121,7 @@ async def group_setting_callback(event: events.CallbackQuery.Event):
             text += "请在回复中输入天数（1-365天）\n"
             text += "发送数字即可，例如：7\n"
             text += "\n⏱ 限时 60 秒，超时需重新操作"
-            await manager.client.edit_message(chat, msg.id, text)
+            await manager.edit_text(chat.id, msg.id, text)
             await event.answer()
             return
 
@@ -137,7 +137,7 @@ async def group_setting_callback(event: events.CallbackQuery.Event):
         text += "\n如需进一步调整，请再次使用 /group_setting 命令"
 
         log.info(f"群组 {chat.id} 更新设置: {key} = {value}")
-        await manager.client.edit_message(chat, msg.id, text)
+        await manager.edit_text(chat.id, msg.id, text)
         await manager.delete_message(chat.id, msg.id, datetime.now() + timedelta(seconds=15))
     except Exception as e:
         log.error(f"处理设置回调时出错: {e}")
@@ -193,5 +193,5 @@ async def handle_pending_input(event: events.NewMessage.Event):
         f"🔹 新成员处理方式：{_method_display(method_value)}\n\n"
         f"如需进一步调整，请再次使用 /group_setting 命令"
     )
-    await manager.client.edit_message(chat, expected_msg_id, confirm_text)
+    await manager.edit_text(chat.id, expected_msg_id, confirm_text)
     await manager.delete_message(chat.id, event.message.id, datetime.now() + timedelta(seconds=5))

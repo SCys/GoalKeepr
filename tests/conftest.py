@@ -255,6 +255,20 @@ def mock_manager(monkeypatch, fake_redis):
     mgr.lazy_session_delete = AsyncMock()
     mgr.delete_message = AsyncMock()
 
+    # 统一封装接口（handlers 不再直接调 manager.client）
+    mgr.mute_member = AsyncMock(return_value=True)
+    mgr.unmute_member = AsyncMock(return_value=True)
+    mgr.unban_member_full = AsyncMock(return_value=True)
+    mgr.hide_member = AsyncMock(return_value=True)
+    mgr.kick_member = AsyncMock(return_value=True)
+    mgr.get_user_info = AsyncMock(return_value=None)
+    mgr.has_profile_photo = AsyncMock(return_value=True)
+    mgr.send_text = AsyncMock(return_value=1)
+    mgr.send_photo = AsyncMock(return_value=1)
+    mgr.send_voice = AsyncMock(return_value=1)
+    mgr.download_media_bytes = AsyncMock(return_value=b"")
+    mgr.edit_text = AsyncMock(return_value=True)
+
     return mgr
 
 

@@ -1,5 +1,5 @@
 import asyncio
-from telethon import events, Button
+from telethon import events
 from manager import manager
 from ..member_captcha.stats import STATS_KEY, FIELD_GROUP_JOINS, FIELD_VERIFICATIONS, FIELD_SUCCESS, FIELD_FAILED
 
@@ -85,9 +85,9 @@ async def _build_page(page: int) -> tuple:
     buttons = []
     nav = []
     if page > 1:
-        nav.append(Button.inline("◀ 上一页", f"{CB_PREFIX}{page - 1}".encode()))
+        nav.append(manager.inline_button("◀ 上一页", f"{CB_PREFIX}{page - 1}"))
     if page < total_pages:
-        nav.append(Button.inline("下一页 ▶", f"{CB_PREFIX}{page + 1}".encode()))
+        nav.append(manager.inline_button("下一页 ▶", f"{CB_PREFIX}{page + 1}"))
     if nav:
         buttons.append(nav)
 
@@ -132,4 +132,4 @@ async def system_groups_callback(event: events.CallbackQuery.Event):
         return
 
     await event.answer()
-    await manager.client.edit_message(event.chat_id, event.message_id, text, buttons=buttons)
+    await manager.edit_text(event.chat_id, event.message_id, text, buttons=buttons)

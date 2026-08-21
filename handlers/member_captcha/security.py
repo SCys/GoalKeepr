@@ -20,46 +20,15 @@ from .session import Session
 
 
 async def restrict_member_permissions(chat: Any, user: Union[int, types.User], until_date: Optional[timedelta] = None) -> bool:
-    """使用 Telethon edit_permissions 限制成员发言等权限。"""
+    """限制成员发言等权限（封装见 manager.mute_member）。"""
     user_id = user.id if isinstance(user, types.User) else user
-    try:
-        await manager.client.edit_permissions(
-            chat,
-            user_id,
-            send_messages=False,
-            send_media=False,
-            send_stickers=False,
-            send_gifs=False,
-            send_games=False,
-            send_inline=False,
-            embed_link_previews=False,
-            until_date=until_date,
-        )
-        return True
-    except Exception as e:
-        logger.error(f"failed to restrict permissions for member {user_id}: {e}")
-        return False
+    return await manager.mute_member(chat, user_id, until_date)
 
 
 async def restore_member_permissions(chat: Any, user: types.User) -> bool:
-    """恢复成员权限（Telethon edit_permissions 全部放开发言等）。"""
-    try:
-        await manager.client.edit_permissions(
-            chat,
-            user,
-            send_messages=True,
-            send_media=True,
-            send_stickers=True,
-            send_gifs=True,
-            send_games=True,
-            send_inline=True,
-            embed_link_previews=True,
-            until_date=None,
-        )
-        return True
-    except Exception as e:
-        logger.error(f"failed to restore permissions for member {user.id}: {e}")
-        return False
+    """恢复成员权限（封装见 manager.unmute_member）。"""
+    user_id = getattr(user, "id", user)
+    return await manager.unmute_member(chat, user_id)
 
 
 async def get_member_info_for_check(user: types.User, session: Session) -> List[str]:
@@ -105,11 +74,10 @@ async def perform_security_checks(
         SecurityCheckError: 安全检查过程中发生错误
     """
     try:
-        # TODO 性能问题暂时搁置
         # LLM检查
-        # llm_found_spam = await _perform_llm_check(user, session, check_list, log_context, now)
-        # if llm_found_spam:
-        #     return "llm"
+        llm_found_spam = await _perform_llm_check(user, session, check_list, log_context, now)
+        if llm_found_spam:
+            return "llm"
 
         # 广告检查
         adv_found = await _perform_advertising_check(

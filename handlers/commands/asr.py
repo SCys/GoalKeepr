@@ -28,7 +28,7 @@ async def asr(event: events.NewMessage.Event):
     if not reply_msg.voice and not reply_msg.media:
         return
 
-    raw = await manager.client.download_media(reply_msg, bytes)
+    raw = await manager.download_media_bytes(reply_msg)
     if not raw:
         return
 

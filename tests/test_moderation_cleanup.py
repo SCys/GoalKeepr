@@ -78,7 +78,7 @@ async def test_sb_cancels_captcha_and_unban(mock_manager):
         "https://api.telegram.org/bot123:test/banChatMember",
         json={"chat_id": BOT_API_CHAT_ID, "user_id": USER_ID, "revoke_messages": True},
     )
-    mock_manager.client.edit_permissions.assert_awaited_once_with(chat, member, view_messages=False, until_date=None)
+    mock_manager.hide_member.assert_awaited_once_with(chat, USER_ID, None)
     # /sb must NOT schedule unban
     mock_manager.lazy_session.assert_not_awaited()
     assert result is not None
@@ -94,8 +94,7 @@ async def test_k_cancels_then_schedules_own_unban(mock_manager):
     admin = SimpleNamespace(id=1, username="admin", first_name="A", last_name="")
     member = SimpleNamespace(id=USER_ID, username="u", first_name="U", last_name="")
 
-    mock_manager.client.edit_permissions = AsyncMock()
-    mock_manager.client.kick_participant = AsyncMock()
+    mock_manager.kick_member = AsyncMock(return_value=True)
     mock_manager.username = lambda u: getattr(u, "username", None) or "x"
 
     with patch(
@@ -105,7 +104,7 @@ async def test_k_cancels_then_schedules_own_unban(mock_manager):
         result = await kick_member(chat, event, admin, member)
 
     mock_cancel.assert_awaited_once_with(CHAT_ID, USER_ID)
-    mock_manager.client.kick_participant.assert_awaited_once_with(chat, member)
+    mock_manager.kick_member.assert_awaited_once_with(chat, USER_ID)
     mock_manager.lazy_session.assert_awaited_once()
     assert mock_manager.lazy_session.await_args.args[3] == "unban_member"
     assert result is not None

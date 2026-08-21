@@ -2,7 +2,8 @@ import os
 import os.path
 import sys
 from configparser import ConfigParser
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import Optional, Union, Tuple, Any
@@ -12,12 +13,26 @@ import aiohttp
 import database
 import redis.asyncio as aioredis
 import loguru
-from telethon import TelegramClient, events, types, hints
+from telethon import Button, TelegramClient, events, types, hints
 from bs4 import BeautifulSoup, Tag
 
 from .settings import SETTINGS_TEMPLATE
 
 logger = loguru.logger
+
+
+@dataclass
+class UserInfo:
+    """统一的用户信息（屏蔽底层库的 User 类型）。"""
+
+    id: int
+    first_name: str = ""
+    last_name: Optional[str] = None
+    username: Optional[str] = None
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name or ''}".strip()
 
 
 def _parse_proxy(proxy_url: str) -> Optional[Tuple[Any, ...]]:
@@ -82,6 +97,7 @@ class Manager:
         self.load_config(config_path)
 
         self.setup_logger()
+        self.is_running = True
 
         token = self.config["telegram"]["token"]
         api_id = self.config["telegram"].get("api_id")
@@ -258,7 +274,9 @@ class Manager:
 
     def username(self, user: hints.EntityLike):
         """获取用户名"""
-        return user.username if isinstance(user, types.User) else user.title if isinstance(user, types.Chat) else str(user)
+        if isinstance(user, UserInfo):
+            return user.username or user.full_name or str(user.id)
+        return user.username if isinstance(user, types.User) else user.title if isinstance(user, types.Chat) else getattr(user, "username", None) or str(user)
 
     async def is_admin(self, chat: Union[types.Chat, types.Channel, int], member: Union[types.User, int]):
         try:
@@ -291,8 +309,9 @@ class Manager:
             "User-Agent": "Mozilla/5.0"
         }
         try:
+            proxy = self.config["telegram"].get("proxy", "")
             session = await self.create_session()
-            async with session.get(url, headers=headers, timeout=15) as response:
+            async with session.get(url, headers=headers, timeout=15, proxy=proxy or None) as response:
                 if response.status != 200:
                     return {"error": f"status {response.status}"}
                 page_content = await response.text()
@@ -506,3 +525,214 @@ class Manager:
             await self.http_session.close()
             self.http_session = None
             logger.debug("http session closed")
+
+    # ------------------------------------------------------------------
+    # 统一 Telegram 操作接口（业务层只应调用以下方法，不直接使用 self.client）
+    # 参数与返回值一律使用原生类型（int/str/datetime），屏蔽底层 TL 类型。
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def inline_button(text: str, data):
+        """构建内联回调按钮。data 为 str/bytes（超长请先 hash 缩短）。"""
+        if isinstance(data, str):
+            data = data.encode("utf-8")
+        return Button.inline(text, data)
+
+    @staticmethod
+    def url_button(text: str, url: str):
+        """构建内联 URL 按钮。"""
+        return Button.url(text, url)
+
+    async def send_text(
+        self,
+        chat_id: int,
+        text: str,
+        *,
+        buttons: Optional[list] = None,
+        parse_mode: Optional[str] = None,
+        reply_to: Optional[int] = None,
+        link_preview: bool = True,
+    ) -> Optional[int]:
+        """发送文本消息，成功返回 msg_id，失败返回 None。"""
+        try:
+            resp = await self.client.send_message(
+                chat_id,
+                text,
+                buttons=buttons,
+                parse_mode=parse_mode,
+                reply_to=reply_to,
+                link_preview=link_preview,
+            )
+            logger.info(f"chat {chat_id} message {resp.id} sent")
+            return resp.id
+        except Exception as e:
+            logger.exception(f"chat {chat_id} send_text error: {e}")
+            return None
+
+    async def send_photo(
+        self,
+        chat_id: int,
+        photo: bytes,
+        *,
+        caption: Optional[str] = None,
+        buttons: Optional[list] = None,
+        reply_to: Optional[int] = None,
+    ) -> Optional[int]:
+        """发送图片（bytes），成功返回 msg_id。"""
+        try:
+            resp = await self.client.send_file(
+                chat_id, photo, caption=caption, buttons=buttons, reply_to=reply_to
+            )
+            logger.info(f"chat {chat_id} photo message {resp.id} sent")
+            return resp.id
+        except Exception as e:
+            logger.exception(f"chat {chat_id} send_photo error: {e}")
+            return None
+
+    async def send_voice(
+        self,
+        chat_id: int,
+        voice: bytes,
+        *,
+        caption: Optional[str] = None,
+        reply_to: Optional[int] = None,
+        silent: bool = False,
+    ) -> Optional[int]:
+        """发送语音（bytes，opus/ogg），成功返回 msg_id。"""
+        try:
+            resp = await self.client.send_file(
+                chat_id, voice, voice_note=True, caption=caption, reply_to=reply_to, silent=silent
+            )
+            logger.info(f"chat {chat_id} voice message {resp.id} sent")
+            return resp.id
+        except Exception as e:
+            logger.exception(f"chat {chat_id} send_voice error: {e}")
+            return None
+
+    async def download_media_bytes(self, msg: Any) -> Optional[bytes]:
+        """下载消息中的媒体文件为 bytes，失败返回 None。"""
+        try:
+            return await self.client.download_media(msg, bytes)
+        except Exception as e:
+            logger.exception(f"download media error: {e}")
+            return None
+
+    async def get_user_info(self, user_id: int) -> Optional[UserInfo]:
+        """按 id 获取用户信息（原生 UserInfo），失败返回 None。"""
+        try:
+            user = await self.client.get_entity(user_id)
+        except Exception as e:
+            logger.error(f"get_user_info {user_id} failed: {e}")
+            return None
+        if not isinstance(user, types.User):
+            return None
+        return UserInfo(
+            id=user.id,
+            first_name=user.first_name or "",
+            last_name=user.last_name,
+            username=user.username,
+        )
+
+    async def has_profile_photo(self, user: Any) -> Optional[bool]:
+        """用户是否有公开头像。user 可以是 UserInfo / 底层 User / user_id。"""
+        entity = user
+        if isinstance(user, UserInfo) or isinstance(user, int):
+            user_id = user.id if isinstance(user, UserInfo) else user
+            try:
+                entity = await self.client.get_entity(user_id)
+            except Exception as e:
+                logger.error(f"get entity {user_id} for profile photo failed: {e}")
+                return None
+        try:
+            photos = await self.client.get_profile_photos(entity, limit=1)
+            return bool(photos)
+        except Exception as e:
+            logger.exception(f"get profile photos error: {e}")
+            return None
+
+    # ---- 成员权限管理（业务语义，屏蔽底层黑名单/白名单差异）----
+
+    async def mute_member(self, chat: Any, user: Any, until: Optional[timedelta] = None) -> bool:
+        """全量禁言成员（不可发言/发媒体等）。until 为相对时长，None 表示直到手动解除。"""
+        user_id = getattr(user, "id", user)
+        try:
+            await self.client.edit_permissions(
+                chat,
+                user_id,
+                send_messages=False,
+                send_media=False,
+                send_stickers=False,
+                send_gifs=False,
+                send_games=False,
+                send_inline=False,
+                embed_link_previews=False,
+                until_date=until,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"failed to restrict permissions for member {user_id}: {e}")
+            return False
+
+    async def unmute_member(self, chat: Any, user: Any) -> bool:
+        """恢复成员默认发言权限。"""
+        user_id = getattr(user, "id", user)
+        try:
+            await self.client.edit_permissions(
+                chat,
+                user_id,
+                send_messages=True,
+                send_media=True,
+                send_stickers=True,
+                send_gifs=True,
+                send_games=True,
+                send_inline=True,
+                embed_link_previews=True,
+                until_date=None,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"failed to restore permissions for member {user_id}: {e}")
+            return False
+
+    async def unban_member_full(self, chat: Any, user: Any) -> bool:
+        """解除封禁并恢复全部权限（含 view_messages），用于 unban 场景。"""
+        user_id = getattr(user, "id", user)
+        try:
+            await self.client.edit_permissions(
+                chat,
+                user_id,
+                view_messages=True,
+                send_messages=True,
+                send_media=True,
+                send_stickers=True,
+                send_gifs=True,
+                send_games=True,
+                send_inline=True,
+                embed_link_previews=True,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"failed to unban member {user_id}: {e}")
+            return False
+
+    async def hide_member(self, chat: Any, user: Any, until: Optional[timedelta] = None) -> bool:
+        """封禁成员（禁止查看消息/加入黑名单）。until 为相对时长，None 表示永久。"""
+        user_id = getattr(user, "id", user)
+        try:
+            await self.client.edit_permissions(
+                chat, user_id, view_messages=False, until_date=until
+            )
+            return True
+        except Exception as e:
+            logger.error(f"failed to ban member {user_id}: {e}")
+            return False
+
+    async def kick_member(self, chat: Any, user: Any) -> bool:
+        """将成员从群组移除（软踢）。"""
+        user_id = getattr(user, "id", user)
+        try:
+            await self.client.kick_participant(chat, user_id)
+            return True
+        except Exception as e:
+            logger.warning(f"kick_participant {user_id} failed: {e}")
+            return False
