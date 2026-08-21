@@ -109,7 +109,7 @@ async def default_handler(event):
 
     # 3. 提交 LLM 进行意图审查
     try:
-        eval_results = await check_spams_with_llm([sender], additional_strings=[f"入群首句发言内容: {text}"])
+        eval_results = await check_spams_with_llm([sender], message=text)
         if eval_results:
             user_eval = next((item for item in eval_results if item.id == user_id), None)
             if user_eval:

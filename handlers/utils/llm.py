@@ -26,6 +26,7 @@ async def check_spams_with_llm(
     session=None,
     additional_strings=None,
     now=None,
+    message: Optional[str] = None,
 ) -> List[LLMUserEvaluation]:
     """members 为具 .user 的对象或 User，兼容 Telethon。返回每个用户的评估结果列表。"""
     try:
@@ -47,20 +48,23 @@ async def check_spams_with_llm(
             if session and hasattr(session, "member_bio") and session.member_bio:
                 member_data["bio"] = session.member_bio
 
+            if message:
+                member_data["first_message"] = message
+
             members_data.append(member_data)
 
         members_str = "\n".join([f"{i + 1}. {json.dumps(member)}" for i, member in enumerate(members_data)])
 
         system_prompt = (
             "你是一个专业的 Telegram 群组安全与垃圾信息（SPAM）识别专家。\n"
-            "任务：分析给出的 Telegram 用户资料（用户名、昵称、Bio 简介），准确评估每个用户的垃圾/风险评分（0~100 分），识别恶意广告、黑灰产、违规引流号，并严防误杀普通正常用户。\n\n"
+            "任务：分析给出的 Telegram 用户资料（用户名、昵称、Bio 简介）以及用户的发言内容 (first_message)，准确评估每个用户的垃圾/风险评分（0~100 分），识别恶意广告、黑灰产、违规引流号，并严防误杀普通正常用户。\n\n"
             "【评分标准 (0~100 分)】：\n"
-            "1. 0 ~ 30 分（正常普通用户）：普通英文/中文昵称（例如包含 Deep, OP, Man, Bot, AI, Pro 等常见字母或词汇），只要没有实际违规引流内容，一律打低分（0~30分，is_spam=false）。\n"
+            "1. 0 ~ 30 分（正常普通用户）：普通的日常打招呼、交流、技术探讨，无广告引流内容，打低分（0~30分，is_spam=false）。\n"
             "2. username 允许为 null，没有 username 绝对不是扣分项。\n"
-            "3. 80 ~ 100 分（高危 SPAM，is_spam=true）：只有存在确凿恶意证据时才打高分，如：\n"
-            "   - Bio 或昵称包含明确的引流广告（如微信号/QQ号/联系方式/Telegram群链接/外链等）；\n"
-            "   - 包含博彩/赌博/色情/代开发票/办证/信用卡套现/兼职刷单/暴富等黑产特征词或话术；\n"
-            "   - 明显的批量营销黑产机器人账号。\n\n"
+            "3. 80 ~ 100 分（高危 SPAM，is_spam=true）：只要个人资料或发言内容 (first_message) 中存在以下确凿恶意证据，一律打高分（≥80，is_spam=true）：\n"
+            "   - 招人、招募兼职、刷单、推广、代购、私聊领福利、外链、微信号/QQ/TG群等引流；\n"
+            "   - 博彩/赌博/色情/代办/信用卡套现/黑产营销话术；\n"
+            "   - 明显的批量黑产营销机器人特征。\n\n"
             "【输出格式】：\n"
             "请为输入的每一个用户输出评估结果，严格输出 JSON 结构：\n"
             "{\n"
