@@ -84,12 +84,12 @@ class TestCheckAndRecord:
         assert data["join_count"] == "2"
 
     async def test_throttled_after_many_joins(self, fake_redis, captcha_session):
-        """Reaching CAPTCHA_JOIN_THRESHOLD_KICK (30) should throttle."""
-        # Insert a session with join_count already at 29
+        """Reaching CAPTCHA_JOIN_THRESHOLD_KICK (3) should throttle."""
+        # Insert a session with join_count already at 2
         key = captcha_session.make_key(CHAT_ID, USER_ID)
         await fake_redis.hset(key, mapping={
-            "join_count": "29",
-            "total_joins": "29",
+            "join_count": "2",
+            "total_joins": "2",
             "first_join_ts": NOW.isoformat(),
             "last_join_ts": NOW.isoformat(),
             "state": "normal",
@@ -102,14 +102,14 @@ class TestCheckAndRecord:
         )
         assert should_proceed is False
         assert data["state"] == "throttled"
-        assert data["join_count"] == "30"
+        assert data["join_count"] == "3"
 
     async def test_throttled_user_rejoin_still_blocked(self, fake_redis, captcha_session):
         """A throttled user who rejoins is still throttled until count drops."""
         key = captcha_session.make_key(CHAT_ID, USER_ID)
         await fake_redis.hset(key, mapping={
-            "join_count": "30",
-            "total_joins": "30",
+            "join_count": "3",
+            "total_joins": "3",
             "first_join_ts": NOW.isoformat(),
             "last_join_ts": NOW.isoformat(),
             "state": "throttled",

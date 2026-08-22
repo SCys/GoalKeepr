@@ -32,9 +32,9 @@ DEFAULT_BAN_DAYS = 30  # 默认封禁天数
 
 # 频率控制配置
 CAPTCHA_REDIS_KEY_PREFIX = "chat_captcha"           # Redis Key 前缀
-CAPTCHA_TTL_DEFAULT = 60 * 60 * 24                  # 默认 TTL: 24小时
-CAPTCHA_TTL_EXTENDED = 60 * 60 * 24 * 7             # 提升 TTL: 7天
-CAPTCHA_JOIN_THRESHOLD_KICK = 30                    # 24h 内超过此次数就 Kick
+CAPTCHA_TTL_DEFAULT = 60 * 60                       # 默认 TTL: 1小时 (频率窗口)
+CAPTCHA_TTL_EXTENDED = 60 * 60 * 24                  # 提升 TTL: 24小时 (处罚期)
+CAPTCHA_JOIN_THRESHOLD_KICK = 3                     # 1小时内达到3次入群即触发惩罚
 CAPTCHA_JOIN_THRESHOLD_RESET = 1                    # 降到此次数恢复默认 TTL
 CAPTCHA_DEDUP_TTL = 10                              # 去重锁 TTL: 10秒（防止同事件重复处理）
 # 同一用户短时间内的多条入群更新合并窗口。

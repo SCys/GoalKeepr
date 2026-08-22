@@ -102,7 +102,7 @@ async def member_captcha(event: events.ChatAction.Event):
         if state == "throttled":
             # 频率过高 → Kick
             join_count = captcha_data.get("join_count", "?")
-            logger.warning(f"{log_context.log_prefix} | 频率限制Kick | " f"24h内第{join_count}次入群 | state={state}")
+            logger.warning(f"{log_context.log_prefix} | 频率限制Kick | " f"1小时内第{join_count}次入群 | state={state}")
             try:
                 await manager.hide_member(chat, user.id, timedelta(seconds=60))
                 # 60s 后自动 unban，让用户可重新加入
