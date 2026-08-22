@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple, List, Any, Dict
 
 from manager import manager
+from .config import DELETED_AFTER
 from .security import restore_member_permissions
 
 
@@ -270,13 +271,13 @@ async def accepted_member(chat: Any, msg: Any, user: Any):
             "> Please send a message in this group within **5 minutes** to complete verification."
         )
         if rdb:
-            await rdb.set(f"first_msg_watch:{chat_id}:{user_id}", "1", ex=300)
+            await rdb.set(f"first_msg_watch:{chat_id}:{user_id}", "1", ex=1800)
         await manager.lazy_session(
             chat_id, 0, user_id, "first_msg_timeout", now + timedelta(minutes=5)
         )
     elif first_msg_check == "on":
         if rdb:
-            await rdb.set(f"first_msg_watch:{chat_id}:{user_id}", "1", ex=300)
+            await rdb.set(f"first_msg_watch:{chat_id}:{user_id}", "1", ex=1800)
 
     has_photo = await manager.has_profile_photo(user)
     try:
@@ -293,7 +294,7 @@ async def accepted_member(chat: Any, msg: Any, user: Any):
     if reply_id is None:
         logger.error(f"{prefix} | 欢迎消息发送失败")
         return
-    await manager.delete_message(chat_id, reply_id)
+    await manager.delete_message(chat_id, reply_id, now + timedelta(seconds=DELETED_AFTER))
     # 取消超时踢人；保留 session 频率计数（若调用方尚未删除）
     await cancel_pending_member_jobs(
         chat_id, user.id, cancel_unban=True, delete_captcha_session=False

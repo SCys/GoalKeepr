@@ -127,7 +127,9 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
         return False
 
 
-async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any, log_prefix: str) -> bool:
+async def handle_self_verification(
+    chat: Any, msg: Any, data: str, operator: Any, log_prefix: str, event: Optional[events.CallbackQuery.Event] = None
+) -> bool:
     """处理用户自验证。从 Redis 读取正确答案进行比较。"""
     try:
         rdb = await manager.get_redis()
@@ -194,6 +196,18 @@ async def handle_self_verification(chat: Any, msg: Any, data: str, operator: Any
             await CaptchaSession.delete(chat.id, operator.id)
             logger.info(f"{log_prefix} | verification passed | member accepted")
             await stats_incr(rdb, FIELD_SUCCESS, chat.id, operator.id)
+
+            if event:
+                from manager.group import settings_get
+                lurk_check = await settings_get(rdb, chat.id, "lurk_check_5min", "off")
+                if lurk_check == "on":
+                    alert_msg = "🎉 验证通过！\n\n📌 提示：请在 5 分钟内在群里发送一条打招呼消息（防僵尸号机制）。"
+                else:
+                    alert_msg = "🎉 验证通过，欢迎加入群组！"
+                try:
+                    await event.answer(alert_msg, alert=True)
+                except Exception:
+                    pass
             return True
 
         else:
@@ -321,10 +335,13 @@ async def process_callback_query(event: events.CallbackQuery.Event) -> None:
             await handle_admin_operation(chat, msg, data, log_prefix)
         elif is_self:
             logger.debug(f"{log_prefix} | member self-verification | data:{data}")
-            await handle_self_verification(chat, msg, data, operator, log_prefix)
+            await handle_self_verification(chat, msg, data, operator, log_prefix, event=event)
         else:
             logger.warning(f"{log_prefix} | cannot determine operation type | data:{data}")
     except Exception as e:
         logger.error(f"{log_prefix} | callback processing failed | error:{e}")
     finally:
-        await event.answer()
+        try:
+            await event.answer()
+        except Exception:
+            pass
