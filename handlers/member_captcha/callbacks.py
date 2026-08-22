@@ -198,14 +198,8 @@ async def handle_self_verification(
             await stats_incr(rdb, FIELD_SUCCESS, chat.id, operator.id)
 
             if event:
-                from manager.group import settings_get
-                lurk_check = await settings_get(rdb, chat.id, "lurk_check_5min", "off")
-                if lurk_check == "on":
-                    alert_msg = "🎉 验证通过！\n\n📌 提示：请在 5 分钟内在群里发送一条打招呼消息（防僵尸号机制）。"
-                else:
-                    alert_msg = "🎉 验证通过，欢迎加入群组！"
                 try:
-                    await event.answer(alert_msg, alert=True)
+                    await event.answer()
                 except Exception:
                     pass
             return True
@@ -308,7 +302,7 @@ async def process_callback_query(event: events.CallbackQuery.Event) -> None:
         logger.warning(f"{log_prefix} | callback_map miss | hash={raw_data}")
         # 验证已过期，提示用户
         try:
-            await event.answer("验证已过期，请重新入群获取新的验证。", alert=True)
+            await event.answer("验证已过期，请重新入群获取新的验证。")
         except Exception:
             pass
         return
