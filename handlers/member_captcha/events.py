@@ -153,21 +153,26 @@ async def unban_member(client, chat_id: int, message_id: int, member_id: int):
 
     prefix = f"chat {chat_id} msg {message_id}"
 
-    # 检查成员当前权限，如果已经被管理员封禁（或已离开），不可自动解禁
+    # 检查成员当前权限，如果已经被管理员永久封禁，不可自动解禁
     try:
-        perms = await client.get_permissions(chat, member_id)
-        if perms and (perms.is_admin or perms.is_creator or getattr(perms, "has_left", False)):
-            return
-        if perms and (getattr(perms, "is_banned", False) or getattr(perms, "view_messages", True) is False):
-            from .session import CaptchaSession
-            if not await CaptchaSession.is_restricted(chat_id, member_id):
-                logger.info(f"{prefix} member {member_id} is permanently/externally banned, skip unban")
+        from telethon.errors import UserNotParticipantError
+        try:
+            perms = await client.get_permissions(chat, member_id)
+            if perms and (perms.is_admin or perms.is_creator or getattr(perms, "has_left", False)):
                 return
+            if perms and (getattr(perms, "is_banned", False) or getattr(perms, "view_messages", True) is False):
+                from .session import CaptchaSession
+                if not await CaptchaSession.is_restricted(chat_id, member_id):
+                    logger.info(f"{prefix} member {member_id} is permanently/externally banned, skip unban")
+                    return
+        except UserNotParticipantError:
+            # 成员被踢后已不在群成员列表中，这是正常现象，继续执行解禁以移除封禁名单
+            pass
     except ValueError as e:
         logger.info(f"{prefix} check member {member_id} entity not cached before unban, skip")
         return
     except Exception as e:
-        logger.warning(f"{prefix} check member {member_id} perms before unban failed: {e}")
+        logger.debug(f"{prefix} check member {member_id} perms before unban: {e}")
 
     if await manager.unban_member_full(chat, member_id):
         logger.info(f"{prefix} member {member_id} is unbanned")
