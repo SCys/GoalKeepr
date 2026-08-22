@@ -121,6 +121,17 @@ async def check_spams_with_llm(
                 f"in {monotonic() - model_started:.2f}s"
             )
 
+            if isinstance(result, list):
+                text_parts = []
+                for part in result:
+                    if isinstance(part, dict) and "text" in part:
+                        text_parts.append(str(part["text"]))
+                    elif isinstance(part, str):
+                        text_parts.append(part)
+                result = "".join(text_parts)
+            elif not isinstance(result, str):
+                result = str(result)
+
             result = result.strip().replace("```json", "").replace("```", "")
 
             if result:

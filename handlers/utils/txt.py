@@ -407,4 +407,22 @@ async def chat_completions(messages: List[Dict[str, Any]], model_name: Optional[
 
     response_data = await _api_request(url, data, proxy_token)
     logger.debug(f"text generated with model {model_name}")
-    return response_data["choices"][0]["message"]["content"]
+    try:
+        content = response_data["choices"][0]["message"].get("content", "")
+        if isinstance(content, list):
+            text_parts = []
+            for part in content:
+                if isinstance(part, dict):
+                    if "text" in part:
+                        text_parts.append(str(part["text"]))
+                    elif "content" in part:
+                        text_parts.append(str(part["content"]))
+                elif isinstance(part, str):
+                    text_parts.append(part)
+            content = "".join(text_parts)
+        elif content is not None:
+            content = str(content)
+        return content
+    except (KeyError, IndexError, TypeError) as e:
+        logger.error(f"Failed to parse content from response: {e}")
+        return None
