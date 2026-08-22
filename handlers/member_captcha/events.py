@@ -32,6 +32,9 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
 
     try:
         perms = await client.get_permissions(chat, member_id)
+    except ValueError as e:
+        logger.info(f"chat {chat_id} member {member_id} entity not cached in session, skip kick")
+        return False
     except Exception as e:
         logger.warning(f"member {member_id} in chat {chat_id} get failed: {e}")
         return False
@@ -160,6 +163,9 @@ async def unban_member(client, chat_id: int, message_id: int, member_id: int):
             if not await CaptchaSession.is_restricted(chat_id, member_id):
                 logger.info(f"{prefix} member {member_id} is permanently/externally banned, skip unban")
                 return
+    except ValueError as e:
+        logger.info(f"{prefix} check member {member_id} entity not cached before unban, skip")
+        return
     except Exception as e:
         logger.warning(f"{prefix} check member {member_id} perms before unban failed: {e}")
 

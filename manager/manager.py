@@ -299,6 +299,10 @@ class Manager:
     async def chat_member_permissions(self, chat, member_id: int):
         try:
             return await self.client.get_permissions(chat, member_id)
+        except ValueError as e:
+            # Telethon entity 未命中缓存或用户已不在群中
+            logger.debug(f"chat_member_permissions entity not found for {member_id} in {chat}: {e}")
+            return None
         except Exception as e:
             logger.exception(f"chat member permissions check exception: {e}")
             return None
