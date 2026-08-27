@@ -28,7 +28,7 @@ async def _handle_first_msg_violation(chat, event, user, reason: str):
         logger.warning(f"delete first spam message failed: {e}")
 
     user_id = user.id
-    await manager.hide_member(chat, user_id, timedelta(seconds=60))
+    await manager.ban_member(chat, user_id, timedelta(seconds=60))
 
     now_dt = datetime.now(timezone.utc)
     full_name = manager.username(user)

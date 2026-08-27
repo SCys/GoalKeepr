@@ -62,10 +62,9 @@ async def k(event: events.NewMessage.Event):
 
 async def kick_member(chat, event, administrator, member):
     """
-    从 chat 踢掉对应的成员（软踢：封禁后 BAN_MEMBER 秒自动解封）。
+    从 chat 踢掉对应的成员（移出群组）。
 
-    若成员正在验证码流程中，必须先取消 new_member_check / safety_timeout_check，
-    否则超时路径会覆盖 ban 时长并再调度一份 unban。
+    若成员正在验证码流程中，必须先取消 new_member_check / safety_timeout_check。
     """
     if member is None:
         return
@@ -73,16 +72,15 @@ async def kick_member(chat, event, administrator, member):
     id = member.id
     prefix = f"chat {chat.id} msg {event.id}"
 
-    # 取消验证超时与既有 unban，再由本命令单独调度 300s unban
     from handlers.member_captcha.helpers import cancel_pending_member_jobs
     await cancel_pending_member_jobs(chat.id, id)
 
-    # 软踢：临时封禁 BAN_MEMBER 秒（Telegram 到期自动解封）
-    if not await manager.hide_member(chat, id, until=timedelta(seconds=BAN_MEMBER)):
+    # 踢出成员：从群组移除
+    if not await manager.kick_member(chat, id):
         logger.warning(f"{prefix} user {id} kick failed")
         return
 
-    logger.info(f"{prefix} user {id} is kicked (temp ban {BAN_MEMBER}s)")
+    logger.info(f"{prefix} user {id} is kicked")
     
     member_name = manager.username(member)
     admin_name = manager.username(administrator)

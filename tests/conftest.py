@@ -259,7 +259,8 @@ def mock_manager(monkeypatch, fake_redis):
     mgr.mute_member = AsyncMock(return_value=True)
     mgr.unmute_member = AsyncMock(return_value=True)
     mgr.unban_member_full = AsyncMock(return_value=True)
-    mgr.hide_member = AsyncMock(return_value=True)
+    mgr.ban_member = AsyncMock(return_value=True)
+    mgr.hide_member = mgr.ban_member
     mgr.kick_member = AsyncMock(return_value=True)
     mgr.get_user_info = AsyncMock(return_value=None)
     mgr.has_profile_photo = AsyncMock(return_value=True)

@@ -55,8 +55,8 @@ async def test_advertising_timeout_does_not_schedule_unban(monkeypatch, mock_man
 
     await new_member_check(mock_manager.client, -1001445219041, 10, 42)
 
-    mock_manager.hide_member.assert_awaited()
-    args = mock_manager.hide_member.await_args.args
+    mock_manager.ban_member.assert_awaited()
+    args = mock_manager.ban_member.await_args.args
     assert args[2] == timedelta(days=30)
     mock_manager.lazy_session.assert_not_awaited()
 
@@ -79,7 +79,7 @@ async def test_default_timeout_bans_60s_no_unban_session(monkeypatch, mock_manag
 
     await new_member_check(mock_manager.client, -1001445219041, 10, 42)
 
-    mock_manager.hide_member.assert_awaited_once_with(chat, 42, timedelta(seconds=60))
+    mock_manager.ban_member.assert_awaited_once_with(chat, 42, timedelta(seconds=60))
     mock_manager.lazy_session.assert_not_awaited()
 
 @pytest.mark.asyncio

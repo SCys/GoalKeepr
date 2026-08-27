@@ -731,7 +731,7 @@ class Manager:
             logger.error(f"failed to unban member {user_id}: {e}")
             return False
 
-    async def hide_member(self, chat: Any, user: Any, until: Optional[timedelta] = None) -> bool:
+    async def ban_member(self, chat: Any, user: Any, until: Optional[timedelta] = None) -> bool:
         """封禁成员（禁止查看消息/全量禁言/加入黑名单）。until 为相对时长，None 表示永久。"""
         user_id = getattr(user, "id", user)
         try:
@@ -756,6 +756,9 @@ class Manager:
         except Exception as e:
             logger.error(f"failed to ban member {user_id}: {e}")
             return False
+
+    # 兼容历史别名
+    hide_member = ban_member
 
     async def kick_member(self, chat: Any, user: Any) -> bool:
         """将成员从群组移除（软踢）。"""

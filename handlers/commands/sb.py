@@ -72,7 +72,7 @@ async def ban_member(chat, event, administrator, member):
     await cancel_pending_member_jobs(chat.id, id)
 
     # 永久封禁成员（禁止查看消息/移出群组并加入黑名单）
-    if not await manager.hide_member(chat, id, None):
+    if not await manager.ban_member(chat, id, None):
         # 成员可能已经离开群组；仍继续执行 Bot API 封禁，确保加入黑名单
         logger.warning(f"{prefix} failed to edit permissions for user {id} before ban")
 

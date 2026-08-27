@@ -78,15 +78,15 @@ async def test_sb_cancels_captcha_and_unban(mock_manager):
         "https://api.telegram.org/bot123:test/banChatMember",
         json={"chat_id": BOT_API_CHAT_ID, "user_id": USER_ID, "revoke_messages": True},
     )
-    mock_manager.hide_member.assert_awaited_once_with(chat, USER_ID, None)
+    mock_manager.ban_member.assert_awaited_once_with(chat, USER_ID, None)
     # /sb must NOT schedule unban
     mock_manager.lazy_session.assert_not_awaited()
     assert result is not None
 
 
 @pytest.mark.asyncio
-async def test_k_cancels_and_bans_300s(mock_manager):
-    """Soft kick cancels captcha jobs, then applies 300s temporary ban."""
+async def test_k_cancels_and_kicks(mock_manager):
+    """Kick command cancels captcha jobs, then kicks the user."""
     from handlers.commands.k import kick_member
 
     chat = SimpleNamespace(id=CHAT_ID, title="g")
@@ -94,7 +94,7 @@ async def test_k_cancels_and_bans_300s(mock_manager):
     admin = SimpleNamespace(id=1, username="admin", first_name="A", last_name="")
     member = SimpleNamespace(id=USER_ID, username="u", first_name="U", last_name="")
 
-    mock_manager.hide_member = AsyncMock(return_value=True)
+    mock_manager.kick_member = AsyncMock(return_value=True)
     mock_manager.username = lambda u: getattr(u, "username", None) or "x"
 
     with patch(
@@ -103,8 +103,7 @@ async def test_k_cancels_and_bans_300s(mock_manager):
     ) as mock_cancel:
         result = await kick_member(chat, event, admin, member)
 
-    from datetime import timedelta
     mock_cancel.assert_awaited_once_with(CHAT_ID, USER_ID)
-    mock_manager.hide_member.assert_awaited_once_with(chat, USER_ID, until=timedelta(seconds=300))
+    mock_manager.kick_member.assert_awaited_once_with(chat, USER_ID)
     mock_manager.lazy_session.assert_not_awaited()
     assert result is not None

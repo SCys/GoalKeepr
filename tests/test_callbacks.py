@@ -181,7 +181,7 @@ class TestSelfVerification:
         )
         assert result is True
         # Should have been banned 60s
-        mock_manager.hide_member.assert_awaited()
+        mock_manager.ban_member.assert_awaited()
 
     async def test_advertising_flag_bans(self, mock_manager, fake_redis):
         """User who got advertising flag → ban 30 days even with correct answer."""
@@ -201,10 +201,10 @@ class TestSelfVerification:
         )
         assert result is True
 
-        # hide_member should have been called with ban (30 days)
+        # ban_member should have been called with ban (30 days)
         # We just check it was called (the exact args are validated by the
         # code itself; checking timedelta equality is fragile)
-        mock_manager.hide_member.assert_awaited()
+        mock_manager.ban_member.assert_awaited()
 
         # accepted_member should NOT have been called (user was banned)
         from handlers.member_captcha.callbacks import accepted_member
@@ -227,8 +227,8 @@ class TestSelfVerification:
             operator, "test"
         )
         assert result is True
-        # hide_member should have been called with 60s
-        mock_manager.hide_member.assert_awaited()
+        # ban_member should have been called with 30d
+        mock_manager.ban_member.assert_awaited()
 
     async def test_admin_operation_accept(self, mock_manager, fake_redis):
         """Admin clicks accept → member is accepted; timeout sessions cancelled."""
@@ -267,7 +267,7 @@ class TestSelfVerification:
             "test"
         )
         assert result is True
-        mock_manager.hide_member.assert_awaited()  # banned
+        mock_manager.ban_member.assert_awaited()  # banned
         # Regression: without cancelling new_member_check, timeout overwrites
         # the 30-day ban with a 60s kick and schedules unban_member.
         deleted_types = {

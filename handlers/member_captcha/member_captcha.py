@@ -104,7 +104,7 @@ async def member_captcha(event: events.ChatAction.Event):
             join_count = captcha_data.get("join_count", "?")
             logger.warning(f"{log_context.log_prefix} | 频率限制Kick | " f"1小时内第{join_count}次入群 | state={state}")
             try:
-                await manager.hide_member(chat, user.id, timedelta(seconds=60))
+                await manager.ban_member(chat, user.id, timedelta(seconds=60))
             except Exception as e:
                 logger.error(f"{log_context.log_prefix} | Kick 失败 | {e}")
         # duplicate 或其他状态：静默跳过
@@ -188,7 +188,7 @@ async def member_captcha(event: events.ChatAction.Event):
                 user.id,
                 delete_captcha_session=False,
             )
-            await manager.hide_member(chat, user.id, timedelta(days=DEFAULT_BAN_DAYS))
+            await manager.ban_member(chat, user.id, timedelta(days=DEFAULT_BAN_DAYS))
             await stats_incr(rdb_stats, FIELD_FAILED, chat.id, user.id)
             logger.warning(
                 f"{log_context.log_prefix} | advertising detected | "
@@ -212,7 +212,7 @@ async def member_captcha(event: events.ChatAction.Event):
                 user.id,
                 delete_captcha_session=False,
             )
-            await manager.hide_member(chat, user.id, timedelta(days=DEFAULT_BAN_DAYS))
+            await manager.ban_member(chat, user.id, timedelta(days=DEFAULT_BAN_DAYS))
             await stats_incr(rdb_stats, FIELD_FAILED, chat.id, user.id)
             logger.warning(
                 f"{log_context.log_prefix} | LLM spam detected | "

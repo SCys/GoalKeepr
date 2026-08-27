@@ -113,7 +113,7 @@ async def handle_admin_operation(chat: Any, msg: Any, data: str, log_prefix: str
             await delete_callback_map(chat.id, msg.id)
             # 必须取消 new_member_check / unban：否则超时会把 30 天封禁改成 60s 并自动解封
             await cancel_pending_member_jobs(chat.id, member_id)
-            await manager.hide_member(chat, member_id, timedelta(days=DEFAULT_BAN_DAYS))
+            await manager.ban_member(chat, member_id, timedelta(days=DEFAULT_BAN_DAYS))
             logger.warning(f"{log_prefix} | admin rejected member | {member_info} | ban_days:{DEFAULT_BAN_DAYS}")
             await stats_incr(rdb, FIELD_FAILED, chat.id, member_id)
             return True
@@ -158,14 +158,14 @@ async def handle_self_verification(
             if flagged_reason == "advertising":
                 # 30 天封禁：取消超时踢人 + 任何已有 unban，不可自动解封
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                await manager.hide_member(chat, operator.id, timedelta(days=DEFAULT_BAN_DAYS))
+                await manager.ban_member(chat, operator.id, timedelta(days=DEFAULT_BAN_DAYS))
                 logger.warning(f"{log_prefix} | advertising detected | member banned | ban_days:{DEFAULT_BAN_DAYS}")
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
                 return True
             elif flagged_reason == "llm":
                 # AI 安全检测违规：封禁 DEFAULT_BAN_DAYS 天
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                await manager.hide_member(chat, operator.id, timedelta(days=DEFAULT_BAN_DAYS))
+                await manager.ban_member(chat, operator.id, timedelta(days=DEFAULT_BAN_DAYS))
                 logger.warning(f"{log_prefix} | LLM detected spam | member banned | ban_days:{DEFAULT_BAN_DAYS}")
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
 
@@ -208,7 +208,7 @@ async def handle_self_verification(
                 await manager.delete_message(chat, msg)
                 await delete_callback_map(chat.id, msg.id)
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                await manager.hide_member(chat, operator.id, timedelta(seconds=60))
+                await manager.ban_member(chat, operator.id, timedelta(seconds=60))
                 logger.warning(
                     f"{log_prefix} | retry limit exceeded, kicking | "
                     f"retry={retry_count} max={CAPTCHA_MAX_RETRY}"

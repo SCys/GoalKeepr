@@ -68,12 +68,12 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
     logger.info(f"{prefix} member {member_id} timeout kick (reason={reason})")
 
     if reason in ("advertising", "llm"):
-        await manager.hide_member(chat, member_id, timedelta(days=DEFAULT_BAN_DAYS))
+        await manager.ban_member(chat, member_id, timedelta(days=DEFAULT_BAN_DAYS))
         logger.info(f"{prefix} member {member_id} banned {DEFAULT_BAN_DAYS} days for {reason}")
         return True
 
     # default → 临时封禁 60 秒（Telegram 服务端 60 秒后自动解封，无需调度 unban_member）
-    await manager.hide_member(chat, member_id, timedelta(seconds=60))
+    await manager.ban_member(chat, member_id, timedelta(seconds=60))
     logger.info(f"{prefix} member {member_id} banned 60s (reason={reason})")
     return True
 
@@ -211,7 +211,7 @@ async def first_msg_timeout(client, chat_id: int, message_id: int, member_id: in
         logger.warning(f"check perms before first_msg_timeout failed: {e}")
         return
 
-    kicked = await manager.hide_member(chat, member_id, timedelta(seconds=60))
+    kicked = await manager.ban_member(chat, member_id, timedelta(seconds=60))
 
     if kicked:
         logger.info(f"chat {chat_id} member {member_id} kicked due to 5min lurk timeout")
