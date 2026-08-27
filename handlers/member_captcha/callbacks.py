@@ -163,17 +163,17 @@ async def handle_self_verification(
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
                 return True
             elif flagged_reason == "llm":
-                # 60s 临时封禁：先清超时任务，Telegram 到期自动解封
+                # AI 安全检测违规：封禁 DEFAULT_BAN_DAYS 天
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                await manager.hide_member(chat, operator.id, timedelta(seconds=60))
-                logger.warning(f"{log_prefix} | LLM detected spam | member kicked")
+                await manager.hide_member(chat, operator.id, timedelta(days=DEFAULT_BAN_DAYS))
+                logger.warning(f"{log_prefix} | LLM detected spam | member banned | ban_days:{DEFAULT_BAN_DAYS}")
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
 
                 op_name = _user_full_name(operator) or str(operator.id)
                 now_utc = datetime.now(timezone.utc)
                 notify_text = (
-                    f"⚠️ 成员 [{op_name}](tg://user?id={operator.id}) 经 AI 安全检测判定为疑似风险/引流账号，已被移出群组（60秒后解禁）。\n\n"
-                    f"> Member [{op_name}](tg://user?id={operator.id}) was flagged as potential spam by AI security check and removed (unbanned in 60s)."
+                    f"🚫 成员 [{op_name}](tg://user?id={operator.id}) 经 AI 安全检测判定为疑似风险/引流账号，已被封禁 {DEFAULT_BAN_DAYS} 天。\n\n"
+                    f"> Member [{op_name}](tg://user?id={operator.id}) was banned for {DEFAULT_BAN_DAYS} days due to AI security detection."
                 )
                 await manager.send(
                     chat,

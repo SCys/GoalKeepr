@@ -67,12 +67,12 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
 
     logger.info(f"{prefix} member {member_id} timeout kick (reason={reason})")
 
-    if reason == "advertising":
+    if reason in ("advertising", "llm"):
         await manager.hide_member(chat, member_id, timedelta(days=DEFAULT_BAN_DAYS))
-        logger.info(f"{prefix} member {member_id} banned {DEFAULT_BAN_DAYS} days for advertising")
+        logger.info(f"{prefix} member {member_id} banned {DEFAULT_BAN_DAYS} days for {reason}")
         return True
 
-    # llm 或 default → 临时封禁 60 秒（Telegram 服务端 60 秒后自动解封，无需调度 unban_member）
+    # default → 临时封禁 60 秒（Telegram 服务端 60 秒后自动解封，无需调度 unban_member）
     await manager.hide_member(chat, member_id, timedelta(seconds=60))
     logger.info(f"{prefix} member {member_id} banned 60s (reason={reason})")
     return True
@@ -104,8 +104,8 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
                 name = user.full_name if user else str(member_id)
                 if reason == "llm":
                     notice = (
-                        f"⚠️ 成员 [{name}](tg://user?id={member_id}) 验证超时且未通过 AI 安全评估，已被移出群组（60秒后解禁）。\n\n"
-                        f"> Member [{name}](tg://user?id={member_id}) verification timed out and failed AI security check."
+                        f"🚫 成员 [{name}](tg://user?id={member_id}) 经 AI 安全评估判定为疑似风险账号，已被封禁 {DEFAULT_BAN_DAYS} 天。\n\n"
+                        f"> Member [{name}](tg://user?id={member_id}) was banned for {DEFAULT_BAN_DAYS} days due to AI security detection."
                     )
                 elif reason == "advertising":
                     notice = (

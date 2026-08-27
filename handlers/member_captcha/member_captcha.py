@@ -212,23 +212,15 @@ async def member_captcha(event: events.ChatAction.Event):
                 user.id,
                 delete_captcha_session=False,
             )
-            if not await manager.kick_member(chat, user.id):
-                await manager.hide_member(chat, user.id, timedelta(seconds=60))
-            await manager.lazy_session(
-                chat.id,
-                0,
-                user.id,
-                "unban_member",
-                now + timedelta(seconds=60),
-            )
+            await manager.hide_member(chat, user.id, timedelta(days=DEFAULT_BAN_DAYS))
             await stats_incr(rdb_stats, FIELD_FAILED, chat.id, user.id)
             logger.warning(
                 f"{log_context.log_prefix} | LLM spam detected | "
-                f"member kicked immediately"
+                f"member banned | ban_days:{DEFAULT_BAN_DAYS}"
             )
             notify_text = (
-                f"⚠️ 成员 [{log_context.member_fullname}](tg://user?id={user.id}) 经 AI 安全检测判定为疑似风险/引流账号，已被移出群组（60秒后解禁）。\n\n"
-                f"> Member [{log_context.member_fullname}](tg://user?id={user.id}) was flagged as potential spam by AI security check and removed (unbanned in 60s)."
+                f"🚫 成员 [{log_context.member_fullname}](tg://user?id={user.id}) 经 AI 安全检测判定为疑似风险/引流账号，已被封禁 {DEFAULT_BAN_DAYS} 天。\n\n"
+                f"> Member [{log_context.member_fullname}](tg://user?id={user.id}) was banned for {DEFAULT_BAN_DAYS} days due to AI security detection."
             )
             await manager.send(
                 chat,

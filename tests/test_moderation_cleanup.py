@@ -85,8 +85,8 @@ async def test_sb_cancels_captcha_and_unban(mock_manager):
 
 
 @pytest.mark.asyncio
-async def test_k_cancels_then_schedules_own_unban(mock_manager):
-    """Soft kick cancels captcha jobs, then schedules its own 300s unban only."""
+async def test_k_cancels_and_bans_300s(mock_manager):
+    """Soft kick cancels captcha jobs, then applies 300s temporary ban."""
     from handlers.commands.k import kick_member
 
     chat = SimpleNamespace(id=CHAT_ID, title="g")
@@ -94,7 +94,7 @@ async def test_k_cancels_then_schedules_own_unban(mock_manager):
     admin = SimpleNamespace(id=1, username="admin", first_name="A", last_name="")
     member = SimpleNamespace(id=USER_ID, username="u", first_name="U", last_name="")
 
-    mock_manager.kick_member = AsyncMock(return_value=True)
+    mock_manager.hide_member = AsyncMock(return_value=True)
     mock_manager.username = lambda u: getattr(u, "username", None) or "x"
 
     with patch(
@@ -103,8 +103,8 @@ async def test_k_cancels_then_schedules_own_unban(mock_manager):
     ) as mock_cancel:
         result = await kick_member(chat, event, admin, member)
 
+    from datetime import timedelta
     mock_cancel.assert_awaited_once_with(CHAT_ID, USER_ID)
-    mock_manager.kick_member.assert_awaited_once_with(chat, USER_ID)
-    mock_manager.lazy_session.assert_awaited_once()
-    assert mock_manager.lazy_session.await_args.args[3] == "unban_member"
+    mock_manager.hide_member.assert_awaited_once_with(chat, USER_ID, until=timedelta(seconds=300))
+    mock_manager.lazy_session.assert_not_awaited()
     assert result is not None

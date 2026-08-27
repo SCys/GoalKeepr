@@ -77,16 +77,12 @@ async def kick_member(chat, event, administrator, member):
     from handlers.member_captcha.helpers import cancel_pending_member_jobs
     await cancel_pending_member_jobs(chat.id, id)
 
-    # 踢出成员：从群组移除
-    if not await manager.kick_member(chat, id):
+    # 软踢：临时封禁 BAN_MEMBER 秒（Telegram 到期自动解封）
+    if not await manager.hide_member(chat, id, until=timedelta(seconds=BAN_MEMBER)):
         logger.warning(f"{prefix} user {id} kick failed")
         return
 
-    ts_free = datetime.now() + timedelta(seconds=BAN_MEMBER)
-    await manager.lazy_session(chat.id, event.id, id, "unban_member", ts_free)
-    logger.info(f"{prefix} user {id} will unban after {ts_free}")
-
-    logger.info(f"{prefix} user {id} is kicked")
+    logger.info(f"{prefix} user {id} is kicked (temp ban {BAN_MEMBER}s)")
     
     member_name = manager.username(member)
     admin_name = manager.username(administrator)
