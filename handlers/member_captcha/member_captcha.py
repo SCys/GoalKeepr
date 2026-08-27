@@ -100,19 +100,11 @@ async def member_captcha(event: events.ChatAction.Event):
     if not should_proceed:
         state = captcha_data.get("state", "unknown")
         if state == "throttled":
-            # 频率过高 → Kick
+            # 频率过高 → 临时封禁 60s（Telegram 服务端到期自动解封）
             join_count = captcha_data.get("join_count", "?")
             logger.warning(f"{log_context.log_prefix} | 频率限制Kick | " f"1小时内第{join_count}次入群 | state={state}")
             try:
                 await manager.hide_member(chat, user.id, timedelta(seconds=60))
-                # 60s 后自动 unban，让用户可重新加入
-                await manager.lazy_session(
-                    chat.id,
-                    0,
-                    user.id,
-                    "unban_member",
-                    now + timedelta(seconds=60),
-                )
             except Exception as e:
                 logger.error(f"{log_context.log_prefix} | Kick 失败 | {e}")
         # duplicate 或其他状态：静默跳过

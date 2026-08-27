@@ -163,19 +163,14 @@ async def handle_self_verification(
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
                 return True
             elif flagged_reason == "llm":
-                # 60s 软踢：先清超时任务，再单独调度 unban
+                # 60s 临时封禁：先清超时任务，Telegram 到期自动解封
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                if not await manager.kick_member(chat, operator.id):
-                    await manager.hide_member(chat, operator.id, timedelta(seconds=60))
-                now_utc = datetime.now(timezone.utc)
-                await manager.lazy_session(
-                    chat.id, msg.id, operator.id, "unban_member",
-                    now_utc + timedelta(seconds=60),
-                )
+                await manager.hide_member(chat, operator.id, timedelta(seconds=60))
                 logger.warning(f"{log_prefix} | LLM detected spam | member kicked")
                 await stats_incr(rdb, FIELD_FAILED, chat.id, operator.id)
 
                 op_name = _user_full_name(operator) or str(operator.id)
+                now_utc = datetime.now(timezone.utc)
                 notify_text = (
                     f"⚠️ 成员 [{op_name}](tg://user?id={operator.id}) 经 AI 安全检测判定为疑似风险/引流账号，已被移出群组（60秒后解禁）。\n\n"
                     f"> Member [{op_name}](tg://user?id={operator.id}) was flagged as potential spam by AI security check and removed (unbanned in 60s)."
@@ -213,12 +208,7 @@ async def handle_self_verification(
                 await manager.delete_message(chat, msg)
                 await delete_callback_map(chat.id, msg.id)
                 await cancel_pending_member_jobs(chat.id, operator.id)
-                if not await manager.kick_member(chat, operator.id):
-                    await manager.hide_member(chat, operator.id, timedelta(seconds=60))
-                await manager.lazy_session(
-                    chat.id, msg.id, operator.id, "unban_member",
-                    now_utc + timedelta(seconds=60),
-                )
+                await manager.hide_member(chat, operator.id, timedelta(seconds=60))
                 logger.warning(
                     f"{log_prefix} | retry limit exceeded, kicking | "
                     f"retry={retry_count} max={CAPTCHA_MAX_RETRY}"

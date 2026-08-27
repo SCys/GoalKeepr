@@ -61,14 +61,13 @@ async def test_advertising_timeout_does_not_schedule_unban(monkeypatch, mock_man
     mock_manager.lazy_session.assert_not_awaited()
 
 @pytest.mark.asyncio
-async def test_default_timeout_schedules_unban(monkeypatch, mock_manager):
+async def test_default_timeout_bans_60s_no_unban_session(monkeypatch, mock_manager):
     import handlers.member_captcha.events  # noqa: F401
     new_member_check = mock_manager.events["new_member_check"]
 
     chat = SimpleNamespace(id=-1001445219041, title="g")
     mock_manager.client.get_entity = AsyncMock(return_value=chat)
     mock_manager.client.get_permissions = AsyncMock(return_value=_restricted_perms())
-    mock_manager.client.kick_participant = AsyncMock()
     mock_manager.client.edit_permissions = AsyncMock()
     mock_manager.lazy_session = AsyncMock()
     mock_manager.lazy_session_delete = AsyncMock()
@@ -80,9 +79,8 @@ async def test_default_timeout_schedules_unban(monkeypatch, mock_manager):
 
     await new_member_check(mock_manager.client, -1001445219041, 10, 42)
 
-    mock_manager.kick_member.assert_awaited_once_with(chat, 42)
-    mock_manager.lazy_session.assert_awaited()
-    assert mock_manager.lazy_session.await_args.args[3] == "unban_member"
+    mock_manager.hide_member.assert_awaited_once_with(chat, 42, timedelta(seconds=60))
+    mock_manager.lazy_session.assert_not_awaited()
 
 @pytest.mark.asyncio
 async def test_timeout_skips_already_banned_no_unban(monkeypatch, mock_manager):

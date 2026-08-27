@@ -13,9 +13,9 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
     获取群组和成员实体，检查权限，然后踢出成员。
 
     根据 reason 决定踢出时长:
-      - "advertising" → 30 天封禁（不调度 unban_member）
-      - "llm"         → 60 秒封禁（需调度 unban_member）
-      - 其他           → 60 秒封禁（需调度 unban_member）
+      - "advertising" → 30 天封禁
+      - "llm"         → 60 秒临时封禁（until_date=60s，Telegram 服务端到期自动解封）
+      - 其他           → 60 秒临时封禁（until_date=60s，Telegram 服务端到期自动解封）
 
     Returns:
       True  — 成功踢出
@@ -72,18 +72,10 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
         logger.info(f"{prefix} member {member_id} banned {DEFAULT_BAN_DAYS} days for advertising")
         return True
 
-    # llm 或 default → 真正踢出成员（从群组中移除）
-    if await manager.kick_member(chat, member_id):
-        logger.info(f"{prefix} member {member_id} kicked from chat")
-    else:
-        logger.warning(f"{prefix} kick_participant failed, fallback to hide_member")
-        await manager.hide_member(chat, member_id, timedelta(seconds=60))
+    # llm 或 default → 临时封禁 60 秒（Telegram 服务端 60 秒后自动解封，无需调度 unban_member）
+    await manager.hide_member(chat, member_id, timedelta(seconds=60))
+    logger.info(f"{prefix} member {member_id} banned 60s (reason={reason})")
     return True
-
-
-def _should_schedule_unban(reason: str) -> bool:
-    """广告 30 天封禁不应在 60s 后自动解封。"""
-    return reason != "advertising"
 
 
 @manager.register_event("new_member_check")
@@ -98,17 +90,9 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
     finally:
         await manager.lazy_session_delete(chat_id, member_id, "safety_timeout_check")
         if kicked:
-            if _should_schedule_unban(reason):
-                await manager.lazy_session(
-                    chat_id,
-                    message_id,
-                    member_id,
-                    "unban_member",
-                    datetime.now() + timedelta(seconds=60),
-                )
             logger.info(
                 f"chat {chat_id} msg {message_id} member {member_id} is kicked by timeout "
-                f"(reason={reason}, unban={_should_schedule_unban(reason)})"
+                f"(reason={reason})"
             )
             rdb = await manager.get_redis()
             await stats_incr(rdb, FIELD_FAILED, chat_id, member_id)
@@ -193,17 +177,9 @@ async def safety_timeout_check(client, chat_id: int, message_id: int, member_id:
         kicked = await _kick_member(client, chat_id, member_id, reason)
     finally:
         if kicked:
-            if _should_schedule_unban(reason):
-                await manager.lazy_session(
-                    chat_id,
-                    message_id,
-                    member_id,
-                    "unban_member",
-                    datetime.now() + timedelta(seconds=60),
-                )
             logger.info(
                 f"chat {chat_id} msg {message_id} member {member_id} is kicked by safety timeout "
-                f"(reason={reason}, unban={_should_schedule_unban(reason)})"
+                f"(reason={reason})"
             )
             rdb = await manager.get_redis()
             await stats_incr(rdb, FIELD_FAILED, chat_id, member_id)
@@ -235,21 +211,9 @@ async def first_msg_timeout(client, chat_id: int, message_id: int, member_id: in
         logger.warning(f"check perms before first_msg_timeout failed: {e}")
         return
 
-    kicked = False
-    if await manager.kick_member(chat, member_id):
-        kicked = True
-    else:
-        kicked = await manager.hide_member(chat, member_id, timedelta(seconds=60))
+    kicked = await manager.hide_member(chat, member_id, timedelta(seconds=60))
 
     if kicked:
-        now_dt = datetime.now(timezone.utc)
-        await manager.lazy_session(
-            chat_id,
-            0,
-            member_id,
-            "unban_member",
-            now_dt + timedelta(seconds=60),
-        )
         logger.info(f"chat {chat_id} member {member_id} kicked due to 5min lurk timeout")
         try:
             user = await manager.get_user_info(member_id)

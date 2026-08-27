@@ -28,14 +28,9 @@ async def _handle_first_msg_violation(chat, event, user, reason: str):
         logger.warning(f"delete first spam message failed: {e}")
 
     user_id = user.id
-    if not await manager.kick_member(chat, user_id):
-        await manager.hide_member(chat, user_id, timedelta(seconds=60))
+    await manager.hide_member(chat, user_id, timedelta(seconds=60))
 
     now_dt = datetime.now(timezone.utc)
-    await manager.lazy_session(
-        chat.id, 0, user_id, "unban_member", now_dt + timedelta(seconds=60)
-    )
-
     full_name = manager.username(user)
     notice = (
         f"🚫 成员 [{full_name}](tg://user?id={user_id}) 入群首句违规（{reason}），消息已撤回并移出群组（60秒后解禁）。\n\n"

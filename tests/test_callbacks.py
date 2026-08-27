@@ -161,7 +161,7 @@ class TestSelfVerification:
         mock_manager.edit_text.assert_awaited()
 
     async def test_retry_limit_kicks(self, mock_manager, fake_redis):
-        """3 wrong attempts → user should be kicked."""
+        """3 wrong attempts → user should be kicked (banned 60s)."""
         from handlers.member_captcha.callbacks import handle_self_verification
         from handlers.member_captcha.session import CaptchaSession
 
@@ -180,8 +180,8 @@ class TestSelfVerification:
             operator, "test"
         )
         assert result is True
-        # Should have been kicked
-        mock_manager.kick_member.assert_awaited()
+        # Should have been banned 60s
+        mock_manager.hide_member.assert_awaited()
 
     async def test_advertising_flag_bans(self, mock_manager, fake_redis):
         """User who got advertising flag → ban 30 days even with correct answer."""
@@ -211,7 +211,7 @@ class TestSelfVerification:
         # Can't easily check with the patch, but the code path doesn't call it
 
     async def test_llm_flag_kicks_then_unbans(self, mock_manager, fake_redis):
-        """User with LLM flag → 60s kick + scheduled unban."""
+        """User with LLM flag → 60s temporary ban (Telegram server auto unbans)."""
         from handlers.member_captcha.callbacks import handle_self_verification
         from handlers.member_captcha.session import CaptchaSession
 
@@ -227,7 +227,8 @@ class TestSelfVerification:
             operator, "test"
         )
         assert result is True
-        mock_manager.lazy_session.assert_awaited()  # schedules unban
+        # hide_member should have been called with 60s
+        mock_manager.hide_member.assert_awaited()
 
     async def test_admin_operation_accept(self, mock_manager, fake_redis):
         """Admin clicks accept → member is accepted; timeout sessions cancelled."""

@@ -62,8 +62,8 @@ async def test_first_message_advertising_kicks(mock_manager, fake_redis, mock_ad
 
     # Message should be deleted
     msg.delete.assert_awaited()
-    # User should be kicked
-    mock_manager.kick_member.assert_awaited()
+    # User should be banned 60s
+    mock_manager.hide_member.assert_awaited()
     # Notice should be sent
     mock_manager.send.assert_awaited()
 
@@ -80,7 +80,7 @@ async def test_lurk_timeout_kicks_inactive_user(mock_manager, fake_redis):
     with patch("handlers.member_captcha.events.resolve_chat_entity", new=AsyncMock(return_value=SimpleNamespace(id=CHAT_ID))):
         await first_msg_timeout(mock_manager.client, CHAT_ID, 0, USER_ID)
 
-    mock_manager.kick_member.assert_awaited()
+    mock_manager.hide_member.assert_awaited()
     # Watch key deleted
     assert await fake_redis.get(f"first_msg_watch:{CHAT_ID}:{USER_ID}") is None
 
