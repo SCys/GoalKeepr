@@ -154,16 +154,8 @@ async def _perform_advertising_check(
 async def _handle_advertising_violation(
     matched_word: str, session: Session, log_context: LogContext
 ) -> None:
-    """处理广告违规：发送通知并记录日志（不执行封禁，由上层验证通过后统一处理）。"""
+    """处理广告违规：记录日志（由上层 member_captcha 统一执行封禁并发送通知）。"""
     try:
-        if not await manager.send(
-            log_context.chat.id,
-            f"用户 {log_context.member_id} 的昵称或者BIO明确包含广告内容，已记录。\n"
-            f"Message from {log_context.member_id} contains advertising content and has been recorded.",
-            auto_deleted_at=datetime.now() + timedelta(seconds=DELETED_AFTER),
-        ):
-            logger.error(f"{log_context.log_prefix} | 广告通知发送失败")
-
         log_details = f"matched:{matched_word}"
         if session.member_username:
             log_details += f" | username:@{session.member_username}"

@@ -732,11 +732,25 @@ class Manager:
             return False
 
     async def hide_member(self, chat: Any, user: Any, until: Optional[timedelta] = None) -> bool:
-        """封禁成员（禁止查看消息/加入黑名单）。until 为相对时长，None 表示永久。"""
+        """封禁成员（禁止查看消息/全量禁言/加入黑名单）。until 为相对时长，None 表示永久。"""
         user_id = getattr(user, "id", user)
         try:
             await self.client.edit_permissions(
-                chat, user_id, view_messages=False, until_date=until
+                chat,
+                user_id,
+                until_date=until,
+                view_messages=False,
+                send_messages=False,
+                send_media=False,
+                send_stickers=False,
+                send_gifs=False,
+                send_games=False,
+                send_inline=False,
+                embed_link_previews=False,
+                send_polls=False,
+                change_info=False,
+                invite_users=False,
+                pin_messages=False,
             )
             return True
         except Exception as e:
