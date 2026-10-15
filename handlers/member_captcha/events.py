@@ -115,7 +115,7 @@ async def new_member_check(client, chat_id: int, message_id: int, member_id: int
                 else:
                     notice = (
                         f"⏱️ 成员 [{name}](tg://user?id={member_id}) 验证超时（未在30秒内完成操作），已被移出群组（60秒后解禁）。\n\n"
-                        f"> Member [{name}](tg://user?id={member_id}) verification timed out and has been removed."
+                        f"> Member [{name}](tg://user?id={member_id}) verification timed out and has been removed (unbanned in 60s)."
                     )
                 await manager.send(
                     chat_id,

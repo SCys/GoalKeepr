@@ -682,6 +682,7 @@ class Manager:
                 send_games=False,
                 send_inline=False,
                 embed_link_previews=False,
+                send_polls=False,
                 until_date=until,
             )
             return True
@@ -756,9 +757,6 @@ class Manager:
         except Exception as e:
             logger.error(f"failed to ban member {user_id}: {e}")
             return False
-
-    # 兼容历史别名
-    hide_member = ban_member
 
     async def kick_member(self, chat: Any, user: Any) -> bool:
         """将成员从群组移除（软踢）。"""
