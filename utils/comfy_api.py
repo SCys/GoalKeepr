@@ -172,7 +172,7 @@ def create_workflow(
         工作流配置字典（模板的深拷贝，不会污染 WORKFLOWS）
     """
     if checkpoint not in WORKFLOWS:
-        checkpoint = "krea"
+        checkpoint = "zimage"
 
     if seed is None:
         seed = random.randint(*DEFAULT_SEED_RANGE)
@@ -194,8 +194,8 @@ def create_workflow(
         workflow["3"]["inputs"]["cfg"] = max(cfg, 1)
         workflow["6"]["inputs"]["text"] = prompt
         # 显式尺寸：直接写 latent 宽高，绕过 FluxResolutionNode 的固定比例计算
-        workflow["13"]["inputs"]["width"] = width
-        workflow["13"]["inputs"]["height"] = height
+        workflow["60"]["inputs"]["width"] = width
+        workflow["60"]["inputs"]["height"] = height
     elif checkpoint == "krea":
         workflow["3"]["inputs"]["seed"] = seed
         workflow["3"]["inputs"]["steps"] = max(steps, 4)

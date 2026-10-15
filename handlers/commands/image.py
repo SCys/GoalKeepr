@@ -55,7 +55,7 @@ PROGRESS_BAR_LEN = 14                    # 进度条长度（字符数）
 # 图像生成配置（LLM 优化模型从 [ai] image_optimize_models 读取，回退见 get_image_optimize_models）
 DEFAULT_SIZE = "836x1216"
 DEFAULT_STEP = 8
-DEFAULT_MODEL = "krea"
+DEFAULT_MODEL = "zimage"
 DEFAULT_CFG = 1
 MAX_CFG = 20.0
 MAX_STEPS = 50
