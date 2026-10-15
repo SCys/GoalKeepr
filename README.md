@@ -28,7 +28,7 @@ Telegram 群组管理机器人，基于 [Telethon](https://docs.telethon.dev/)�
 | `/k`             | 踢掉发消息的人。                                                                          |
 | `/sb`            | 将发消息的人加入黑名单。                                                       |
 | `/id`            | 获取用户信息（回复某人或自己），返回 ID、昵称、分享链接等。                               |
-| `/image`         | 根据文本生成图片。支持英文；中文会先翻译为英文。可配置允许的用户/群组及图床（imgproxy）（需在代码中启用）。 |
+| `/image`         | 根据文本生成图片。支持英文；中文会先翻译为英文。可配置允许的用户/群组。                   |
 | `/shorturl`      | 将消息中的 URL 转为短链接（需在代码中启用）。                                             |
 | `/tr`            | 将输入文本翻译为中文（需在代码中启用）。                                                  |
 | `/tts`           | 文本转语音（需在代码中启用）。                                                            |
@@ -164,16 +164,6 @@ groups = -100xxx
 ```
 
 允许使用图片生成命令的 TG 用户 ID 与群组 ID，逗号分隔；不填则按代码默认策略。
-
-```ini
-[imgproxy]
-domain = https://img.example.com
-imgproxy_key = <key>
-imgproxy_salt = <salt>
-imgproxy_source_url_encryption_key = <key>
-```
-
-图床代理，用于图片生成后的访问与裁剪（可选）。
 
 ```ini
 [ai]

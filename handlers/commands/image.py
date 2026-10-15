@@ -1,9 +1,5 @@
 import asyncio
-import base64
-import hmac
-import hashlib
 import itertools
-import os
 import random
 import re
 import time
@@ -11,11 +7,7 @@ from configparser import ConfigParser
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
-from urllib.parse import urlparse
 import uuid
-
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from cryptography.hazmat.backends import default_backend
 
 from telethon import events
 from telethon.errors import FloodWaitError
@@ -28,101 +20,6 @@ from utils.comfy_workflow import WORKFLOWS
 from ..utils import strip_text_prefix, chat_completions, get_image_optimize_models
 
 logger = manager.logger
-
-
-def encrypt_url_for_imgproxy(url: str, encryption_key: str) -> str:
-    """
-    使用 AES-256-CBC 加密 URL 用于 imgproxy
-    """
-    try:
-        try:
-            key_bytes = base64.b64decode(encryption_key)
-        except Exception:
-            key_bytes = encryption_key.encode('utf-8')
-            if len(key_bytes) != 32:
-                key_bytes = hashlib.sha256(key_bytes).digest()
-        
-        if len(key_bytes) != 32:
-            raise ValueError(f"加密密钥必须是32字节，当前为{len(key_bytes)}字节")
-        
-        iv = os.urandom(16)
-        
-        cipher = Cipher(algorithms.AES(key_bytes), modes.CBC(iv), backend=default_backend())
-        encryptor = cipher.encryptor()
-        
-        url_bytes = url.encode('utf-8')
-        pad_length = 16 - (len(url_bytes) % 16)
-        padded_url = url_bytes + bytes([pad_length] * pad_length)
-        
-        ciphertext = encryptor.update(padded_url) + encryptor.finalize()
-        
-        encrypted_data = iv + ciphertext
-        encrypted_url = base64.urlsafe_b64encode(encrypted_data).decode('utf-8').rstrip('=')
-        
-        return encrypted_url
-    except Exception as e:
-        logger.error(f"URL加密失败: {e}")
-        raise
-
-
-def generate_imgproxy_url(original_url: str, domain: str, key: str, salt: str = "", encryption_key: Optional[str] = None) -> str:
-    """
-    使用 imgproxy 生成签名 URL 或加密 URL
-    """
-    if not domain:
-        return original_url
-    
-    if encryption_key:
-        try:
-            encrypted_url = encrypt_url_for_imgproxy(original_url, encryption_key)
-            domain = domain.rstrip('/')
-            imgproxy_url = f"{domain}/{encrypted_url}"
-            return imgproxy_url
-        except Exception as e:
-            logger.warning(f"URL加密失败，回退到签名模式: {e}")
-    
-    if not key:
-        return original_url
-    
-    if original_url.startswith("local://"):
-        path = f"/{original_url}"
-    else:
-        try:
-            parsed = urlparse(original_url)
-            path = parsed.path
-            if not path.startswith("/"):
-                path = f"/{path}"
-        except Exception:
-            if "://" in original_url:
-                parts = original_url.split("://", 1)[1].split("/", 1)
-                path = f"/{parts[1]}" if len(parts) > 1 else "/"
-            else:
-                path = original_url if original_url.startswith("/") else f"/{original_url}"
-    
-    try:
-        key_bytes = base64.b64decode(key)
-    except Exception:
-        key_bytes = key.encode('utf-8')
-    
-    salt_bytes = b''
-    if salt:
-        try:
-            salt_bytes = base64.b64decode(salt)
-        except Exception:
-            salt_bytes = salt.encode('utf-8')
-    
-    if salt_bytes:
-        inner_hash = hmac.new(salt_bytes, path.encode('utf-8'), hashlib.sha256).digest()
-        signature = hmac.new(key_bytes, inner_hash, hashlib.sha256).digest()
-    else:
-        signature = hmac.new(key_bytes, path.encode('utf-8'), hashlib.sha256).digest()
-    
-    signature_b64 = base64.urlsafe_b64encode(signature).decode('utf-8').rstrip('=')
-    
-    domain = domain.rstrip('/')
-    imgproxy_url = f"{domain}/{signature_b64}{path}"
-    
-    return imgproxy_url
 
 
 # 常量定义
@@ -446,7 +343,6 @@ class OutboundDispatcher:
                 task.msg.chat_id,
                 bytes(img_raw),
                 caption=build_caption(task),
-                buttons=build_original_button(task),
                 reply_to=task.msg.message_id,
             )
             if sent_id is None:
@@ -632,32 +528,6 @@ def build_caption(task: "Task") -> str:
         f"📝 {prompt}"
     )
     return caption[:1023]
-
-
-def build_original_button(task: "Task"):
-    """构建 imgproxy 原始图片按钮，配置缺失或失败时返回 None。"""
-    filename = task.options.get("image_filename")
-    subfolder = task.options.get("image_subfolder") or ""
-    if not filename:
-        return None
-    try:
-        original_url = f"local://comfy/{subfolder}/{filename}"
-        imgproxy_domain = manager.config["imgproxy"]["domain"]
-        imgproxy_key = manager.config["imgproxy"].get("imgproxy_key", "")
-        imgproxy_salt = manager.config["imgproxy"].get("imgproxy_salt", "")
-        imgproxy_encryption_key = manager.config["imgproxy"].get("imgproxy_source_url_encryption_key", "")
-        image_url = generate_imgproxy_url(
-            original_url,
-            imgproxy_domain,
-            imgproxy_key,
-            imgproxy_salt,
-            imgproxy_encryption_key if imgproxy_encryption_key else None,
-        )
-        if image_url:
-            return [manager.url_button("Original|原始图片", image_url)]
-    except Exception as e:
-        logger.warning(f"imgproxy config error: {e}, skipping imgproxy URL")
-    return None
 
 
 # 进度编辑节流状态（内存即可，重启后从零节起无副作用）
