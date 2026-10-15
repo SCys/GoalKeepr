@@ -595,9 +595,9 @@ class PermissionManager:
                 [int(i) for i in groups_val] if isinstance(groups_val, (list, tuple)) else
                 [int(i) for i in str(groups_val).split(",") if str(i).strip()]
             )
-            # 过滤无效值
+            # 过滤无效值：用户 ID 为正数，群组 ID 为负数（-100... 超负群 / 普通负群）
             users = [i for i in users if i > 0]
-            groups = [i for i in groups if i > 0]
+            groups = [i for i in groups if i < 0]
             return users, groups
         except (KeyError, ValueError) as e:
             logger.error(f"Invalid image users or groups config: {e}")

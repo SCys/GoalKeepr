@@ -227,3 +227,36 @@ async def test_queue_snapshot_survives_redis_errors():
         logger.remove(hid)
 
     assert any("snapshot failed" in r for r in records)
+
+
+# ---- /image 访问控制 ----
+
+
+class TestImagePermission:
+    def _parse(self, users="", groups=""):
+        from configparser import ConfigParser
+
+        c = ConfigParser()
+        c["image"] = {"users": users, "groups": groups}
+        return image_mod.PermissionManager.parse_user_groups_config(c)
+
+    def test_groups_keep_negative_ids(self):
+        """群组 ID 是负数，过滤时必须保留（回归：i>0 曾把所有群组 ID 过滤掉）。"""
+        users, groups = self._parse(users="123,456", groups="-1001085650365,-100999")
+        assert users == [123, 456]
+        assert groups == [-1001085650365, -100999]
+
+    def test_invalid_values_dropped(self):
+        users, groups = self._parse(users="0,-5", groups="0,123")
+        assert users == []
+        assert groups == []
+
+    def test_empty_config_denies_everyone(self):
+        users, groups = self._parse()
+        assert not image_mod.PermissionManager.check_permission(1, -100, users, groups)
+
+    def test_user_or_group_match(self):
+        users, groups = self._parse(users="123", groups="-1001085650365")
+        assert image_mod.PermissionManager.check_permission(123, -999, users, groups)
+        assert image_mod.PermissionManager.check_permission(999, -1001085650365, users, groups)
+        assert not image_mod.PermissionManager.check_permission(999, -100999, users, groups)
