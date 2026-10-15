@@ -854,7 +854,10 @@ async def process_task(task: Task):
                 logger.warning(f"{prefix} unknown task status: {task.status}, and force set to completed")
                 task.status = "completed"
 
-            await rdb.set(f"{REDIS_KEY_PREFIX}{task.task_id}", dumps(task))
+            # failed 终态的任务已在 fail_task 中出队，不能再写回 Redis，
+            # 否则下个轮询周期会复活成僵尸任务（not_found 无限循环的成因）
+            if task.status != "failed":
+                await rdb.set(f"{REDIS_KEY_PREFIX}{task.task_id}", dumps(task))
 
         except Exception as e:
             cost = datetime.now() - datetime.fromtimestamp(task.created_at)
@@ -1103,12 +1106,15 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
 
 
 async def fail_task(task: Task, rdb, reason: str, prefix: str) -> None:
-    """任务失败收尾：更新状态消息并出队。"""
+    """任务失败收尾：更新状态消息、置 failed 终态并出队。"""
     elapsed = (datetime.now() - datetime.fromtimestamp(task.created_at)).total_seconds()
     await dispatcher.submit_edit(
         task.msg.chat_id, task.msg.reply_message_id,
         render_status_message(task, "failed", elapsed=elapsed, error=reason),
     )
+    # 终态标记必须先于出队设置：process_task 末尾会按状态决定是否写回 Redis，
+    # 缺了它，已出队的任务会被重新写回，下个轮询周期复活成僵尸任务无限重试
+    task.status = "failed"
     await task.dequeue_task(rdb)
     comfy_api.progress_tracker.clear(task.job_id or "")
     _progress_throttle.pop(task.task_id, None)
