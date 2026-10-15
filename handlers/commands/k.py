@@ -1,11 +1,9 @@
-from datetime import datetime, timedelta
-from typing import Union
+from datetime import timedelta
 
 from telethon import events, types
 from manager import manager
 
 DELETED_AFTER = 5
-BAN_MEMBER = 300  # 300s
 
 logger = manager.logger
 

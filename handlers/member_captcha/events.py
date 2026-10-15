@@ -13,8 +13,8 @@ async def _kick_member(client, chat_id: int, member_id: int, reason: str) -> boo
     获取群组和成员实体，检查权限，然后踢出成员。
 
     根据 reason 决定踢出时长:
-      - "advertising" → 30 天封禁
-      - "llm"         → 60 秒临时封禁（until_date=60s，Telegram 服务端到期自动解封）
+      - "advertising" → DEFAULT_BAN_DAYS 天封禁
+      - "llm"         → DEFAULT_BAN_DAYS 天封禁（AI 安全检测违规）
       - 其他           → 60 秒临时封禁（until_date=60s，Telegram 服务端到期自动解封）
 
     Returns:
@@ -216,6 +216,7 @@ async def first_msg_timeout(client, chat_id: int, message_id: int, member_id: in
     if kicked:
         logger.info(f"chat {chat_id} member {member_id} kicked due to 5min lurk timeout")
         try:
+            now_dt = datetime.now(timezone.utc)
             user = await manager.get_user_info(member_id)
             name = user.full_name if user else str(member_id)
             notice = (
