@@ -14,6 +14,7 @@ import database
 import redis.asyncio as aioredis
 import loguru
 from telethon import Button, TelegramClient, events, types, hints
+from telethon.errors import FloodWaitError
 from bs4 import BeautifulSoup, Tag
 
 from .settings import SETTINGS_TEMPLATE
@@ -393,6 +394,8 @@ class Manager:
                 await self.client.delete_messages(id_chat, id_message)
                 logger.info(f"chat {id_chat} message {id_message} deleted")
                 return True
+            except FloodWaitError:
+                raise
             except Exception as e:
                 logger.error(f"chat {id_chat} message {id_message} delete failed: {e}")
                 return False
@@ -481,6 +484,8 @@ class Manager:
         try:
             await self.client.edit_message(chat, msg, content, *args, **kwargs)
             logger.info(f"chat {chat} message {msg} edited")
+        except FloodWaitError:
+            raise
         except Exception as e:
             logger.exception(f"edit error: {e}")
             return False
@@ -594,13 +599,15 @@ class Manager:
         buttons: Optional[list] = None,
         reply_to: Optional[int] = None,
     ) -> Optional[int]:
-        """发送图片（bytes），成功返回 msg_id。"""
+        """发送图片（bytes），成功返回 msg_id。FloodWaitError 会向上抛出（供限速调度感知）。"""
         try:
             resp = await self.client.send_file(
                 chat_id, photo, caption=caption, buttons=buttons, reply_to=reply_to
             )
             logger.info(f"chat {chat_id} photo message {resp.id} sent")
             return resp.id
+        except FloodWaitError:
+            raise
         except Exception as e:
             logger.exception(f"chat {chat_id} send_photo error: {e}")
             return None

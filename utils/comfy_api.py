@@ -1,8 +1,12 @@
 import asyncio
+import copy
 import random
+import re
+import uuid
 from typing import Optional, Dict, Any, Tuple
 
-from aiohttp import ClientSession, ClientTimeout, ClientError
+from aiohttp import ClientSession, ClientTimeout, ClientError, WSMsgType
+from orjson import loads as json_loads
 
 from manager import manager
 from .comfy_workflow import WORKFLOWS
@@ -16,6 +20,9 @@ HISTORY_TIMEOUT = 10
 MAX_RETRIES = 30
 RETRY_DELAY = 7
 DEFAULT_SEED_RANGE = (0, 0xFFFFFFFFFFFFFFFF)
+
+# 提交工作流时使用的固定 client_id，WebSocket 进度事件按此关联
+CLIENT_ID = f"goalkeepr-{uuid.uuid4().hex[:8]}"
 
 
 class ComfyAPIError(Exception):
@@ -40,6 +47,84 @@ class ImageDownloadError(ComfyAPIError):
     """图片下载失败错误"""
 
     pass
+
+
+class ProgressTracker:
+    """ComfyUI WebSocket 进度跟踪。
+
+    提交工作流时携带 CLIENT_ID 后，ComfyUI 会把该任务的执行事件推送到
+    /ws?clientId=CLIENT_ID。本类维护一条长连接，把 progress/executing
+    事件按 prompt_id（即 job_id）记录为内存快照，供调用方渲染进度。
+
+    断线指数退避重连（2s → 30s 封顶）；断线期间快照停更，调用方应自行
+    兜底（显示无进度条的"生成中"）。
+    """
+
+    RECONNECT_MIN = 2.0
+    RECONNECT_MAX = 30.0
+
+    def __init__(self) -> None:
+        self._progress: Dict[str, Dict[str, Any]] = {}
+        self._ws_task: Optional[asyncio.Task] = None
+
+    def snapshot(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """获取任务进度快照：{"value": 当前步, "max": 总步数, "node": 当前节点ID}"""
+        return self._progress.get(job_id)
+
+    def clear(self, job_id: str) -> None:
+        self._progress.pop(job_id, None)
+
+    def ensure_running(self, endpoint: str) -> None:
+        if self._ws_task is None or self._ws_task.done():
+            self._ws_task = asyncio.create_task(self._run(endpoint))
+
+    async def _run(self, endpoint: str) -> None:
+        delay = self.RECONNECT_MIN
+        ws_base = re.sub(r"^http", "ws", endpoint.rstrip("/"))
+        url = f"{ws_base}/ws?clientId={CLIENT_ID}"
+        while True:
+            try:
+                session = await manager.create_session()
+                async with session.ws_connect(url, timeout=DEFAULT_TIMEOUT) as ws:
+                    logger.info("comfy ws connected")
+                    delay = self.RECONNECT_MIN
+                    async for msg in ws:
+                        if msg.type == WSMsgType.TEXT:
+                            self._handle(msg.data)
+                        elif msg.type in (WSMsgType.CLOSED, WSMsgType.ERROR):
+                            break
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.warning(f"comfy ws error: {e}")
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, self.RECONNECT_MAX)
+
+    def _handle(self, raw: Any) -> None:
+        try:
+            data = json_loads(raw)
+        except Exception:
+            return
+        payload = data.get("data") or {}
+        job_id = payload.get("prompt_id")
+        if not job_id:
+            return
+        mtype = data.get("type")
+        if mtype == "progress":
+            cur = self._progress.setdefault(job_id, {"value": 0, "max": 0, "node": None})
+            cur["value"] = payload.get("value", 0)
+            cur["max"] = payload.get("max", 0)
+        elif mtype == "executing":
+            node = payload.get("node")
+            if node is None:
+                # node=None 表示整个 prompt 执行完毕
+                self._progress.pop(job_id, None)
+            else:
+                cur = self._progress.setdefault(job_id, {"value": 0, "max": 0, "node": None})
+                cur["node"] = node
+
+
+progress_tracker = ProgressTracker()
 
 
 def _parse_image_size(size: str) -> Tuple[int, int]:
@@ -75,7 +160,7 @@ def create_workflow(
     创建 ComfyUI 工作流配置
 
     Args:
-        model: 模型名称
+        checkpoint: 模型名称（对应 WORKFLOWS 的键）
         prompt: 提示词
         width: 图片宽度
         height: 图片高度
@@ -84,7 +169,7 @@ def create_workflow(
         seed: 随机种子，如果为 None 则随机生成
 
     Returns:
-        工作流配置字典
+        工作流配置字典（模板的深拷贝，不会污染 WORKFLOWS）
     """
     if checkpoint not in WORKFLOWS:
         checkpoint = "zimage"
@@ -92,16 +177,25 @@ def create_workflow(
     if seed is None:
         seed = random.randint(*DEFAULT_SEED_RANGE)
 
-    workflow = WORKFLOWS[checkpoint]
+    # 必须深拷贝：模板是模块级共享字典，直接修改会污染后续任务
+    workflow = copy.deepcopy(WORKFLOWS[checkpoint])
 
     if checkpoint == "flux":
         workflow["6"]["inputs"]["text"] = prompt
         workflow["17"]["inputs"]["steps"] = steps
+        workflow["25"]["inputs"]["noise_seed"] = seed
+        workflow["27"]["inputs"]["width"] = width
+        workflow["27"]["inputs"]["height"] = height
+        workflow["30"]["inputs"]["width"] = width
+        workflow["30"]["inputs"]["height"] = height
     elif checkpoint == "zimage":
         workflow["3"]["inputs"]["seed"] = seed
         workflow["3"]["inputs"]["steps"] = max(steps, 8)
         workflow["3"]["inputs"]["cfg"] = max(cfg, 1)
         workflow["6"]["inputs"]["text"] = prompt
+        # 显式尺寸：直接写 latent 宽高，绕过 FluxResolutionNode 的固定比例计算
+        workflow["13"]["inputs"]["width"] = width
+        workflow["13"]["inputs"]["height"] = height
 
     return workflow
 
@@ -126,7 +220,7 @@ async def _submit_workflow(
     try:
         async with session.post(
             f"{endpoint}/prompt",
-            json={"prompt": workflow},
+            json={"prompt": workflow, "client_id": CLIENT_ID},
             timeout=DEFAULT_TIMEOUT,
         ) as response:
             if response.status != 200:
@@ -212,7 +306,7 @@ async def generate_image(
     endpoint: str,
     checkpoint: str,
     prompt: str,
-    size: str = "832x1216",
+    size: str = "836x1216",
     steps: int = 16,
     cfg: float = 1.0,
     seed: Optional[int] = None,
@@ -247,6 +341,8 @@ async def generate_image(
 
         # 创建 HTTP 会话
         session = await manager.create_session()
+        # 确保 WebSocket 进度跟踪已启动（提交后再启动会错过早期事件）
+        progress_tracker.ensure_running(endpoint)
         # 提交工作流
         return await _submit_workflow(session, endpoint, workflow)
 
@@ -295,13 +391,13 @@ async def job_status(endpoint: str, job_id: str) -> Optional[Dict[str, Any]]:
                 for item in queue_data.get("queue_running", []):
                     if len(item) > 1 and item[1] == job_id:
                         logger.info(f"任务 {job_id} 正在运行。")
-                        return {"status": "running", "data": item}
+                        return {"status": "running", "position": 0, "data": item}
 
                 # 检查待处理的队列
-                for item in queue_data.get("queue_pending", []):
+                for idx, item in enumerate(queue_data.get("queue_pending", [])):
                     if len(item) > 1 and item[1] == job_id:
                         logger.info(f"任务 {job_id} 正在等待。")
-                        return {"status": "pending", "data": item}
+                        return {"status": "pending", "position": idx + 1, "data": item}
             else:
                 logger.warning(f"获取队列状态失败: HTTP {response.status}")
 
@@ -316,7 +412,7 @@ async def job_status(endpoint: str, job_id: str) -> Optional[Dict[str, Any]]:
 
 async def job_cancel(endpoint: str, job_id: str) -> bool:
     """
-    取消任务
+    取消任务（vanilla ComfyUI 标准 API：从队列删除；运行中的任务需另调 /interrupt）。
 
     Args:
         endpoint: ComfyUI API 端点
@@ -324,9 +420,13 @@ async def job_cancel(endpoint: str, job_id: str) -> bool:
     """
     try:
         session = await manager.create_session()
-        async with session.post(f"{endpoint}/cancel/{job_id}", timeout=DEFAULT_TIMEOUT) as response:
+        async with session.post(
+            f"{endpoint}/queue",
+            json={"delete": [job_id]},
+            timeout=DEFAULT_TIMEOUT,
+        ) as response:
             if response.status == 200:
-                logger.info(f"任务 {job_id} 已取消。")
+                logger.info(f"任务 {job_id} 已从队列删除。")
                 return True
             else:
                 logger.warning(f"取消任务失败: HTTP {response.status}")

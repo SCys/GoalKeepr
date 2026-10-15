@@ -75,11 +75,17 @@ async def sdxl(event: events.NewMessage.Event):
             await event.reply("task is failed: cloudflare worker return invalid json.")
             return
 
-    sent_id = await manager.send_photo(
-        chat.id,
-        image_binary,
-        caption="---\n\rPower by Cloudflare AI",
-    )
+    from telethon.errors import FloodWaitError
+    try:
+        sent_id = await manager.send_photo(
+            chat.id,
+            image_binary,
+            caption="---\n\rPower by Cloudflare AI",
+        )
+    except FloodWaitError as e:
+        logger.warning(f"{prefix} flood wait {e.seconds}s when sending image")
+        await event.reply(f"telegram is rate limited, please try again in {e.seconds}s.")
+        return
     if sent_id is None:
         await event.reply("task is failed: send image failed.")
         return
