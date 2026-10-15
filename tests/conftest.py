@@ -92,6 +92,15 @@ class FakeRedis:
             deduped = [k for k in deduped if fnmatch.fnmatch(k, match)]
         return (0, deduped)
 
+    async def scan_iter(self, match=None):
+        _, keys = await self.scan(match=match)
+        for k in keys:
+            yield k
+
+    async def mget(self, *keys):
+        self._evict()
+        return [self._data.get(self._norm_key(k)) for k in keys]
+
     # ------------------------------------------------------------------
     # Hash operations
     # ------------------------------------------------------------------

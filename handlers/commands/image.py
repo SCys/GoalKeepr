@@ -165,12 +165,21 @@ class Task:
             raise ImageGenerationError("Failed to remove task from queue")
 
     @staticmethod
+    def _is_task_key(key) -> bool:
+        """只匹配任务键 image:<uuid>，排除 image:lock:* / image:img:* 等内部键。"""
+        k = key.decode() if isinstance(key, bytes) else str(key)
+        sub = k[len(REDIS_KEY_PREFIX):]
+        return not sub.startswith(("lock:", "img:"))
+
+    @staticmethod
     async def all_tasks(rdb) -> List["Task"]:
         """从队列中获取任务"""
         try:
             tasks: List["Task"] = []
             batch: List[bytes] = []
             async for key in rdb.scan_iter(f"{REDIS_KEY_PREFIX}*"):
+                if not Task._is_task_key(key):
+                    continue
                 batch.append(key)
                 if len(batch) >= 100:
                     tasks.extend(await Task._load_tasks(rdb, batch))
@@ -193,29 +202,35 @@ class Task:
                 continue
             try:
                 task_data = loads(task_raw)
+                msg_data = task_data["msg"]
+                task_msg = TaskMessage(
+                    chat_id=msg_data["chat_id"],
+                    chat_name=msg_data["chat_name"],
+                    user_id=msg_data["user_id"],
+                    user_name=msg_data["user_name"],
+                    message_id=msg_data["message_id"],
+                    reply_message_id=msg_data["reply_message_id"],
+                    reply_content=msg_data["reply_content"],
+                )
+                task = Task(
+                    msg=task_msg,
+                    prompt=task_data["prompt"],
+                    options=task_data["options"],
+                    created_at=task_data["created_at"],
+                    status=task_data["status"],
+                    job_id=task_data["job_id"],
+                    task_id=task_data["task_id"],
+                    poll_errors=task_data.get("poll_errors", 0),
+                )
             except Exception as e:
-                logger.warning(f"Invalid task data {key}: {e}")
+                # 损坏/脏数据（如旧版本写入、误命中内部键）无法恢复：
+                # 跳过并删除，否则会永久占用队列名额（GLOBAL_TASK_LIMIT）
+                logger.warning(f"Invalid task data {key}: {e}, removing")
+                try:
+                    await rdb.delete(key)
+                except Exception:
+                    pass
                 continue
-            msg_data = task_data["msg"]
-            task_msg = TaskMessage(
-                chat_id=msg_data["chat_id"],
-                chat_name=msg_data["chat_name"],
-                user_id=msg_data["user_id"],
-                user_name=msg_data["user_name"],
-                message_id=msg_data["message_id"],
-                reply_message_id=msg_data["reply_message_id"],
-                reply_content=msg_data["reply_content"],
-            )
-            task = Task(
-                msg=task_msg,
-                prompt=task_data["prompt"],
-                options=task_data["options"],
-                created_at=task_data["created_at"],
-                status=task_data["status"],
-                job_id=task_data["job_id"],
-                task_id=task_data["task_id"],
-                poll_errors=task_data.get("poll_errors", 0),
-            )
             tasks.append(task)
         return tasks
 

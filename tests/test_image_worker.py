@@ -134,3 +134,38 @@ async def test_edit_text_not_modified_is_success():
     mgr.client.edit_message = AsyncMock(side_effect=MessageNotModifiedError("req"))
 
     assert await mgr.edit_text(123, 456, "x") is True
+
+
+# ---- 队列扫描的键过滤与脏数据清理 ----
+
+
+async def test_all_tasks_ignores_internal_keys(fake_redis):
+    """image:lock:* / image:img:* 等内部键不得进入任务队列解析。
+
+    回归：锁键的值是 "1"，orjson 解析为 int 后 task_data["msg"] 抛
+    TypeError，旧代码会拖垮整个 all_tasks 调用（worker 整轮崩溃）。
+    """
+    task = make_task()
+    await task.enqueue_task(fake_redis)
+    await fake_redis.set(f"image:lock:{task.task_id}", "1", nx=True, ex=180)
+    await fake_redis.set(f"image:img:{task.task_id}", b"\x89PNG-binary")
+
+    tasks = await image_mod.Task.all_tasks(fake_redis)
+
+    assert len(tasks) == 1
+    assert tasks[0].task_id == task.task_id
+    # 内部键不受影响
+    assert await fake_redis.exists(f"image:lock:{task.task_id}")
+    assert await fake_redis.exists(f"image:img:{task.task_id}")
+
+
+async def test_all_tasks_removes_garbage_keys(fake_redis):
+    """解析失败的任务键被跳过并删除，避免永久占用队列名额。"""
+    task = make_task()
+    await task.enqueue_task(fake_redis)
+    await fake_redis.set("image:corrupted", b"not-a-task{{{")
+
+    tasks = await image_mod.Task.all_tasks(fake_redis)
+
+    assert [t.task_id for t in tasks] == [task.task_id]
+    assert not await fake_redis.exists("image:corrupted")
