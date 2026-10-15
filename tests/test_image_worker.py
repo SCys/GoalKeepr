@@ -169,3 +169,61 @@ async def test_all_tasks_removes_garbage_keys(fake_redis):
 
     assert [t.task_id for t in tasks] == [task.task_id]
     assert not await fake_redis.exists("image:corrupted")
+
+
+# ---- worker 启动队列快照日志 ----
+
+
+def _capture_logs():
+    from loguru import logger
+
+    records = []
+    handler_id = logger.add(lambda m: records.append(m.record["message"]), level="INFO")
+    return records, handler_id
+
+
+async def test_queue_snapshot_logs_existing_tasks(fake_redis):
+    from loguru import logger
+
+    task = make_task()
+    await task.enqueue_task(fake_redis)
+
+    records, hid = _capture_logs()
+    try:
+        await image_mod.log_queue_snapshot(fake_redis)
+    finally:
+        logger.remove(hid)
+
+    text = "\n".join(records)
+    assert "1 task(s)" in text
+    assert task.task_id in text
+    assert "status=queued" in text
+    assert "model=zimage" in text
+
+
+async def test_queue_snapshot_empty_queue(fake_redis):
+    from loguru import logger
+
+    records, hid = _capture_logs()
+    try:
+        await image_mod.log_queue_snapshot(fake_redis)
+    finally:
+        logger.remove(hid)
+
+    assert any("empty" in r for r in records)
+
+
+async def test_queue_snapshot_survives_redis_errors():
+    """all_tasks 抛错时只记 warning，不炸 worker 启动流程。"""
+    from loguru import logger
+
+    class BrokenRedis:
+        pass
+
+    records, hid = _capture_logs()
+    try:
+        await image_mod.log_queue_snapshot(BrokenRedis())
+    finally:
+        logger.remove(hid)
+
+    assert any("snapshot failed" in r for r in records)

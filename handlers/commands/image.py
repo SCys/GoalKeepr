@@ -1198,12 +1198,34 @@ async def handle_not_found_task(task: Task, rdb, prefix: str):
     await fail_task(task, rdb, "远端任务丢失 / Task not found on remote service", prefix)
 
 
+async def log_queue_snapshot(rdb) -> None:
+    """worker 启动时打印存量任务快照（id/状态/年龄/来源），便于排查重启遗留任务。"""
+    try:
+        tasks = await Task.all_tasks(rdb)
+    except Exception as e:
+        logger.warning(f"image queue snapshot failed: {e}")
+        return
+    if not tasks:
+        logger.info("image queue snapshot: empty")
+        return
+    now = datetime.now().timestamp()
+    logger.info(f"image queue snapshot: {len(tasks)} task(s)")
+    for t in tasks:
+        age = now - t.created_at
+        logger.info(
+            f"  task {t.task_id} status={t.status} age={age:.0f}s "
+            f"chat={t.msg.chat_id} msg={t.msg.message_id} user={t.msg.user_name} "
+            f"job={t.job_id or '-'} model={t.options.get('model', DEFAULT_MODEL)}"
+        )
+
+
 async def worker():
     """图像生成工作进程"""
     try:
         logger.info("image worker is started")
         dispatcher.ensure_running()
         redis_unavailable_logged = False
+        queue_snapshot_logged = False
 
         while True:
             try:
@@ -1222,6 +1244,11 @@ async def worker():
                 if redis_unavailable_logged:
                     logger.info("redis is ready, image worker resuming")
                     redis_unavailable_logged = False
+
+                if not queue_snapshot_logged:
+                    # 启动后第一次拿到 Redis 时打印存量任务，便于排查重启遗留
+                    await log_queue_snapshot(rdb)
+                    queue_snapshot_logged = True
 
                 tasks = await Task.all_tasks(rdb)
                 if not tasks:
