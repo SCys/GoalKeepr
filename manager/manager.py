@@ -15,7 +15,7 @@ import database
 import redis.asyncio as aioredis
 import loguru
 from telethon import Button, TelegramClient, events, types, hints
-from telethon.errors import FloodWaitError
+from telethon.errors import FloodWaitError, MessageIdInvalidError, MessageNotModifiedError
 from bs4 import BeautifulSoup, Tag
 
 from .settings import SETTINGS_TEMPLATE
@@ -480,13 +480,21 @@ class Manager:
         return True
 
     async def edit_text(self, chat: int, msg: int, content: str, *args, **kwargs):
+        """编辑消息。返回 True 成功 / False 一般错误 / None 消息已不存在（调用方应短路后续编辑）。"""
         auto_deleted_at = kwargs.pop("auto_deleted_at", None)
-        
+
         try:
             await self.client.edit_message(chat, msg, content, *args, **kwargs)
             logger.info(f"chat {chat} message {msg} edited")
         except FloodWaitError:
             raise
+        except MessageNotModifiedError:
+            # 内容未变化，不算错误
+            return True
+        except MessageIdInvalidError:
+            # 消息已被删除（如用户删掉了状态消息），不重试、不刷错误堆栈
+            logger.warning(f"chat {chat} message {msg} is gone, skip edit")
+            return None
         except Exception as e:
             logger.exception(f"edit error: {e}")
             return False

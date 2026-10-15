@@ -258,6 +258,7 @@ class OutboundDispatcher:
         self._last_op_at = 0.0
         self._last_chat_op: Dict[int, float] = {}
         self._edited_texts: Dict[Tuple[int, int], str] = {}
+        self._gone_msgs: set = set()  # 已被删除的消息 (chat_id, message_id)，后续编辑/删除直接短路
         self._delivering: set = set()
         self.degrade_level = 0
         self._last_flood_at = 0.0
@@ -290,39 +291,54 @@ class OutboundDispatcher:
         await self._queue.put((op.priority, next(self._seq), op))
 
     async def submit_edit(self, chat_id: int, message_id: int, text: str) -> None:
-        """状态变更类编辑（P1）。"""
-        if message_id <= 0:
+        """状态变更类编辑（P1）。消息已被删除时直接短路。"""
+        key = (chat_id, message_id)
+        if message_id <= 0 or key in self._gone_msgs:
             return
 
         async def op():
-            await manager.edit_text(chat_id, message_id, text)
-            self._edited_texts[(chat_id, message_id)] = text
+            result = await manager.edit_text(chat_id, message_id, text)
+            if result is None:
+                # 消息已删除：记住它，之后不再尝试编辑/删除
+                self._mark_gone(key)
+            elif result:
+                self._edited_texts[key] = text
 
         await self._enqueue(_OutboundOp(OP_NOTIFY, op, chat_id, kind="edit"))
 
     async def submit_progress_edit(self, chat_id: int, message_id: int, text_getter) -> None:
         """进度编辑（P2）：执行时才渲染最新进度；内容未变则跳过；静默级别直接丢弃。"""
-        if message_id <= 0 or self.degrade_level >= 2:
-            return
         key = (chat_id, message_id)
+        if message_id <= 0 or self.degrade_level >= 2 or key in self._gone_msgs:
+            return
 
         async def op():
             text = text_getter()
             if not text or text == self._edited_texts.get(key):
                 return
-            await manager.edit_text(chat_id, message_id, text)
-            self._edited_texts[key] = text
+            result = await manager.edit_text(chat_id, message_id, text)
+            if result is None:
+                self._mark_gone(key)
+            elif result:
+                self._edited_texts[key] = text
 
         await self._enqueue(_OutboundOp(OP_PROGRESS, op, chat_id, kind="progress"))
 
     async def submit_delete(self, chat_id: int, message_id: int) -> None:
-        if message_id <= 0:
+        key = (chat_id, message_id)
+        if message_id <= 0 or key in self._gone_msgs:
             return
 
         async def op():
             await manager.delete_message(chat_id, message_id)
+            # 删除成功后同样短路：防止已入队的迟到编辑再打到这条消息上
+            self._mark_gone(key)
 
         await self._enqueue(_OutboundOp(OP_NOTIFY, op, chat_id, kind="delete"))
+
+    def _mark_gone(self, key: Tuple[int, int]) -> None:
+        self._gone_msgs.add(key)
+        self._edited_texts.pop(key, None)
 
     # ---- 完成图投递（P0）----
 
