@@ -1,3 +1,4 @@
+import io
 import os
 import os.path
 import sys
@@ -599,10 +600,16 @@ class Manager:
         buttons: Optional[list] = None,
         reply_to: Optional[int] = None,
     ) -> Optional[int]:
-        """发送图片（bytes），成功返回 msg_id。FloodWaitError 会向上抛出（供限速调度感知）。"""
+        """发送图片（bytes），成功返回 msg_id。FloodWaitError 会向上抛出（供限速调度感知）。
+
+        Telethon 靠文件名后缀判断是否为图片，裸 bytes 会被当成 document 发送，
+        因此包装成带 .png/.jpg 后缀名的 BytesIO（按魔数识别，未知一律按 png）。
+        """
         try:
+            buf = io.BytesIO(photo)
+            buf.name = "image.jpg" if photo[:2] == b"\xff\xd8" else "image.png"
             resp = await self.client.send_file(
-                chat_id, photo, caption=caption, buttons=buttons, reply_to=reply_to
+                chat_id, buf, caption=caption, buttons=buttons, reply_to=reply_to
             )
             logger.info(f"chat {chat_id} photo message {resp.id} sent")
             return resp.id
