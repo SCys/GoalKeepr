@@ -19,7 +19,7 @@ SETTINGS_TEMPLATE = {
         "manage_group": 0,  # manage group id
         "chat_model": "gemini-3.8-flash",  # 用于 /chat；预设见 txt.py SUPPORTED_MODELS（128k 输入/32k 输出，支持图文视频），也可用任意后端支持的模型名
         "spam_models": "openai/gpt-oss-120b;gemini-3.1-flash-lite-preview;openai/gpt-oss-20b;gemma-4-31b-it",  # 入群 LLM 垃圾检测，多模型 ; 分隔 fallback
-        "image_optimize_models": "deepseek-flash;qwen3.6-flash;gemini-3.8-flash",  # /image 提示词 LLM 优化，多模型 ; 分隔 fallback
+        "image_optimize_models": "simple;deepseek-flash;qwen3.6-flash;gemini-3.8-flash",  # /image 提示词 LLM 优化，多模型 ; 分隔 fallback
     },
     "image": {
         "users": [],  # allowed users(id list)

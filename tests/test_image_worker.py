@@ -274,8 +274,8 @@ class TestPromptOptimize:
 
         assert optimized == "一只橘猫趴在窗台，午后阳光，电影感"
         assert reply == optimized
-        # 默认第一个模型是 deepseek-flash
-        assert mock_chat.call_args.kwargs["model_name"] == "deepseek-flash"
+        # 默认第一个模型是 simple（代理端 combo）
+        assert mock_chat.call_args.kwargs["model_name"] == "simple"
         # system prompt 已换成通用版
         sys_msg = mock_chat.call_args.args[0][0]["content"]
         assert "文生图提示词优化专家" in sys_msg
@@ -296,7 +296,7 @@ class TestPromptOptimize:
 
         async def flaky(messages, model_name=None):
             calls.append(model_name)
-            if model_name == "deepseek-flash":
+            if model_name == "simple":
                 raise RuntimeError("boom")
             return "优化后"
 
@@ -305,7 +305,7 @@ class TestPromptOptimize:
         optimized, _ = await image_mod.PromptProcessor.optimize_prompt("橘猫")
 
         assert optimized == "优化后"
-        assert calls == ["deepseek-flash", "qwen3.6-flash"]
+        assert calls == ["simple", "deepseek-flash"]
 
 
 class TestParseOptionsRaw:

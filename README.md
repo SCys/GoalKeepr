@@ -28,7 +28,7 @@ Telegram 群组管理机器人，基于 [Telethon](https://docs.telethon.dev/)�
 | `/k`             | 踢掉发消息的人。                                                                          |
 | `/sb`            | 将发消息的人加入黑名单。                                                       |
 | `/id`            | 获取用户信息（回复某人或自己），返回 ID、昵称、分享链接等。                               |
-| `/image`         | 根据文本生成图片，默认先用 LLM（deepseek-flash）把描述优化成高质量提示词再提交，`[raw]` 选项可跳过优化。可配置允许的用户/群组。 |
+| `/image`         | 根据文本生成图片，默认先用 LLM（simple）把描述优化成高质量提示词再提交，`[raw]` 选项可跳过优化。可配置允许的用户/群组。 |
 | `/shorturl`      | 将消息中的 URL 转为短链接（需在代码中启用）。                                             |
 | `/tr`            | 将输入文本翻译为中文（需在代码中启用）。                                                  |
 | `/tts`           | 文本转语音（需在代码中启用）。                                                            |
@@ -172,7 +172,7 @@ proxy_token = <代理 token>
 # administrator / manage_group 为旧版 /chat 高级权限管理遗留（基础版 /chat 已不再使用）
 chat_model = gemini-3.8-flash
 spam_models = openai/gpt-oss-120b;gemini-3.1-flash-lite-preview;openai/gpt-oss-20b;gemma-4-31b-it
-image_optimize_models = deepseek-flash;qwen3.6-flash;gemini-3.8-flash
+image_optimize_models = simple;deepseek-flash;qwen3.6-flash;gemini-3.8-flash
 # chat_model 用于 /chat 基础会话（30min 上下文）。可使用任意后端支持的模型名；
 # 内置预设：gemini-3.8-flash / deepseek-flash / qwen3.6-flash（均 128k 输入 / 32k 输出，支持图文与视频输入，
 # /chat 可直接携带或回复图片、视频消息）；预设模型使用精确上下文长度和友好显示名，
