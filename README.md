@@ -170,11 +170,12 @@ groups = -100xxx
 proxy_host = <AI 代理地址>
 proxy_token = <代理 token>
 # administrator / manage_group 为旧版 /chat 高级权限管理遗留（基础版 /chat 已不再使用）
-chat_model = gemini-3.8-flash
+chat_model = simple
 spam_models = openai/gpt-oss-120b;gemini-3.1-flash-lite-preview;openai/gpt-oss-20b;gemma-4-31b-it
 image_optimize_models = simple;deepseek-flash;qwen3.6-flash;gemini-3.8-flash
 # chat_model 用于 /chat 基础会话（30min 上下文）。可使用任意后端支持的模型名；
-# 内置预设：gemini-3.8-flash / deepseek-flash / qwen3.6-flash（均 128k 输入 / 32k 输出，支持图文与视频输入，
+# 内置预设：simple（代理端 combo，默认）/ gemini-3.8-flash / deepseek-flash / qwen3.6-flash
+# （均 128k 输入 / 32k 输出，支持图文与视频输入，
 # /chat 可直接携带或回复图片、视频消息）；预设模型使用精确上下文长度和友好显示名，
 # 未列出的模型名使用 128k 默认输入长度 + 4096 输出 + 原始模型名作为 "Powered by"。
 # spam_models 用于新成员入群的 LLM 垃圾检测（handlers/member_captcha/security.py + utils/llm.py），支持多模型 ; 分隔 fallback

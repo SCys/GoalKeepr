@@ -25,9 +25,15 @@ class ModelDescription:
 
 BASIC_SYSTEM_PROMPT = "You are a helpful assistant in a Telegram chat. Keep responses concise and useful."
 CONVERSATION_TTL = 1800
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "simple"
 # 内置预设模型：均支持图文与视频输入，统一 128k 输入 / 32k 输出
+# simple 是代理端 combo 模型（服务端复合多个后端），作为默认
 SUPPORTED_MODELS = {
+    "simple": ModelDescription(
+        name="Simple",
+        input_length=128000,
+        output_length=32768,
+    ),
     "gemini-3.8-flash": ModelDescription(
         name="Gemini 3.8 Flash",
         input_length=128000,

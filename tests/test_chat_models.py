@@ -9,14 +9,14 @@ from handlers.utils.txt import DEFAULT_MODEL, SUPPORTED_MODELS
 
 
 def test_supported_models_preset():
-    """三个预设模型：统一 128k 输入 / 32k 输出，均声明图文与视频支持。"""
-    assert set(SUPPORTED_MODELS) == {"gemini-3.8-flash", "deepseek-flash", "qwen3.6-flash"}
+    """预设模型：统一 128k 输入 / 32k 输出，均声明图文与视频支持；simple 为默认。"""
+    assert set(SUPPORTED_MODELS) == {"simple", "gemini-3.8-flash", "deepseek-flash", "qwen3.6-flash"}
     for desc in SUPPORTED_MODELS.values():
         assert desc.input_length == 128000
         assert desc.output_length == 32768
         assert "image" in desc.media
         assert "video" in desc.media
-    assert DEFAULT_MODEL in SUPPORTED_MODELS
+    assert DEFAULT_MODEL == "simple"
 
 
 async def test_tg_generate_text_with_media(mock_manager, fake_redis, monkeypatch):
