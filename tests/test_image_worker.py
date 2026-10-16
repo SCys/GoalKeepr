@@ -357,3 +357,44 @@ async def test_image_handler_enqueues_task_with_reply_id(mock_manager, fake_redi
     assert task.msg.reply_message_id == 555
     assert task.status == "queued"
     assert task.prompt == "优化后的提示词"
+
+
+# ---- 优化器拒绝文案兜底 ----
+
+
+class TestOptimizeRefusal:
+    def test_looks_like_refusal(self):
+        assert image_mod.looks_like_refusal("抱歉，我无法生成涉及未成年人性化内容的提示词。")
+        assert image_mod.looks_like_refusal("Sorry, I cannot help with that.")
+        assert image_mod.looks_like_refusal("长" * 900)  # 超长视为解释/拒绝长文
+        assert not image_mod.looks_like_refusal("一只橘猫趴在窗台，午后阳光，电影感")
+        assert not image_mod.looks_like_refusal("a cat on the moon, cinematic lighting")
+
+    async def test_refusal_falls_back_to_original(self, monkeypatch):
+        """所有模型都输出拒绝文案时，必须原文提交（回归：拒绝文案曾被当提示词提交 ComfyUI）。"""
+        monkeypatch.setattr(
+            image_mod, "chat_completions",
+            AsyncMock(return_value="抱歉，我无法生成涉及未成年人性化内容或违反安全政策的提示词。"),
+        )
+
+        optimized, reply = await image_mod.PromptProcessor.optimize_prompt("童颜巨乳")
+
+        assert optimized == "童颜巨乳"
+        assert reply == "童颜巨乳"
+
+    async def test_refusal_tries_next_model(self, monkeypatch):
+        """第一个模型拒绝时尝试 fallback 模型。"""
+        calls = []
+
+        async def picky(messages, model_name=None):
+            calls.append(model_name)
+            if model_name == "simple":
+                return "抱歉，我无法处理这个描述。"
+            return "一只橘猫趴在窗台，午后阳光"
+
+        monkeypatch.setattr(image_mod, "chat_completions", picky)
+
+        optimized, _ = await image_mod.PromptProcessor.optimize_prompt("橘猫")
+
+        assert optimized == "一只橘猫趴在窗台，午后阳光"
+        assert calls == ["simple", "deepseek-flash"]

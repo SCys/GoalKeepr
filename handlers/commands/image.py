@@ -77,8 +77,22 @@ IMAGE_OPTIMIZE_PROMPT = """你是文生图提示词优化专家。用户给你�
 3. 用连贯的自然语言短段落描述，不要标签堆砌，不要负面词（负面词由工作流单独处理），不要任何参数（如 --ar、steps、cfg）。
 4. 长度控制在 100 字（词）以内，信息密度优先，不写废话。
 5. 只输出优化后的提示词本身：不要解释、不要引号、不要前后缀、不要换行标题。
+6. 无论任何原因无法优化（包括内容敏感、描述不清、你不愿意处理），都必须**原样输出用户的原始输入**，一个字都不要改。绝对禁止输出道歉、拒绝、解释或建议。
 
-**输出格式**：仅输出优化后的提示词。"""
+**输出格式**：仅输出优化后的提示词，或原样输出用户输入。"""
+
+
+# 优化结果的 sanity check：LLM 可能无视指令输出拒绝/解释文案，这类输出绝不能当提示词提交
+REFUSAL_MARKERS = ("抱歉", "无法", "不能", "sorry", "cannot", "can't", "unable", "i'm afraid")
+OPTIMIZED_MAX_LEN = 800  # 优化要求 100 字以内，超过 800 字符基本判定为解释/拒绝长文
+
+
+def looks_like_refusal(text: str) -> bool:
+    """检测 LLM 输出是否是拒绝/解释文案而非提示词。"""
+    t = text.strip().lower()
+    if len(t) > OPTIMIZED_MAX_LEN:
+        return True
+    return any(m in t for m in REFUSAL_MARKERS)
 
 
 def _is_valid_size(size: str) -> bool:
@@ -673,7 +687,7 @@ class PromptProcessor:
 
     @staticmethod
     async def optimize_prompt(prompt: str) -> Tuple[str, str]:
-        """优化提示词"""
+        """优化提示词。LLM 输出拒绝/解释文案时换下一个模型，全部无效则原文提交。"""
         reply_content = prompt
 
         if "," in prompt:
@@ -688,12 +702,14 @@ class PromptProcessor:
                     ],
                     model_name=model,
                 )
-                if optimized_prompt:
+                if optimized_prompt and not looks_like_refusal(optimized_prompt):
                     logger.info(f"Prompt optimized by {model}: {prompt} => {optimized_prompt}")
 
                     prompt = optimized_prompt
                     reply_content = prompt
                     break
+
+                logger.warning(f"Prompt optimization by {model} returned refusal/invalid text, trying next")
 
             except Exception as e:
                 logger.warning(f"Prompt optimization failed: {e}")
