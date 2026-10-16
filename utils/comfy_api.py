@@ -391,23 +391,25 @@ async def job_status(endpoint: str, job_id: str) -> Optional[Dict[str, Any]]:
 
         # 如果不在历史记录中，检查队列
         async with session.get(f"{endpoint}/queue", timeout=DEFAULT_TIMEOUT) as response:
-            if response.status == 200:
-                queue_data = await response.json()
+            if response.status != 200:
+                # 查询失败 ≠ 任务丢失：必须走 ComfyAPIError 让调用方用 poll_errors 宽限重试，
+                # 否则一次瞬时 500/超时就会误杀健康任务
+                raise ComfyAPIError(f"获取队列状态失败: HTTP {response.status}")
 
-                # 检查正在运行的队列
-                # item format: [prompt_number, prompt_id, prompt, extra_prompt_data, client_id]
-                for item in queue_data.get("queue_running", []):
-                    if len(item) > 1 and item[1] == job_id:
-                        logger.info(f"任务 {job_id} 正在运行。")
-                        return {"status": "running", "position": 0, "data": item}
+            queue_data = await response.json()
 
-                # 检查待处理的队列
-                for idx, item in enumerate(queue_data.get("queue_pending", [])):
-                    if len(item) > 1 and item[1] == job_id:
-                        logger.info(f"任务 {job_id} 正在等待。")
-                        return {"status": "pending", "position": idx + 1, "data": item}
-            else:
-                logger.warning(f"获取队列状态失败: HTTP {response.status}")
+            # 检查正在运行的队列
+            # item format: [prompt_number, prompt_id, prompt, extra_prompt_data, client_id]
+            for item in queue_data.get("queue_running", []):
+                if len(item) > 1 and item[1] == job_id:
+                    logger.info(f"任务 {job_id} 正在运行。")
+                    return {"status": "running", "position": 0, "data": item}
+
+            # 检查待处理的队列
+            for idx, item in enumerate(queue_data.get("queue_pending", [])):
+                if len(item) > 1 and item[1] == job_id:
+                    logger.info(f"任务 {job_id} 正在等待。")
+                    return {"status": "pending", "position": idx + 1, "data": item}
 
             logger.info(f"任务 {job_id} 在历史记录或当前队列中未找到。")
             return {"status": "not_found", "data": {}}
