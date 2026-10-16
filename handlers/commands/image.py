@@ -173,7 +173,7 @@ class Task:
         """只匹配任务键 image:<uuid>，排除 image:lock:* / image:img:* 等内部键。"""
         k = key.decode() if isinstance(key, bytes) else str(key)
         sub = k[len(REDIS_KEY_PREFIX):]
-        return not sub.startswith(("lock:", "img:"))
+        return not sub.startswith(("lock:", "img:", "done:"))
 
     @staticmethod
     async def all_tasks(rdb) -> List["Task"]:
@@ -896,8 +896,10 @@ async def process_task(task: Task):
                 task.status = "completed"
 
             # failed 终态的任务已在 fail_task 中出队，不能再写回 Redis，
-            # 否则下个轮询周期会复活成僵尸任务（not_found 无限循环的成因）
-            if task.status != "failed":
+            # 否则下个轮询周期会复活成僵尸任务（not_found 无限循环的成因）；
+            # delivering 同理：投递由 dispatcher 异步收尾（finalize 会删键），
+            # 这里回写会和删除竞态，复活成僵尸导致同一张图重复投递
+            if task.status not in ("failed", "delivering"):
                 await rdb.set(f"{REDIS_KEY_PREFIX}{task.task_id}", dumps(task))
 
         except Exception as e:
@@ -1166,6 +1168,13 @@ async def handle_delivering_task(task: Task, rdb, prefix: str) -> None:
     if dispatcher.is_delivering(task.task_id):
         return
 
+    # 墓碑检查：已投递完成的任务若因竞态复活（worker 旧副本回写），
+    # 直接出队，绝不能二次投递同一张图
+    if await rdb.exists(f"{REDIS_KEY_PREFIX}done:{task.task_id}"):
+        logger.info(f"{prefix} task {task.task_id} already delivered (tombstone), dequeuing zombie")
+        await task.dequeue_task(rdb)
+        return
+
     img_key = f"{REDIS_KEY_PREFIX}img:{task.task_id}"
     if not await rdb.exists(img_key):
         filename = task.options.get("image_filename")
@@ -1187,9 +1196,11 @@ async def handle_delivering_task(task: Task, rdb, prefix: str) -> None:
 
 
 async def finalize_delivery(task: Task, rdb) -> None:
-    """投递成功收尾：删进度消息、出队、清理进度快照。"""
+    """投递成功收尾：留墓碑、删进度消息、出队、清理进度快照。"""
     cost = (datetime.now() - datetime.fromtimestamp(task.created_at)).total_seconds()
     logger.info(f"chat {task.msg.chat_id} task {task.task_id} delivered, cost {cost:.1f}s")
+    # 墓碑先于出队写入：任何路径复活的僵尸 delivering 任务都能被识别并直接出队
+    await rdb.set(f"{REDIS_KEY_PREFIX}done:{task.task_id}", "1", ex=IMG_BYTES_TTL)
     await dispatcher.submit_delete(task.msg.chat_id, task.msg.reply_message_id)
     await task.dequeue_task(rdb)
     await rdb.delete(f"{REDIS_KEY_PREFIX}img:{task.task_id}")

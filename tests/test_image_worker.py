@@ -398,3 +398,52 @@ class TestOptimizeRefusal:
 
         assert optimized == "一只橘猫趴在窗台，午后阳光"
         assert calls == ["simple", "deepseek-flash"]
+
+
+# ---- 投递墓碑：僵尸 delivering 任务不得重复发图 ----
+
+
+async def test_delivered_tombstone_blocks_zombie_redelivery(mock_manager, fake_redis, fake_dispatcher):
+    """已有 done 墓碑的 delivering 任务直接出队，不进入投递流程。
+
+    回归：finalize_delivery 删键与 worker 旧副本回写存在竞态，复活的僵尸
+    任务会从 ComfyUI 重下载图片并重复投递（同一张图发多次）。
+    """
+    mock_manager.config["sd_api"] = {"endpoint": "http://comfy"}
+
+    task = make_task()
+    task.status = "delivering"
+    task.options["image_filename"] = "a.png"
+    await task.enqueue_task(fake_redis)
+    await fake_redis.set(f"image:done:{task.task_id}", "1", ex=3600)
+
+    await image_mod.process_task(task)
+
+    assert not await fake_redis.exists(f"image:{task.task_id}")
+    fake_dispatcher.submit_delivery.assert_not_called()
+
+
+async def test_finalize_delivery_writes_tombstone(mock_manager, fake_redis, fake_dispatcher):
+    """投递成功收尾必须留下墓碑并清理任务与图片字节。"""
+    task = make_task()
+    await task.enqueue_task(fake_redis)
+    await fake_redis.set(f"image:img:{task.task_id}", b"\x89PNG-binary")
+
+    await image_mod.finalize_delivery(task, fake_redis)
+
+    assert await fake_redis.exists(f"image:done:{task.task_id}")
+    assert not await fake_redis.exists(f"image:{task.task_id}")
+    assert not await fake_redis.exists(f"image:img:{task.task_id}")
+    fake_dispatcher.submit_delete.assert_called_once()
+
+
+async def test_all_tasks_ignores_done_keys(fake_redis):
+    """done: 墓碑键不得混入任务队列解析。"""
+    task = make_task()
+    await task.enqueue_task(fake_redis)
+    await fake_redis.set(f"image:done:{task.task_id}", "1", ex=3600)
+
+    tasks = await image_mod.Task.all_tasks(fake_redis)
+
+    assert len(tasks) == 1
+    assert await fake_redis.exists(f"image:done:{task.task_id}")
