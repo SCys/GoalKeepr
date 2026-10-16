@@ -166,13 +166,13 @@ WORKFLOWS = {
         "6": {
             "inputs": {
                 "text": "",
-                "clip": ["81", 0],
+                "clip": ["82", 0],
             },
             "class_type": "CLIPTextEncode",
             "_meta": {"title": "CLIP Text Encode (Positive Prompt)"},
         },
         "7": {
-            "inputs": {"text": "低质量", "clip": ["81", 0]},
+            "inputs": {"text": "低质量", "clip": ["82", 0]},
             "class_type": "CLIPTextEncode",
             "_meta": {"title": "CLIP Text Encode (Negative Prompt)"},
         },
@@ -230,10 +230,10 @@ WORKFLOWS = {
             "class_type": "EmptySD3LatentImage",
             "_meta": {"title": "EmptySD3LatentImage"},
         },
-        "81": {
-            "inputs": {"clip_name": "qwen3_4b_fp8_scaled.safetensors", "type": "stable_diffusion", "device": "default"},
-            "class_type": "CLIPLoader",
-            "_meta": {"title": "Load CLIP"},
+        "82": {
+            "inputs": {"clip_name": "zimage-engineer-v6-dhq-Q4_K_M.gguf", "type": "stable_diffusion"},
+            "class_type": "CLIPLoaderGGUF",
+            "_meta": {"title": "CLIPLoader (GGUF)"},
         },
     },
     "krea": {
