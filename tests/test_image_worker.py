@@ -323,3 +323,37 @@ class TestParseOptionsRaw:
         assert options["raw"] is True
         assert options["model"] == "krea"
         assert options["size"] == "768x768"
+
+
+# ---- /image 命令 handler：入队必须带正确的状态消息 id ----
+
+
+async def test_image_handler_enqueues_task_with_reply_id(mock_manager, fake_redis, monkeypatch):
+    """任务入队时 reply_message_id 必须是排队消息的 id。
+
+    回归：旧流程"入队 → 回复 → 二次入队"存在竞态，worker 读到
+    reply_message_id=-1 的旧版本会覆盖回 Redis，状态消息永远卡在"排队中"。
+    """
+    from types import SimpleNamespace as NS
+
+    mock_manager.config["image"] = {"users": "2002", "groups": ""}
+    monkeypatch.setattr(image_mod, "chat_completions", AsyncMock(return_value="优化后的提示词"))
+
+    event = NS(
+        chat_id=1001,
+        id=10,
+        text="/image 橘猫",
+        get_chat=AsyncMock(return_value=NS(title="TestChat")),
+        get_sender=AsyncMock(return_value=NS(id=2002, username="tester", first_name="tester", last_name=None)),
+        get_reply_message=AsyncMock(return_value=None),
+        reply=AsyncMock(return_value=NS(id=555)),
+    )
+
+    await image_mod.image(event)
+
+    tasks = await image_mod.Task.all_tasks(fake_redis)
+    assert len(tasks) == 1
+    task = tasks[0]
+    assert task.msg.reply_message_id == 555
+    assert task.status == "queued"
+    assert task.prompt == "优化后的提示词"

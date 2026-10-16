@@ -776,10 +776,7 @@ async def image(event: events.NewMessage.Event):
         else:
             prompt, reply_content = await PromptProcessor.optimize_prompt(prompt)
 
-        # 创建任务
-        reply_msg = await event.get_reply_message()
-        reply_id = reply_msg.id if reply_msg else -1
-
+        # 创建任务（reply_message_id 先占位 -1）
         task = Task(
             msg=TaskMessage(
                 chat_id=event.chat_id,
@@ -787,7 +784,7 @@ async def image(event: events.NewMessage.Event):
                 user_id=sender.id,
                 user_name=sender_name,
                 message_id=event.id,
-                reply_message_id=reply_id,
+                reply_message_id=-1,
                 reply_content=reply_content,
             ),
             prompt=prompt,
@@ -798,15 +795,18 @@ async def image(event: events.NewMessage.Event):
             task_id=str(uuid.uuid4()),
         )
 
-        # 将任务加入队列
-        await task.enqueue_task(rdb)
-
-        # 发送排队通知并更新任务
+        # 先回复排队消息拿到 msg_id，再一次性入队。
+        # 之前是"入队 → 回复 → 二次入队"，worker 可能在间隙读到
+        # reply_message_id=-1 的旧版本并覆盖回去，导致状态消息永远卡在
+        # "排队中"、完成后也删不掉（和完成图并存成两段回复）。
         reply = await event.reply(render_status_message(task, "queued", position=task_size + 1))
         task.msg.reply_message_id = reply.id
-
-        # 更新任务到Redis，确保reply_message_id被保存
-        await task.enqueue_task(rdb)
+        try:
+            await task.enqueue_task(rdb)
+        except ImageGenerationError:
+            # 入队失败时把刚发的排队消息删掉，避免留下永远卡住的"排队中"
+            await manager.delete_message(event.chat_id, reply.id)
+            raise
 
         logger.info(f"{prefix} task is queued, size is {task_size + 1}")
     except ImageGenerationError as e:
