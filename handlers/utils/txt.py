@@ -19,34 +19,29 @@ class ModelDescription:
     name: str
     input_length: int
     output_length: int
-    rate_minute: float
-    rate_daily: float
+    # 除文本外支持的输入模态（/chat 附件会用得到）：image / video
+    media: tuple = ("image", "video")
 
 
 BASIC_SYSTEM_PROMPT = "You are a helpful assistant in a Telegram chat. Keep responses concise and useful."
 CONVERSATION_TTL = 1800
-DEFAULT_MODEL = "step-3.7-flash"
+DEFAULT_MODEL = "gemini-3.8-flash"
+# 内置预设模型：均支持图文与视频输入，统一 128k 输入 / 32k 输出
 SUPPORTED_MODELS = {
-    "gemini-3.6-flash": ModelDescription(
-        name="Gemini 3.6 Flash",
-        input_length=1048576,
-        output_length=65535,
-        rate_minute=10,
-        rate_daily=1500,
+    "gemini-3.8-flash": ModelDescription(
+        name="Gemini 3.8 Flash",
+        input_length=128000,
+        output_length=32768,
     ),
-    "gemini-3.1-flash-lite": ModelDescription(
-        name="Gemini 3.1 Flash Lite",
-        input_length=1048576,
-        output_length=65535,
-        rate_minute=10,
-        rate_daily=4500,
+    "deepseek-flash": ModelDescription(
+        name="DeepSeek Flash",
+        input_length=128000,
+        output_length=32768,
     ),
-    "step-3.7-flash": ModelDescription(
-        name="Gemini 3.7 Flash",
-        input_length=1048576,
-        output_length=65535,
-        rate_minute=10,
-        rate_daily=3500,
+    "qwen3.6-flash": ModelDescription(
+        name="Qwen 3.6 Flash",
+        input_length=128000,
+        output_length=32768,
     ),
 }
 
@@ -303,7 +298,18 @@ async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict
     raise ValueError("所有重试都失败了，请稍后重试")
 
 
-async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optional[str]:
+async def tg_generate_text(
+    chat_id: int,
+    member_id: int,
+    prompt: str,
+    media: Optional[List[tuple]] = None,
+) -> Optional[str]:
+    """生成 /chat 回复。
+
+    media: 可选的多模态附件 [(kind, data_url)]，kind 为 "image" / "video"，
+    data_url 形如 data:image/jpeg;base64,...。附件只进当次请求，
+    会话历史里以 [图片]/[视频] 占位（base64 落 Redis 会撑爆内存）。
+    """
     config = manager.config
 
     host = config["ai"]["proxy_host"]
@@ -316,8 +322,25 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
     # Basic fixed system prompt for the simplified 30min TTL session feature.
     # (No per-user/global overrides in the reset basic version.)
     prompt_system = BASIC_SYSTEM_PROMPT
+
+    # 历史/截断统一用纯文本；多模态 content 只在最终请求里替换最后一条用户消息
+    history_text = prompt
+    user_content: Union[str, list] = prompt
+    if media:
+        parts = [{"type": "text", "text": prompt}]
+        placeholders = []
+        for kind, data_url in media:
+            if kind == "video":
+                parts.append({"type": "video_url", "video_url": {"url": data_url}})
+                placeholders.append("[视频]")
+            else:
+                parts.append({"type": "image_url", "image_url": {"url": data_url}})
+                placeholders.append("[图片]")
+        user_content = parts
+        history_text = f"{prompt} {' '.join(placeholders)}".strip()
+
     chat_history = [
-        {"role": "user", "content": prompt},
+        {"role": "user", "content": history_text},
     ]
 
     # Always use the default model in the basic version (advanced per-user model selection removed).
@@ -326,9 +349,11 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
     model_desc = SUPPORTED_MODELS.get(model_name)
     if model_desc:
         model_input_length = model_desc.input_length
+        model_output_length = model_desc.output_length
         display_name = model_desc.name
     else:
         model_input_length = DEFAULT_INPUT_LENGTH
+        model_output_length = 4096  # 未知模型用保守输出上限
         display_name = model_name
         logger.info(f"chat_model '{model_name}' not listed in SUPPORTED_MODELS, using default input length {DEFAULT_INPUT_LENGTH} and raw name for display")
 
@@ -359,16 +384,21 @@ async def tg_generate_text(chat_id: int, member_id: int, prompt: str) -> Optiona
     if prompt_system:
         chat_history.insert(0, {"role": "system", "content": prompt_system})
 
+    # 请求消息：历史是纯文本；有附件时把最后一条用户消息换成多模态 content
+    request_messages = list(chat_history)
+    if media:
+        request_messages[-1] = {"role": "user", "content": user_content}
+
     # API request preparation
     url = f"{host}/v1/chat/completions"
     data = {
         "model": model_name,
-        "max_tokens": 4096,  # fixed reasonable output limit
-        "messages": chat_history,
+        "max_tokens": model_output_length,
+        "messages": request_messages,
     }
 
     # Log model usage information
-    logger.info(f"chat {chat_id} user {member_id} generating text with model {model_name} ({display_name})")
+    logger.info(f"chat {chat_id} user {member_id} generating text with model {model_name} ({display_name}), media={len(media or [])}")
 
     try:
         response_data = await _api_request(url, data, proxy_token)
