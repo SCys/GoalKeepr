@@ -69,24 +69,14 @@ SIZE_MAPPING = {
     "small": "768x768",
     "large": "1024x1280",
 }
-IMAGE_OPTIMIZE_PROMPT = """你是一个专为Flux.1 Dev模型设计的提示词优化专家。用户提供原始绘画描述后，你需要按以下规则优化并输出最终提示词：  
+IMAGE_OPTIMIZE_PROMPT = """你是文生图提示词优化专家。用户给你一句简短的绘画描述，你要把它改写成一条高质量提示词，直接交给图像生成模型（Z-Image Turbo / Krea / Flux）使用。
 
-1. **明确主体与细节**  
-- 添加具体特征（如服饰、材质、动作、表情），使用形容词强化画面感（例：*glowing neon lights, intricate lace details*）。  
-- 若涉及人物，需指定年龄、姿态、服装风格，并加入防止畸变的负面词（如*extra fingers, deformed hands*）。  
-
-2. **场景与风格强化**  
-- 补充环境细节（光线、季节、背景物体），指定艺术风格（*cinematic lighting, cyberpunk, Studio Ghibli*）。  
-- 若需文字生成，用*quotation marks*标注文本内容并描述排版（例：*chalk-written on a blackboard*）。  
-
-3. **技术参数适配**  
-- 推荐添加质量关键词（*ultra-detailed, 8K resolution, Unreal Engine render*）与镜头类型（*wide-angle, macro*）。  
-
-4. **逻辑与创意引导**  
-- 将抽象概念转化为具象元素（例：*"hope" → sunlight breaking through storm clouds*）。  
-- 若描述模糊，提供多选项（例：*"奇幻场景"可细化为"龙与城堡"或"外星森林"*）。  
-
-5. 仅输出英文的 Prompt，不要输出任何其他内容。
+规则：
+1. 保持用户的原始意图，不改变主体和核心内容；保持输入语言（中文输入输出中文，英文输入输出英文），不要翻译。
+2. 补全画面要素：主体细节（外貌、服饰、动作、表情、材质）、场景环境（光线、氛围、时间、背景）、构图与视角（特写 / 广角 / 俯视等）、艺术风格与质量词。
+3. 用连贯的自然语言短段落描述，不要标签堆砌，不要负面词（负面词由工作流单独处理），不要任何参数（如 --ar、steps、cfg）。
+4. 长度控制在 100 字（词）以内，信息密度优先，不写废话。
+5. 只输出优化后的提示词本身：不要解释、不要引号、不要前后缀、不要换行标题。
 
 **输出格式**：仅输出优化后的提示词。"""
 
@@ -670,6 +660,9 @@ class PromptProcessor:
                         options["cfg"] = max(1.0, min(MAX_CFG, cfg))
                     except ValueError:
                         logger.warning(f"Invalid cfg option: {opt}")
+                elif opt == "raw":
+                    # 跳过 LLM 提示词优化，原文直接提交
+                    options["raw"] = True
 
             logger.info(f"Parsed options: {options}, prompt: {prompt}")
             return prompt, options
@@ -776,11 +769,12 @@ async def image(event: events.NewMessage.Event):
         # 解析选项和优化提示词
         prompt, options = PromptProcessor.parse_options(raw_prompt)
 
-        if options.get("model", DEFAULT_MODEL) == "flux":
-            # LLM 提示词优化是为 Flux 设计的，turbo 类模型（krea/zimage）直接出图更快
-            prompt, reply_content = await PromptProcessor.optimize_prompt(prompt)
-        else:
+        # 默认先用 LLM（deepseek-flash 等）把描述优化成高质量提示词再提交；
+        # 专业用户可用 [raw] 选项跳过优化，或提示词含英文逗号时视为已细化、自动跳过
+        if options.get("raw"):
             reply_content = prompt
+        else:
+            prompt, reply_content = await PromptProcessor.optimize_prompt(prompt)
 
         # 创建任务
         reply_msg = await event.get_reply_message()

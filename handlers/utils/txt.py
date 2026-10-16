@@ -93,7 +93,8 @@ def get_image_optimize_models() -> list[str]:
                     return parts
     except Exception:
         pass
-    return ["deepseek-r1", "gemini-flash"]
+    # 默认优化模型：deepseek-flash 主力，其余预设模型作为 fallback
+    return ["deepseek-flash", "qwen3.6-flash", "gemini-3.8-flash"]
 
 
 async def _api_request(url: str, data: Dict[str, Any], proxy_token: str) -> Dict[str, Any]:

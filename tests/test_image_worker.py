@@ -260,3 +260,66 @@ class TestImagePermission:
         assert image_mod.PermissionManager.check_permission(123, -999, users, groups)
         assert image_mod.PermissionManager.check_permission(999, -1001085650365, users, groups)
         assert not image_mod.PermissionManager.check_permission(999, -100999, users, groups)
+
+
+# ---- /image 提示词优化 ----
+
+
+class TestPromptOptimize:
+    async def test_optimize_returns_llm_result(self, monkeypatch):
+        mock_chat = AsyncMock(return_value="一只橘猫趴在窗台，午后阳光，电影感")
+        monkeypatch.setattr(image_mod, "chat_completions", mock_chat)
+
+        optimized, reply = await image_mod.PromptProcessor.optimize_prompt("橘猫")
+
+        assert optimized == "一只橘猫趴在窗台，午后阳光，电影感"
+        assert reply == optimized
+        # 默认第一个模型是 deepseek-flash
+        assert mock_chat.call_args.kwargs["model_name"] == "deepseek-flash"
+        # system prompt 已换成通用版
+        sys_msg = mock_chat.call_args.args[0][0]["content"]
+        assert "文生图提示词优化专家" in sys_msg
+
+    async def test_optimize_skips_comma_prompts(self, monkeypatch):
+        """含英文逗号视为用户已细化，不调用 LLM。"""
+        mock_chat = AsyncMock()
+        monkeypatch.setattr(image_mod, "chat_completions", mock_chat)
+
+        optimized, _ = await image_mod.PromptProcessor.optimize_prompt("a cat, cinematic")
+
+        assert optimized == "a cat, cinematic"
+        mock_chat.assert_not_called()
+
+    async def test_optimize_falls_back_to_next_model(self, monkeypatch):
+        """第一个模型失败时依次尝试 fallback 模型，全失败返回原文。"""
+        calls = []
+
+        async def flaky(messages, model_name=None):
+            calls.append(model_name)
+            if model_name == "deepseek-flash":
+                raise RuntimeError("boom")
+            return "优化后"
+
+        monkeypatch.setattr(image_mod, "chat_completions", flaky)
+
+        optimized, _ = await image_mod.PromptProcessor.optimize_prompt("橘猫")
+
+        assert optimized == "优化后"
+        assert calls == ["deepseek-flash", "qwen3.6-flash"]
+
+
+class TestParseOptionsRaw:
+    def test_raw_option(self):
+        _, options = image_mod.PromptProcessor.parse_options("[raw] 橘猫")
+        assert options.get("raw") is True
+
+    def test_no_raw_by_default(self):
+        _, options = image_mod.PromptProcessor.parse_options("橘猫")
+        assert not options.get("raw")
+
+    def test_raw_with_other_options(self):
+        prompt, options = image_mod.PromptProcessor.parse_options("[raw model:krea size:small] a cat")
+        assert prompt == "a cat"
+        assert options["raw"] is True
+        assert options["model"] == "krea"
+        assert options["size"] == "768x768"
