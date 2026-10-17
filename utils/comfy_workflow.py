@@ -327,78 +327,172 @@ WORKFLOWS = {
             "_meta": {"title": "Load Checkpoint"},
         },
     },
-    "qwen":     {   '16': {   'inputs': {'width': ['17', 0], 'height': ['17', 1], 'batch_size': 1},
-                  'class_type': 'EmptySD3LatentImage',
-                  '_meta': {'title': 'EmptySD3LatentImage'}},
-        '17': {   'inputs': {   'megapixel': '0.6',
-                                'aspect_ratio': '9:16 (Slim Vertical)',
-                                'divisible_by': '64',
-                                'custom_ratio': False,
-                                'custom_aspect_ratio': '1:1'},
-                  'class_type': 'FluxResolutionNode',
-                  '_meta': {'title': 'Flux Resolution Calc'}},
-        '33': {   'inputs': {   'filename': '%time_%basemodelname_%seed',
-                                'path': 'qwen_image',
-                                'extension': 'webp',
-                                'lossless_webp': False,
-                                'quality_jpeg_or_webp': 85,
-                                'optimize_png': False,
-                                'embed_workflow': True,
-                                'save_workflow_as_json': False,
-                                'counter': 0,
-                                'time_format': '%Y-%m-%d-%H%M%S',
-                                'show_preview': True,
-                                'images': ['15:7', 0]},
-                  'class_type': 'Image Saver Simple',
-                  '_meta': {'title': 'Image Saver Simple'}},
-        '15:3': {   'inputs': {'vae_name': 'qwen_image_2.1_vae_bf16.safetensors'},
-                    'class_type': 'VAELoader',
-                    '_meta': {'title': 'Load VAE'}},
-        '15:4': {   'inputs': {   'prompt': '1girl, anime visual novel style, standing on a train '
-                                            'station platform at dusk, sunset glow, golden hour, long '
-                                            'shadows, windy atmosphere, school uniform with blazer and '
-                                            'plaid skirt, holding an umbrella against the light '
-                                            'drizzle, puddle reflections on the ground, urban '
-                                            'cityscape background, lens flare, film grain',
-                                  'negative_prompt': '',
-                                  'resolution': 1632,
-                                  'clip': ['15:18', 0]},
-                    'class_type': 'TextEncodeQwenImage21',
-                    '_meta': {'title': 'Text Encode Qwen Image 2.1'}},
-        '15:6': {   'inputs': {   'seed': 309574049933007,
-                                  'steps': 6,
-                                  'cfg': 1,
-                                  'sampler_name': 'er_sde',
-                                  'scheduler': 'simple',
-                                  'denoise': 1,
-                                  'model': ['15:29', 0],
-                                  'positive': ['15:4', 0],
-                                  'negative': ['15:4', 1],
-                                  'latent_image': ['16', 0]},
-                    'class_type': 'KSampler',
-                    '_meta': {'title': 'KSampler'}},
-        '15:7': {   'inputs': {'samples': ['15:6', 0], 'vae': ['15:3', 0]},
-                    'class_type': 'VAEDecode',
-                    '_meta': {'title': 'VAE Decode'}},
-        '15:18': {   'inputs': {'clip_name': 'qwen3vl_8b_heretic-Q4_K_M.gguf', 'type': 'qwen_image'},
-                     'class_type': 'CLIPLoaderGGUF',
-                     '_meta': {'title': 'CLIPLoader (GGUF)'}},
-        '15:29': {   'inputs': {   'lora_name': 'Viggle_Turbo_6step_r128.safetensors',
-                                   'strength_model': 1,
-                                   'strength_clip': 1,
-                                   'model': ['15:30', 0],
-                                   'clip': ['15:18', 0]},
-                     'class_type': 'LoraLoader',
-                     '_meta': {'title': 'Load LoRA (Model and CLIP)'}},
-        '15:30': {   'inputs': {   'model_name': 'NoctQ_V4_int8_convrot.safetensors',
-                                   'weight_dtype': 'default',
-                                   'compute_dtype': 'default',
-                                   'patch_cublaslinear': True,
-                                   'sage_attention': 'auto',
-                                   'enable_fp16_accumulation': True},
-                     'class_type': 'DiffusionModelLoaderKJ',
-                     '_meta': {'title': 'Diffusion Model Loader KJ'}},
-        '15:32': {   'inputs': {'unet_name': 'qwen_image_2.1_Q8_0.gguf'},
-                     'class_type': 'UnetLoaderGGUF',
-                     '_meta': {'title': 'Unet Loader (GGUF)'}}},
+    "qwen":     {
+        "16": {
+            "inputs": {
+                "width": [
+                    "17",
+                    0
+                ],
+                "height": [
+                    "17",
+                    1
+                ],
+                "batch_size": 1
+            },
+            "class_type": "EmptySD3LatentImage",
+            "_meta": {
+                "title": "EmptySD3LatentImage"
+            }
+        },
+        "17": {
+            "inputs": {
+                "megapixel": "0.6",
+                "aspect_ratio": "9:16 (Slim Vertical)",
+                "divisible_by": "64",
+                "custom_ratio": False,
+                "custom_aspect_ratio": "1:1"
+            },
+            "class_type": "FluxResolutionNode",
+            "_meta": {
+                "title": "Flux Resolution Calc"
+            }
+        },
+        "33": {
+            "inputs": {
+                "filename": "%time_%basemodelname_%seed",
+                "path": "qwen_image",
+                "extension": "webp",
+                "lossless_webp": False,
+                "quality_jpeg_or_webp": 85,
+                "optimize_png": False,
+                "embed_workflow": True,
+                "save_workflow_as_json": False,
+                "counter": 0,
+                "time_format": "%Y-%m-%d-%H%M%S",
+                "show_preview": True,
+                "images": [
+                    "15:7",
+                    0
+                ]
+            },
+            "class_type": "Image Saver Simple",
+            "_meta": {
+                "title": "Image Saver Simple"
+            }
+        },
+        "15:3": {
+            "inputs": {
+                "vae_name": "qwen_image_2.1_vae_bf16.safetensors"
+            },
+            "class_type": "VAELoader",
+            "_meta": {
+                "title": "Load VAE"
+            }
+        },
+        "15:4": {
+            "inputs": {
+                "prompt": "一头巨象腾空翱翔于金色云海之上，皮肤纹理清晰，双耳舒展，眼神温和，周身环绕流动光晕与飘带，逆光散射，超现实奇幻风格，广角仰视，精致细节，8k画质。\n",
+                "negative_prompt": "",
+                "resolution": 1632,
+                "clip": [
+                    "15:29",
+                    1
+                ]
+            },
+            "class_type": "TextEncodeQwenImage21",
+            "_meta": {
+                "title": "Text Encode Qwen Image 2.1"
+            }
+        },
+        "15:6": {
+            "inputs": {
+                "seed": 980162501076260,
+                "steps": 6,
+                "cfg": 1,
+                "sampler_name": "er_sde",
+                "scheduler": "simple",
+                "denoise": 1,
+                "model": [
+                    "15:29",
+                    0
+                ],
+                "positive": [
+                    "15:4",
+                    0
+                ],
+                "negative": [
+                    "15:4",
+                    1
+                ],
+                "latent_image": [
+                    "16",
+                    0
+                ]
+            },
+            "class_type": "KSampler",
+            "_meta": {
+                "title": "KSampler"
+            }
+        },
+        "15:7": {
+            "inputs": {
+                "samples": [
+                    "15:6",
+                    0
+                ],
+                "vae": [
+                    "15:3",
+                    0
+                ]
+            },
+            "class_type": "VAEDecode",
+            "_meta": {
+                "title": "VAE Decode"
+            }
+        },
+        "15:18": {
+            "inputs": {
+                "clip_name": "qwen3vl_8b_heretic-Q4_K_M.gguf",
+                "type": "qwen_image"
+            },
+            "class_type": "CLIPLoaderGGUF",
+            "_meta": {
+                "title": "CLIPLoader (GGUF)"
+            }
+        },
+        "15:29": {
+            "inputs": {
+                "lora_name": "Viggle_Turbo_6step_r128.safetensors",
+                "strength_model": 1,
+                "strength_clip": 1,
+                "model": [
+                    "15:30",
+                    0
+                ],
+                "clip": [
+                    "15:18",
+                    0
+                ]
+            },
+            "class_type": "LoraLoader",
+            "_meta": {
+                "title": "Load LoRA (Model and CLIP)"
+            }
+        },
+        "15:30": {
+            "inputs": {
+                "model_name": "NoctQ_V4_int8_convrot.safetensors",
+                "weight_dtype": "default",
+                "compute_dtype": "default",
+                "patch_cublaslinear": True,
+                "sage_attention": "auto",
+                "enable_fp16_accumulation": True
+            },
+            "class_type": "DiffusionModelLoaderKJ",
+            "_meta": {
+                "title": "Diffusion Model Loader KJ"
+            }
+        }
+    },
 }
