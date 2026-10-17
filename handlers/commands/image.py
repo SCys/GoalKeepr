@@ -831,7 +831,12 @@ class PromptProcessor:
         return prompt, reply_content
 
 
-@manager.register("message", pattern=r"(?i)^/image(?: .*)?$")
+# /image 命令匹配：[\s\S] 兼容多行提示词（. 不匹配换行，长文本会被静默忽略），
+# 支持 @mention 形式（群内自动补全常带出 @bot 后缀）
+IMAGE_CMD_PATTERN = r"(?i)^/image(?:@\w+)?(?:\s[\s\S]*)?$"
+
+
+@manager.register("message", pattern=IMAGE_CMD_PATTERN)
 async def image(event: events.NewMessage.Event):
     """处理图像生成命令"""
     chat = await event.get_chat()

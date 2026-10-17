@@ -1,6 +1,7 @@
 """LLM 提示词优化的反馈时序与超时兜底回归测试。"""
 
 import asyncio
+import re
 from types import SimpleNamespace as NS
 from unittest.mock import AsyncMock
 
@@ -80,3 +81,43 @@ def test_queued_render_with_optimizing_note():
 
     text = image_mod.render_status_message(make_task(), "queued", position=1)
     assert "正在优化提示词" not in text
+
+
+class TestImageCmdPattern:
+    """/image 注册正则：多行提示词与 @mention 必须命中。
+
+    回归：旧 pattern `(?i)^/image(?: .*)?$` 的 `.` 不匹配换行，
+    多行长文本命令被静默忽略（handler 根本没触发）。
+    """
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "/image 橘猫",
+            "/image",
+            "/image@muteditbot 橘猫",
+            "/image [mp:1.0] 橘猫",
+            "/image 一只橘猫\n趴在窗台上\n阳光洒落",  # 多行长文本
+            "/image 第一行\n\n第三行",
+            "/IMAGE 大写也可以",
+        ],
+    )
+    def test_pattern_matches(self, text):
+        assert re.match(image_mod.IMAGE_CMD_PATTERN, text)
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "/imageabc 橘猫",   # 前缀粘连不命中
+            "/img 橘猫",        # 其他命令不命中
+            "前缀 /image 橘猫",  # 命令必须在行首
+        ],
+    )
+    def test_pattern_rejects(self, text):
+        assert not re.match(image_mod.IMAGE_CMD_PATTERN, text)
+
+    def test_multiline_prompt_extracted(self):
+        """多行提示词经 strip_text_prefix 后保留换行内容。"""
+        from handlers.utils import strip_text_prefix
+
+        assert strip_text_prefix("/image 一只橘猫\n趴在窗台上") == "一只橘猫\n趴在窗台上"
