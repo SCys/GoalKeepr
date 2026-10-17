@@ -93,6 +93,7 @@ IMAGE_OPTIMIZE_PROMPT = """你是文生图提示词优化专家。用户给你�
 # 优化结果的 sanity check：LLM 可能无视指令输出拒绝/解释文案，这类输出绝不能当提示词提交
 REFUSAL_MARKERS = ("抱歉", "无法", "不能", "sorry", "cannot", "can't", "unable", "i'm afraid")
 OPTIMIZED_MAX_LEN = 800  # 优化要求 100 字以内，超过 800 字符基本判定为解释/拒绝长文
+OPTIMIZE_TIMEOUT = 30  # 单个优化模型的调用超时（秒），超时换下一个模型
 
 
 def looks_like_refusal(text: str) -> bool:
@@ -514,6 +515,7 @@ def render_status_message(
     elapsed: Optional[float] = None,
     error: Optional[str] = None,
     degraded: bool = False,
+    optimizing: bool = False,
 ) -> str:
     """渲染任务状态消息。phase: queued/submitted/running/delivering/failed/expired"""
     model = task.options.get("model", DEFAULT_MODEL)
@@ -528,6 +530,9 @@ def render_status_message(
     if phase == "queued":
         head = f"⏳ 图像生成排队中 · 第 {position} 位" if position else "⏳ 图像生成排队中"
         en = f"> Queued, position {position}. Please wait." if position else "> Queued. Please wait."
+        if optimizing:
+            head += "\n✨ 正在优化提示词…"
+            en = "> Optimizing prompt with LLM first..."
     elif phase == "submitted":
         head = f"📤 已提交，等待 GPU 调度 · ComfyUI 队列第 {position} 位" if position else "📤 已提交，等待 GPU 调度"
         en = "> Submitted, waiting for GPU."
@@ -787,7 +792,11 @@ class PromptProcessor:
 
     @staticmethod
     async def optimize_prompt(prompt: str) -> Tuple[str, str]:
-        """优化提示词。LLM 输出拒绝/解释文案时换下一个模型，全部无效则原文提交。"""
+        """优化提示词。LLM 输出拒绝/解释文案时换下一个模型，全部无效则原文提交。
+
+        单模型 OPTIMIZE_TIMEOUT 秒超时：chat_completions 的 HTTP 超时上限是 180s
+        且带 3 次重试，不加这个兜底，一个慢模型就能让用户等好几分钟。
+        """
         reply_content = prompt
 
         if "," in prompt:
@@ -795,12 +804,15 @@ class PromptProcessor:
 
         for model in get_image_optimize_models():
             try:
-                optimized_prompt = await chat_completions(
-                    [
-                        {"role": "system", "content": IMAGE_OPTIMIZE_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ],
-                    model_name=model,
+                optimized_prompt = await asyncio.wait_for(
+                    chat_completions(
+                        [
+                            {"role": "system", "content": IMAGE_OPTIMIZE_PROMPT},
+                            {"role": "user", "content": prompt},
+                        ],
+                        model_name=model,
+                    ),
+                    timeout=OPTIMIZE_TIMEOUT,
                 )
                 if optimized_prompt and not looks_like_refusal(optimized_prompt):
                     logger.info(f"Prompt optimized by {model}: {prompt} => {optimized_prompt}")
@@ -885,14 +897,7 @@ async def image(event: events.NewMessage.Event):
         # 解析选项和优化提示词
         prompt, options = PromptProcessor.parse_options(raw_prompt)
 
-        # 默认先用 LLM（deepseek-flash 等）把描述优化成高质量提示词再提交；
-        # 专业用户可用 [raw] 选项跳过优化，或提示词含英文逗号时视为已细化、自动跳过
-        if options.get("raw"):
-            reply_content = prompt
-        else:
-            prompt, reply_content = await PromptProcessor.optimize_prompt(prompt)
-
-        # 创建任务（reply_message_id 先占位 -1）
+        # 创建任务（reply_content 先用原始 prompt 占位，优化完成后更新）
         task = Task(
             msg=TaskMessage(
                 chat_id=event.chat_id,
@@ -901,7 +906,7 @@ async def image(event: events.NewMessage.Event):
                 user_name=sender_name,
                 message_id=event.id,
                 reply_message_id=-1,
-                reply_content=reply_content,
+                reply_content=prompt,
             ),
             prompt=prompt,
             options=options,
@@ -911,12 +916,23 @@ async def image(event: events.NewMessage.Event):
             task_id=str(uuid.uuid4()),
         )
 
-        # 先回复排队消息拿到 msg_id，再一次性入队。
-        # 之前是"入队 → 回复 → 二次入队"，worker 可能在间隙读到
-        # reply_message_id=-1 的旧版本并覆盖回去，导致状态消息永远卡在
-        # "排队中"、完成后也删不掉（和完成图并存成两段回复）。
-        reply = await event.reply(render_status_message(task, "queued", position=task_size + 1))
+        # 先回复排队消息拿到 msg_id，再做 LLM 优化、最后一次性入队。
+        # - 优化可能耗时数十秒（LLM 超时上限 180s），必须先给用户即时反馈，
+        #   否则命令后长时间毫无动静（实测私聊等了 71s）；
+        # - 入队仍只发生一次：worker 不会在间隙读到 reply_message_id=-1 的旧版本
+        #   覆盖回去（状态消息卡"排队中"、完成后和完成图并存两段回复的回归）。
+        reply = await event.reply(
+            render_status_message(task, "queued", position=task_size + 1, optimizing=not options.get("raw"))
+        )
         task.msg.reply_message_id = reply.id
+
+        # 默认先用 LLM（simple 等）把描述优化成高质量提示词再提交；
+        # 专业用户可用 [raw] 选项跳过优化，或提示词含英文逗号时视为已细化、自动跳过
+        if not options.get("raw"):
+            prompt, reply_content = await PromptProcessor.optimize_prompt(prompt)
+            task.prompt = prompt
+            task.msg.reply_content = reply_content
+
         try:
             await task.enqueue_task(rdb)
         except ImageGenerationError:
