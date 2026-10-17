@@ -51,3 +51,23 @@ async def test_send_photo_propagates_flood_wait():
     except FloodWaitError:
         return
     raise AssertionError("FloodWaitError should propagate")
+
+
+async def test_send_photo_webp_converted_to_png():
+    """webp 字节先转 PNG 再以图片发送（Telegram 不把 webp 当照片显示）。"""
+    from PIL import Image
+
+    # 造一张真实的 2x2 webp
+    src = io.BytesIO()
+    Image.new("RGB", (2, 2), (255, 0, 0)).save(src, format="WEBP")
+    webp = src.getvalue()
+    assert webp[:4] == b"RIFF" and webp[8:12] == b"WEBP"
+
+    mgr = _make_manager()
+    msg_id = await mgr.send_photo(123, webp)
+
+    assert msg_id == 42
+    file_arg = mgr.client.send_file.call_args[0][1]
+    assert file_arg.name == "image.png"
+    # 内容确实已转成 PNG
+    assert file_arg.getvalue()[:8] == b"\x89PNG\r\n\x1a\n"

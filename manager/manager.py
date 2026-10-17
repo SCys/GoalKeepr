@@ -612,8 +612,16 @@ class Manager:
 
         Telethon 靠文件名后缀判断是否为图片，裸 bytes 会被当成 document 发送，
         因此包装成带 .png/.jpg 后缀名的 BytesIO（按魔数识别，未知一律按 png）。
+        webp（RIFF....WEBP）Telegram 不按图片显示，先用 Pillow 转成 PNG 再发。
         """
         try:
+            if photo[:4] == b"RIFF" and photo[8:12] == b"WEBP":
+                from PIL import Image
+
+                with Image.open(io.BytesIO(photo)) as im:
+                    out = io.BytesIO()
+                    im.save(out, format="PNG")
+                    photo = out.getvalue()
             buf = io.BytesIO(photo)
             buf.name = "image.jpg" if photo[:2] == b"\xff\xd8" else "image.png"
             resp = await self.client.send_file(

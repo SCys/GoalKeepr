@@ -1147,9 +1147,9 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
             await fail_task(task, rdb, "ComfyUI 执行出错 / Execution error", prefix)
             return
 
-        # 按模型选择保存节点（qwen="8"，zimage/krea="37"，flux="50"），兜底扫描所有输出
+        # 按模型选择保存节点（qwen="33"，zimage/krea="37"，flux="50"），兜底扫描所有输出
         outputs = info.get("outputs", {})
-        node_id = {"qwen": "8", "zimage": "37", "krea": "37", "flux": "50"}.get(task.options.get("model", DEFAULT_MODEL), "8")
+        node_id = {"qwen": "33", "zimage": "37", "krea": "37", "flux": "50"}.get(task.options.get("model", DEFAULT_MODEL), "33")
         images = outputs.get(node_id, {}).get("images", [])
         if not images:
             for node_output in outputs.values():

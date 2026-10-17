@@ -15,6 +15,7 @@ dependencies = [
     "pydub>=0.25.1",
     "telegramify-markdown>=1.2.0",
     "telethon>=1.36.0",
+    "Pillow>=10.0.0",  # webp 完成图转 png 后再发送（Telegram 不支持 webp 照片）
     "PySocks>=1.7.1",  # Telegram 代理（socks5/http）时 Telethon 需要
     "tiktoken>=0.12.0",
     "translators>=6.0.2,<6.0.4",

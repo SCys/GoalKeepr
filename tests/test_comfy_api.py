@@ -101,7 +101,8 @@ class TestQwenWorkflow:
         q = comfy_api.WORKFLOWS["qwen"]
         assert q["15:6"]["class_type"] == "KSampler"
         assert q["15:4"]["class_type"] == "TextEncodeQwenImage21"
-        assert q["8"]["class_type"] == "SaveImage"
+        assert q["33"]["class_type"] == "Image Saver Simple"
+        assert q["33"]["inputs"]["extension"] == "webp"
 
     def test_create_workflow_injects_params(self):
         wf = comfy_api.create_workflow("qwen", "一只橘猫", 1024, 1280, 8, 1.5, seed=42)
