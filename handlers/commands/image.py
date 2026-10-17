@@ -638,11 +638,24 @@ class PermissionManager:
             return [], []
 
     @staticmethod
+    def normalize_group_id(gid: int) -> int:
+        """群 ID 归一化：超级群带 -100 前缀（-1005232001169），配置里常写成
+        裸 ID（-5232001169），两者视为同一群。普通小群 ID 不受影响。"""
+        s = str(gid)
+        if s.startswith("-100") and len(s) > 4:
+            return -int(s[4:])
+        return gid
+
+    @staticmethod
     def check_permission(user_id: int, chat_id: int, users: List[int], groups: List[int]) -> bool:
         """检查用户或群组是否有权限"""
         if not users and not groups:
             return False
-        return user_id in users or chat_id in groups
+        if user_id in users:
+            return True
+        # 群匹配按归一化后的 ID 比较，兼容配置写裸 ID 或带 -100 前缀
+        normalized = PermissionManager.normalize_group_id(chat_id)
+        return any(PermissionManager.normalize_group_id(g) == normalized for g in groups)
 
 
 class PromptProcessor:

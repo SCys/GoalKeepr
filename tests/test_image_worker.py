@@ -261,6 +261,26 @@ class TestImagePermission:
         assert image_mod.PermissionManager.check_permission(999, -1001085650365, users, groups)
         assert not image_mod.PermissionManager.check_permission(999, -100999, users, groups)
 
+    def test_bare_supergroup_id_matches_prefixed_chat(self):
+        """配置写裸 ID（-5232001169），事件里 chat_id 带 -100 前缀也必须匹配。
+
+        回归：超级群 ID 超过 2^31 时 Telegram 事件里是 -100<裸ID>，
+        直接精确匹配会导致白名单里的群被判无权。
+        """
+        users, groups = self._parse(groups="-5232001169")
+        assert image_mod.PermissionManager.check_permission(999, -1005232001169, users, groups)
+
+    def test_prefixed_config_matches_bare_or_prefixed_chat(self):
+        """配置带 -100 前缀时，两种形式的 chat_id 都能匹配。"""
+        users, groups = self._parse(groups="-1005232001169")
+        assert image_mod.PermissionManager.check_permission(999, -5232001169, users, groups)
+        assert image_mod.PermissionManager.check_permission(999, -1005232001169, users, groups)
+
+    def test_normalization_does_not_match_other_groups(self):
+        users, groups = self._parse(groups="-5232001169")
+        assert not image_mod.PermissionManager.check_permission(999, -1009998888, users, groups)
+        assert not image_mod.PermissionManager.check_permission(999, -5232001170, users, groups)
+
 
 # ---- /image 提示词优化 ----
 
