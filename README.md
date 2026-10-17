@@ -36,6 +36,7 @@ Telegram 群组管理机器人，基于 [Telethon](https://docs.telethon.dev/)�
 | `/sdxl`          | 使用 SDXL 接口根据文本生成图片（需在代码中启用）。                                        |
 | `/chat`          | 基础 AI 会话（30 分钟 TTL 上下文）。`/chat <问题>` 或回复消息后加 `/chat` 继续；`/chat reset` 重置会话。需配置 `[ai]` + Redis（默认已启用）。 |
 | `/group_setting` | 群组设置：新成员入群处理方式等（需配置 Redis）。                 |
+| `/captcha_stats` | 入群验证统计（入群人次/验证成功失败/唯一用户/成功率）。全局 admin 可查全局和任意群（`/captcha_stats [群ID]`）；群管理员在群内可查本群（不带参数默认本群）。 |
 
 部分命令（如 `/image`、`/shorturl` 等）在 `handlers/commands/__init__.py` 中默认未导入，需取消注释后重启方可使用。`/chat` 为简化后的基础会话功能，已默认启用。
 
