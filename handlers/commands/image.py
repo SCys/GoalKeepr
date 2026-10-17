@@ -59,7 +59,7 @@ PROGRESS_BAR_LEN = 14                    # 进度条长度（字符数）
 # 图像生成配置（LLM 优化模型从 [ai] image_optimize_models 读取，回退见 get_image_optimize_models）
 DEFAULT_SIZE = "836x1216"
 DEFAULT_STEP = 8
-DEFAULT_MODEL = "zimage"
+DEFAULT_MODEL = "qwen"
 DEFAULT_CFG = 1
 MAX_CFG = 20.0
 MAX_STEPS = 50
@@ -1147,9 +1147,9 @@ async def handle_completed_task(task: Task, endpoint: str, prefix: str, rdb):
             await fail_task(task, rdb, "ComfyUI 执行出错 / Execution error", prefix)
             return
 
-        # 按模型选择保存节点（zimage/krea="37"，flux="50"），兜底扫描所有输出
+        # 按模型选择保存节点（qwen="8"，zimage/krea="37"，flux="50"），兜底扫描所有输出
         outputs = info.get("outputs", {})
-        node_id = {"zimage": "37", "krea": "37", "flux": "50"}.get(task.options.get("model", DEFAULT_MODEL), "37")
+        node_id = {"qwen": "8", "zimage": "37", "krea": "37", "flux": "50"}.get(task.options.get("model", DEFAULT_MODEL), "8")
         images = outputs.get(node_id, {}).get("images", [])
         if not images:
             for node_output in outputs.values():

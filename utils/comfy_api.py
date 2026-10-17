@@ -196,6 +196,14 @@ def create_workflow(
         # 显式尺寸：直接写 latent 宽高，绕过 FluxResolutionNode 的固定比例计算
         workflow["60"]["inputs"]["width"] = width
         workflow["60"]["inputs"]["height"] = height
+    elif checkpoint == "qwen":
+        workflow["15:6"]["inputs"]["seed"] = seed
+        workflow["15:6"]["inputs"]["steps"] = max(steps, 6)
+        workflow["15:6"]["inputs"]["cfg"] = max(cfg, 1)
+        workflow["15:4"]["inputs"]["prompt"] = prompt
+        # 显式尺寸：直接写 latent 宽高，绕过 FluxResolutionNode 的固定比例计算
+        workflow["16"]["inputs"]["width"] = width
+        workflow["16"]["inputs"]["height"] = height
     elif checkpoint == "krea":
         workflow["3"]["inputs"]["seed"] = seed
         workflow["3"]["inputs"]["steps"] = max(steps, 4)

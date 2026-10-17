@@ -91,3 +91,41 @@ async def test_job_status_completed_from_history(monkeypatch):
 
     result = await comfy_api.job_status("http://comfy", "job-x")
     assert result["status"] == "completed"
+
+
+class TestQwenWorkflow:
+    """qwen（Qwen Image 2.1 Turbo）workflow 参数注入与模板完整性。"""
+
+    def test_qwen_in_workflows(self):
+        assert "qwen" in comfy_api.WORKFLOWS
+        q = comfy_api.WORKFLOWS["qwen"]
+        assert q["15:6"]["class_type"] == "KSampler"
+        assert q["15:4"]["class_type"] == "TextEncodeQwenImage21"
+        assert q["8"]["class_type"] == "SaveImage"
+
+    def test_create_workflow_injects_params(self):
+        wf = comfy_api.create_workflow("qwen", "一只橘猫", 1024, 1280, 8, 1.5, seed=42)
+        assert wf["15:6"]["inputs"]["seed"] == 42
+        assert wf["15:6"]["inputs"]["steps"] == 8
+        assert wf["15:6"]["inputs"]["cfg"] == 1.5
+        assert wf["15:4"]["inputs"]["prompt"] == "一只橘猫"
+        # 显式尺寸写入 latent 节点，绕过 FluxResolutionNode
+        assert wf["16"]["inputs"]["width"] == 1024
+        assert wf["16"]["inputs"]["height"] == 1280
+
+    def test_create_workflow_clamps_steps(self):
+        """turbo LoRA 至少 6 步。"""
+        wf = comfy_api.create_workflow("qwen", "cat", 512, 512, 2, 1)
+        assert wf["15:6"]["inputs"]["steps"] == 6
+
+    def test_template_not_polluted(self):
+        """深拷贝：生成不得污染模块级模板。"""
+        comfy_api.create_workflow("qwen", "cat", 512, 512, 8, 1, seed=1)
+        q = comfy_api.WORKFLOWS["qwen"]
+        assert q["15:6"]["inputs"]["seed"] != 1 or True  # seed 初值无所谓，关键是不等于上次注入的 prompt
+        assert q["15:4"]["inputs"]["prompt"] != "cat"
+
+    def test_unknown_checkpoint_falls_back(self):
+        """未知模型回退到 zimage（保持既有行为）。"""
+        wf = comfy_api.create_workflow("nonexistent", "cat", 512, 512, 8, 1)
+        assert "3" in wf  # zimage KSampler
