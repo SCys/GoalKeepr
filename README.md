@@ -28,7 +28,7 @@ Telegram 群组管理机器人，基于 [Telethon](https://docs.telethon.dev/)�
 | `/k`             | 踢掉发消息的人。                                                                          |
 | `/sb`            | 将发消息的人加入黑名单。                                                       |
 | `/id`            | 获取用户信息（回复某人或自己），返回 ID、昵称、分享链接等。                               |
-| `/image`         | 根据文本生成图片，默认先用 LLM（simple）把描述优化成高质量提示词再提交，`[raw]` 选项可跳过优化。可配置允许的用户/群组。 |
+| `/image`         | 根据文本生成图片，默认先用 LLM（simple）把描述优化成高质量提示词再提交，`[raw]` 选项可跳过优化。高级选项：`[size:WxH]`（或 mini/small/large）、`[step:N]`、`[model:zimage/krea/flux]`、`[cfg:N]`、`[seed:N]`（复现 caption 展示的种子）。可配置允许的用户/群组。 |
 | `/shorturl`      | 将消息中的 URL 转为短链接（需在代码中启用）。                                             |
 | `/tr`            | 将输入文本翻译为中文（需在代码中启用）。                                                  |
 | `/tts`           | 文本转语音（需在代码中启用）。                                                            |

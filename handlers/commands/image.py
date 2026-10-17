@@ -35,6 +35,10 @@ REDIS_RETRY_INTERVAL = 2  # 2s
 REDIS_KEY_PREFIX = "image:"
 TASK_LOCK_TTL = 180  # 3分钟，避免任务并发重复处理
 MAX_POLL_ERRORS = 3  # 状态轮询连续失败次数上限，超过才判定任务丢失
+STALL_TIMEOUT = 300  # running 进度停滞超时（秒）：WS 进度 5 分钟不动判失败
+MAX_RUNNING_TIME = 1800  # running 全程无 WS 进度时的兜底总时长（秒）
+# HTTP 状态轮询最小间隔：进度走 WebSocket，HTTP 只查状态迁移，按状态放缓
+STATUS_POLL_INTERVALS = {"submitted": 2.0, "pending": 3.0, "running": 4.0}
 
 # ---- Telegram 出口调度与限速降级 ----
 OP_DELIVER = 0    # P0 完成图投递（不可丢，撞墙重试直到成功或字节过期）
@@ -190,6 +194,8 @@ class Task:
                     batch = []
             if batch:
                 tasks.extend(await Task._load_tasks(rdb, batch))
+            # FIFO：scan_iter 顺序随机，按创建时间排序保证先来先做、排队位置显示准确
+            tasks.sort(key=lambda t: t.created_at)
             return tasks
         except Exception as e:
             logger.error(f"Failed to get all tasks: {e}")
@@ -567,6 +573,10 @@ def build_caption(task: "Task") -> str:
 
 # 进度编辑节流状态（内存即可，重启后从零节起无副作用）
 _progress_throttle: Dict[str, Dict[str, float]] = {}
+# HTTP 状态轮询节流：task_id -> 下次允许轮询的 monotonic 时间
+_poll_schedule: Dict[str, float] = {}
+# running 停滞检测：task_id -> {"sig": 进度签名, "last_change": 变动时间, "first_running": 首次 running 时间}
+_stall_track: Dict[str, Dict[str, Any]] = {}
 
 
 def should_update_progress(state: Dict[str, float], percent: float, now: float, level: int) -> bool:
@@ -677,6 +687,16 @@ class PromptProcessor:
                 elif opt == "raw":
                     # 跳过 LLM 提示词优化，原文直接提交
                     options["raw"] = True
+                elif opt.startswith("seed:"):
+                    # 指定随机种子（复现 caption 里展示的 seed）
+                    try:
+                        seed = int(opt[5:])
+                        if 0 <= seed <= 0xFFFFFFFFFFFFFFFF:
+                            options["seed"] = seed
+                        else:
+                            logger.warning(f"Seed out of range: {seed}")
+                    except ValueError:
+                        logger.warning(f"Invalid seed option: {opt}")
 
             logger.info(f"Parsed options: {options}, prompt: {prompt}")
             return prompt, options
@@ -880,10 +900,8 @@ async def process_task(task: Task):
             # 根据任务状态进行分类处理
             if task.status == "queued":
                 await handle_queued_task(task, endpoint, prefix)
-            elif task.status == "submitted":
-                await handle_submitted_task(task, endpoint, prefix)
-            elif task.status in ["running", "pending"]:
-                await handle_processing_task(task, endpoint, prefix)
+            elif task.status in ["submitted", "running", "pending"]:
+                await handle_active_task(task, endpoint, prefix, rdb)
             elif task.status == "delivering":
                 # 投递由 dispatcher 异步执行；这里只兜底（重启后恢复投递）
                 await handle_delivering_task(task, rdb, prefix)
@@ -982,20 +1000,77 @@ async def handle_queued_task(task: Task, endpoint: str, prefix: str):
         task.status = "completed"
 
 
-async def handle_submitted_task(task: Task, endpoint: str, prefix: str):
+async def _check_stall(task: Task, rdb, prefix: str) -> bool:
+    """running 进度停滞检测（每个 worker 循环都跑，不依赖 HTTP 轮询节奏）。
+
+    WS 进度快照（value/max/node 签名）STALL_TIMEOUT 秒不变 → 判失败释放名额；
+    全程无 WS 进度（断连等）则用 MAX_RUNNING_TIME 兜底，防止 ComfyUI 卡死后
+    任务无限轮询占着队列名额。返回 True 表示已判失败并完成收尾。
+    """
+    now = time.monotonic()
+    track = _stall_track.setdefault(
+        task.task_id, {"sig": None, "last_change": now, "first_running": now}
+    )
+    snapshot = comfy_api.progress_tracker.snapshot(task.job_id)
+
+    if snapshot:
+        sig = (snapshot.get("value"), snapshot.get("max"), snapshot.get("node"))
+        if sig != track["sig"]:
+            track["sig"] = sig
+            track["last_change"] = now
+        elif now - track["last_change"] > STALL_TIMEOUT:
+            logger.warning(
+                f"{prefix} task {task.task_id} progress stalled over {STALL_TIMEOUT}s, mark failed"
+            )
+            await fail_task(
+                task, rdb,
+                f"生成进度停滞超时 / Progress stalled for {STALL_TIMEOUT // 60}min",
+                prefix,
+            )
+            return True
+    elif now - track["first_running"] > MAX_RUNNING_TIME:
+        logger.warning(
+            f"{prefix} task {task.task_id} running over {MAX_RUNNING_TIME}s without any progress, mark failed"
+        )
+        await fail_task(task, rdb, "生成超时 / Generation timeout", prefix)
+        return True
+    return False
+
+
+async def handle_active_task(task: Task, endpoint: str, prefix: str, rdb):
+    """submitted/pending/running 统一轮询（合并原 submitted/processing 两个重复实现）。
+
+    - HTTP 轮询按状态节流（STATUS_POLL_INTERVALS），进度显示走 WS 不受影响
+    - running 状态每次循环做停滞检测，ComfyUI 卡死不会无限占坑
+    - 网络抖动不直接判死，连续 MAX_POLL_ERRORS 次失败才置为 not_found
+    """
     if not task.job_id:
-        logger.warning(f"{prefix} submitted task has no job_id")
+        logger.warning(f"{prefix} active task has no job_id")
         task.status = "completed"
         return
+
+    if task.status == "running" and await _check_stall(task, rdb, prefix):
+        return  # 已判失败收尾
+
+    now = time.monotonic()
+    if now < _poll_schedule.get(task.task_id, 0.0):
+        # 未到 HTTP 轮询时间：running 时仍用 WS 快照刷新进度显示
+        if task.status == "running":
+            await update_progress(task, prefix)
+        return
+
+    interval = STATUS_POLL_INTERVALS.get(task.status, 3.0)
+    _poll_schedule[task.task_id] = now + interval
 
     try:
         status_info = await comfy_api.job_status(endpoint, task.job_id)
         if status_info:
             task.poll_errors = 0
+            old_status = task.status
             new_status = status_info.get("status", "not_found")
-            if new_status != task.status:
+            if new_status != old_status:
                 task.status = new_status
-                logger.info(f"{prefix} task status updated to: {task.status}")
+                logger.info(f"{prefix} task status changed from {old_status} to {new_status}")
                 if new_status == "pending":
                     await safe_edit_text(
                         task.msg.chat_id, task.msg.reply_message_id,
@@ -1006,39 +1081,6 @@ async def handle_submitted_task(task: Task, endpoint: str, prefix: str):
                     await safe_edit_text(
                         task.msg.chat_id, task.msg.reply_message_id,
                         render_status_message(task, "running"),
-                        prefix,
-                    )
-        else:
-            logger.warning(f"{prefix} failed to get task status")
-            task.status = "not_found"
-
-    except comfy_api.ComfyAPIError as e:
-        # 网络抖动不直接判死，连续 MAX_POLL_ERRORS 次失败才置为 not_found
-        task.poll_errors += 1
-        logger.warning(f"{prefix} comfy api error when getting status ({task.poll_errors}/{MAX_POLL_ERRORS}): {e}")
-        if task.poll_errors >= MAX_POLL_ERRORS:
-            task.status = "not_found"
-
-
-async def handle_processing_task(task: Task, endpoint: str, prefix: str):
-    if not task.job_id:
-        logger.warning(f"{prefix} processing task has no job_id")
-        task.status = "completed"
-        return
-
-    try:
-        status_info = await comfy_api.job_status(endpoint, task.job_id)
-        if status_info:
-            task.poll_errors = 0
-            old_status = task.status
-            task.status = status_info.get("status", "not_found")
-
-            if old_status != task.status:
-                logger.info(f"{prefix} task status changed from {old_status} to {task.status}")
-                if task.status == "pending":
-                    await safe_edit_text(
-                        task.msg.chat_id, task.msg.reply_message_id,
-                        render_status_message(task, "submitted", position=status_info.get("position")),
                         prefix,
                     )
 
@@ -1161,6 +1203,8 @@ async def fail_task(task: Task, rdb, reason: str, prefix: str) -> None:
     await task.dequeue_task(rdb)
     comfy_api.progress_tracker.clear(task.job_id or "")
     _progress_throttle.pop(task.task_id, None)
+    _poll_schedule.pop(task.task_id, None)
+    _stall_track.pop(task.task_id, None)
 
 
 async def handle_delivering_task(task: Task, rdb, prefix: str) -> None:
@@ -1206,6 +1250,8 @@ async def finalize_delivery(task: Task, rdb) -> None:
     await rdb.delete(f"{REDIS_KEY_PREFIX}img:{task.task_id}")
     comfy_api.progress_tracker.clear(task.job_id or "")
     _progress_throttle.pop(task.task_id, None)
+    _poll_schedule.pop(task.task_id, None)
+    _stall_track.pop(task.task_id, None)
 
 
 async def finalize_delivery_failed(task: Task, rdb, err: Exception) -> None:
