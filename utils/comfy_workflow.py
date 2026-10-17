@@ -327,7 +327,7 @@ WORKFLOWS = {
             "_meta": {"title": "Load Checkpoint"},
         },
     },
-    "qwen":     {
+    "qwen": {
         "16": {
             "inputs": {
                 "width": [
