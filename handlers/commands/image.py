@@ -94,6 +94,7 @@ IMAGE_OPTIMIZE_PROMPT = """你是文生图提示词优化专家。用户给你�
 REFUSAL_MARKERS = ("抱歉", "无法", "不能", "sorry", "cannot", "can't", "unable", "i'm afraid")
 OPTIMIZED_MAX_LEN = 800  # 优化要求 100 字以内，超过 800 字符基本判定为解释/拒绝长文
 OPTIMIZE_TIMEOUT = 30  # 单个优化模型的调用超时（秒），超时换下一个模型
+OPTIMIZE_MAX_INPUT = 128  # 输入超过 128 字视为已细化，跳过优化（和英文逗号规则同理）
 
 
 def looks_like_refusal(text: str) -> bool:
@@ -799,7 +800,8 @@ class PromptProcessor:
         """
         reply_content = prompt
 
-        if "," in prompt:
+        # 含英文逗号或超过 128 字：视为用户已细化提示词，跳过优化
+        if "," in prompt or len(prompt) >= OPTIMIZE_MAX_INPUT:
             return prompt, reply_content
 
         for model in get_image_optimize_models():

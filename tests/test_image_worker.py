@@ -310,6 +310,24 @@ class TestPromptOptimize:
         assert optimized == "a cat, cinematic"
         mock_chat.assert_not_called()
 
+    async def test_optimize_skips_long_prompts(self, monkeypatch):
+        """超过 128 字的输入视为已细化，跳过优化不调用 LLM。"""
+        mock_chat = AsyncMock()
+        monkeypatch.setattr(image_mod, "chat_completions", mock_chat)
+
+        long_prompt = "一" * 128
+        optimized, _ = await image_mod.PromptProcessor.optimize_prompt(long_prompt)
+        assert optimized == long_prompt
+        mock_chat.assert_not_called()
+
+    async def test_optimize_just_below_limit_still_optimizes(self, monkeypatch):
+        """127 字仍会优化（边界）。"""
+        mock_chat = AsyncMock(return_value="优化后")
+        monkeypatch.setattr(image_mod, "chat_completions", mock_chat)
+
+        optimized, _ = await image_mod.PromptProcessor.optimize_prompt("一" * 127)
+        assert optimized == "优化后"
+
     async def test_optimize_falls_back_to_next_model(self, monkeypatch):
         """第一个模型失败时依次尝试 fallback 模型，全失败返回原文。"""
         calls = []
