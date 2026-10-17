@@ -825,8 +825,11 @@ class PromptProcessor:
 
                 logger.warning(f"Prompt optimization by {model} returned refusal/invalid text, trying next")
 
+            except asyncio.TimeoutError:
+                # asyncio.TimeoutError 的 str() 是空串，必须显式标注，否则日志只剩冒号
+                logger.warning(f"Prompt optimization by {model} timed out ({OPTIMIZE_TIMEOUT}s), trying next")
             except Exception as e:
-                logger.warning(f"Prompt optimization failed: {e}")
+                logger.warning(f"Prompt optimization by {model} failed: {type(e).__name__}: {e}")
 
         return prompt, reply_content
 
