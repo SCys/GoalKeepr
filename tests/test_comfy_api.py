@@ -105,12 +105,12 @@ class TestQwenWorkflow:
         assert q["33"]["inputs"]["extension"] == "webp"
 
     def test_create_workflow_injects_params(self):
-        wf = comfy_api.create_workflow("qwen", "一只橘猫", 1024, 1280, 8, 1.5, seed=42)
+        wf = comfy_api.create_workflow("qwen", "一只橘猫", 1.31, "4:5", 8, 1.5, seed=42)
         assert wf["15:6"]["inputs"]["seed"] == 42
         assert wf["15:6"]["inputs"]["steps"] == 8
         assert wf["15:6"]["inputs"]["cfg"] == 1.5
         assert wf["15:4"]["inputs"]["prompt"] == "一只橘猫"
-        # 分辨率走 FluxResolutionNode：megapixel + 约简宽高比，latent 节点保持链接不动
+        # 分辨率走 FluxResolutionNode：megapixel + 宽高比，latent 节点保持链接不动
         res = wf["17"]["inputs"]
         assert res["megapixel"] == "1.31"
         assert res["custom_ratio"] is True
@@ -118,25 +118,41 @@ class TestQwenWorkflow:
         assert wf["16"]["inputs"]["width"] == ["17", 0]
         assert wf["16"]["inputs"]["height"] == ["17", 1]
 
-    def test_create_workflow_megapixel_default_size(self):
-        """qwen 默认 576x1024 ≈ 0.59MP，与 workflow 原生 0.6MP 对齐。"""
-        wf = comfy_api.create_workflow("qwen", "cat", 576, 1024, 8, 1)
-        assert wf["17"]["inputs"]["megapixel"] == "0.59"
+    def test_create_workflow_megapixel_default(self):
+        """qwen 默认 0.6MP / 9:16，与 workflow 原生默认对齐。"""
+        wf = comfy_api.create_workflow("qwen", "cat", 0.6, "9:16", 8, 1)
+        assert wf["17"]["inputs"]["megapixel"] == "0.60"
         assert wf["17"]["inputs"]["custom_aspect_ratio"] == "9:16"
 
     def test_create_workflow_clamps_steps(self):
         """turbo LoRA 至少 6 步。"""
-        wf = comfy_api.create_workflow("qwen", "cat", 512, 512, 2, 1)
+        wf = comfy_api.create_workflow("qwen", "cat", 0.26, "1:1", 2, 1)
         assert wf["15:6"]["inputs"]["steps"] == 6
+
+    def test_mp_ratio_to_pixels(self):
+        """mp+比例按 64 对齐换算显式宽高（非 qwen 模型用）。"""
+        assert comfy_api.mp_ratio_to_pixels(1.0, "11:16") == (832, 1216)
+        assert comfy_api.mp_ratio_to_pixels(0.6, "9:16") == (576, 1024)
+        assert comfy_api.mp_ratio_to_pixels(0.59, "1:1") == (768, 768)
+        # 极小 mp 保底 64
+        w, h = comfy_api.mp_ratio_to_pixels(0.001, "1:1")
+        assert w >= 64 and h >= 64
+
+    def test_zimage_gets_explicit_size(self):
+        """zimage 分支：mp+比例换算成显式 latent 宽高。"""
+        wf = comfy_api.create_workflow("zimage", "cat", 1.0, "11:16", 8, 1, seed=7)
+        assert wf["60"]["inputs"]["width"] == 832
+        assert wf["60"]["inputs"]["height"] == 1216
 
     def test_template_not_polluted(self):
         """深拷贝：生成不得污染模块级模板。"""
-        comfy_api.create_workflow("qwen", "cat", 512, 512, 8, 1, seed=1)
+        comfy_api.create_workflow("qwen", "cat", 0.6, "9:16", 8, 1, seed=1)
         q = comfy_api.WORKFLOWS["qwen"]
         assert q["15:6"]["inputs"]["seed"] != 1 or True  # seed 初值无所谓，关键是不等于上次注入的 prompt
         assert q["15:4"]["inputs"]["prompt"] != "cat"
+        assert q["17"]["inputs"]["megapixel"] == "0.6"  # 模板默认值不被改写
 
     def test_unknown_checkpoint_falls_back(self):
         """未知模型回退到 zimage（保持既有行为）。"""
-        wf = comfy_api.create_workflow("nonexistent", "cat", 512, 512, 8, 1)
+        wf = comfy_api.create_workflow("nonexistent", "cat", 0.26, "1:1", 8, 1)
         assert "3" in wf  # zimage KSampler

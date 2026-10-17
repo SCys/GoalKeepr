@@ -18,7 +18,7 @@ from handlers.commands.image import (
 
 
 def make_task(**options) -> Task:
-    opts = {"size": "836x1216", "step": 16, "model": "zimage", "cfg": 1}
+    opts = {"mp": 1.0, "ratio": "11:16", "step": 16, "model": "zimage", "cfg": 1}
     opts.update(options)
     return Task(
         msg=TaskMessage(

@@ -3,7 +3,6 @@ import copy
 import random
 import re
 import uuid
-from math import gcd
 from typing import Optional, Dict, Any, Tuple
 
 from aiohttp import ClientSession, ClientTimeout, ClientError, WSMsgType
@@ -128,31 +127,35 @@ class ProgressTracker:
 progress_tracker = ProgressTracker()
 
 
-def _parse_image_size(size: str) -> Tuple[int, int]:
-    """
-    解析图片尺寸字符串
-
-    Args:
-        size: 尺寸字符串，格式为 "widthxheight"
-
-    Returns:
-        元组 (width, height)
-
-    Raises:
-        ValueError: 格式错误时抛出
-    """
+def _parse_ratio(ratio: str) -> Tuple[int, int]:
+    """解析宽高比字符串 "W:H" 为 (w, h) 整数对。"""
     try:
-        width, height = map(int, size.lower().split("x"))
-        return width, height
+        w, h = map(int, ratio.split(":"))
+        if w <= 0 or h <= 0:
+            raise ValueError
+        return w, h
     except ValueError:
-        raise ValueError("尺寸格式错误，应为 'widthxheight'，例如 '512x512'")
+        raise ValueError(f"比例格式错误，应为 'W:H'，例如 '9:16'，收到 {ratio!r}")
+
+
+def mp_ratio_to_pixels(mp: float, ratio: str) -> Tuple[int, int]:
+    """megapixel + 宽高比 -> (width, height)，按 64 对齐（与 FluxResolutionNode 一致）。
+
+    非 qwen 模型的 latent 需要显式宽高，用与 FluxResolutionNode 相同的口径
+    在代码侧换算，保证各模型输出尺寸一致。
+    """
+    rw, rh = _parse_ratio(ratio)
+    total = mp * 1_000_000
+    w = round((total * rw / rh) ** 0.5 / 64) * 64
+    h = round((total * rh / rw) ** 0.5 / 64) * 64
+    return max(64, w), max(64, h)
 
 
 def create_workflow(
     checkpoint: str,
     prompt: str,
-    width: int,
-    height: int,
+    mp: float,
+    ratio: str,
     steps: int,
     cfg: float,
     seed: Optional[int] = None,
@@ -163,8 +166,8 @@ def create_workflow(
     Args:
         checkpoint: 模型名称（对应 WORKFLOWS 的键）
         prompt: 提示词
-        width: 图片宽度
-        height: 图片高度
+        mp: 像素量（百万像素，如 0.6 表示 0.6MP）
+        ratio: 宽高比，格式 "W:H"（如 "9:16"）
         steps: 采样步数
         cfg: CFG scale
         seed: 随机种子，如果为 None 则随机生成
@@ -181,6 +184,22 @@ def create_workflow(
     # 必须深拷贝：模板是模块级共享字典，直接修改会污染后续任务
     workflow = copy.deepcopy(WORKFLOWS[checkpoint])
 
+    if checkpoint == "qwen":
+        workflow["15:6"]["inputs"]["seed"] = seed
+        workflow["15:6"]["inputs"]["steps"] = max(steps, 6)
+        workflow["15:6"]["inputs"]["cfg"] = max(cfg, 1)
+        workflow["15:4"]["inputs"]["prompt"] = prompt
+        # 分辨率走 FluxResolutionNode：megapixel + 宽高比，latent 宽高由它按
+        # divisible_by=64 计算，与 ComfyUI 里的原生控制方式一致（不写死 latent 宽高）
+        res = workflow["17"]["inputs"]
+        res["megapixel"] = f"{mp:.2f}"
+        res["custom_ratio"] = True
+        res["custom_aspect_ratio"] = ratio
+        return workflow
+
+    # 其余模型（flux/zimage/krea）latent 需要显式宽高：按同一口径（mp+比例，64 对齐）换算
+    width, height = mp_ratio_to_pixels(mp, ratio)
+
     if checkpoint == "flux":
         workflow["6"]["inputs"]["text"] = prompt
         workflow["17"]["inputs"]["steps"] = steps
@@ -194,27 +213,13 @@ def create_workflow(
         workflow["3"]["inputs"]["steps"] = max(steps, 8)
         workflow["3"]["inputs"]["cfg"] = max(cfg, 1)
         workflow["6"]["inputs"]["text"] = prompt
-        # 显式尺寸：直接写 latent 宽高，绕过 FluxResolutionNode 的固定比例计算
         workflow["60"]["inputs"]["width"] = width
         workflow["60"]["inputs"]["height"] = height
-    elif checkpoint == "qwen":
-        workflow["15:6"]["inputs"]["seed"] = seed
-        workflow["15:6"]["inputs"]["steps"] = max(steps, 6)
-        workflow["15:6"]["inputs"]["cfg"] = max(cfg, 1)
-        workflow["15:4"]["inputs"]["prompt"] = prompt
-        # 分辨率走 FluxResolutionNode：megapixel + 自定义宽高比，latent 宽高由它按
-        # divisible_by=64 计算，与 ComfyUI 里的原生控制方式一致（不写死 latent 宽高）
-        res = workflow["17"]["inputs"]
-        res["megapixel"] = f"{width * height / 1_000_000:.2f}"
-        res["custom_ratio"] = True
-        g = gcd(width, height)
-        res["custom_aspect_ratio"] = f"{width // g}:{height // g}"
     elif checkpoint == "krea":
         workflow["3"]["inputs"]["seed"] = seed
         workflow["3"]["inputs"]["steps"] = max(steps, 4)
         workflow["3"]["inputs"]["cfg"] = max(cfg, 1)
         workflow["6"]["inputs"]["text"] = prompt
-        # 显式尺寸：直接写 latent 宽高，绕过 FluxResolutionNode 的固定比例计算
         workflow["60"]["inputs"]["width"] = width
         workflow["60"]["inputs"]["height"] = height
 
@@ -327,7 +332,8 @@ async def generate_image(
     endpoint: str,
     checkpoint: str,
     prompt: str,
-    size: str = "836x1216",
+    mp: float = 0.6,
+    ratio: str = "9:16",
     steps: int = 16,
     cfg: float = 1.0,
     seed: Optional[int] = None,
@@ -337,28 +343,26 @@ async def generate_image(
 
     Args:
         endpoint: ComfyUI API 端点
-        checkpoint: 检查点模型名称（暂未使用）
+        checkpoint: 检查点模型名称（对应 WORKFLOWS 的键）
         prompt: 生成图片的文本描述
-        size: 图片尺寸，格式为 "宽x高"，如 "512x512"
-        steps: 采样步数，默认为 12
-        cfg: CFG scale，默认为 1.0（暂未使用）
+        mp: 像素量（百万像素，如 0.6 表示 0.6MP）
+        ratio: 宽高比，格式 "W:H"（如 "9:16"）
+        steps: 采样步数
+        cfg: CFG scale
         seed: 随机种子，如果为 None 则随机生成
 
     Returns:
-        图片的二进制数据，失败时返回 None
+        提示词 ID，失败时返回 None
 
     Raises:
         ValueError: 参数格式错误
         ComfyAPIError: API 调用相关错误
     """
     try:
-        # 解析尺寸
-        width, height = _parse_image_size(size)
+        # 创建工作流（mp+比例在各模型分支内换算/透传）
+        workflow = create_workflow(checkpoint, prompt, mp, ratio, steps, cfg, seed)
 
-        # 创建工作流
-        workflow = create_workflow(checkpoint, prompt, width, height, steps, cfg, seed)
-
-        logger.info(f"开始生成图片: [{size}] {prompt}")
+        logger.info(f"开始生成图片: [{mp}MP {ratio}] {prompt}")
 
         # 创建 HTTP 会话
         session = await manager.create_session()

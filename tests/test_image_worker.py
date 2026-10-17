@@ -322,7 +322,9 @@ class TestParseOptionsRaw:
         assert prompt == "a cat"
         assert options["raw"] is True
         assert options["model"] == "krea"
-        assert options["size"] == "768x768"
+        # 旧版 size:small 预设换算为 mp + 比例
+        assert options["mp"] == 0.59
+        assert options["ratio"] == "1:1"
 
 
 # ---- /image 命令 handler：入队必须带正确的状态消息 id ----

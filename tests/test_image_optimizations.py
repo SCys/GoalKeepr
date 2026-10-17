@@ -326,22 +326,58 @@ class TestActiveTaskHandler:
         await image_mod.handle_active_task(task, "http://comfy", "test", fake_redis)
         assert task.status == "completed"
 
-
 class TestModelDefaultSize:
-    """未显式指定尺寸时按模型取默认（qwen 0.6MP），显式 size 优先。"""
+    """分辨率由 mp + ratio + 方向控制；未显式指定 mp 时按模型取默认（qwen 0.6MP）。"""
 
-    def test_qwen_default_size_without_options(self):
+    def test_qwen_default_mp_without_options(self):
         _, options = image_mod.PromptProcessor.parse_options("橘猫")
-        assert options["size"] == "576x1024"
+        assert options["mp"] == 0.6
+        assert options["ratio"] == "11:16"
 
-    def test_qwen_default_size_with_other_options(self):
+    def test_qwen_default_mp_with_other_options(self):
         _, options = image_mod.PromptProcessor.parse_options("[model:qwen raw] 橘猫")
-        assert options["size"] == "576x1024"
+        assert options["mp"] == 0.6
 
-    def test_explicit_size_wins(self):
-        _, options = image_mod.PromptProcessor.parse_options("[size:1024x1024] 橘猫")
-        assert options["size"] == "1024x1024"
+    def test_explicit_mp_wins(self):
+        _, options = image_mod.PromptProcessor.parse_options("[mp:1.2] 橘猫")
+        assert options["mp"] == 1.2
+
+    def test_mp_out_of_range_ignored(self):
+        _, options = image_mod.PromptProcessor.parse_options("[mp:99] 橘猫")
+        assert options["mp"] == 0.6  # 回落模型默认
+
+    def test_ratio_option_reduced(self):
+        _, options = image_mod.PromptProcessor.parse_options("[ratio:10:16] 橘猫")
+        assert options["ratio"] == "5:8"
+
+    def test_invalid_ratio_ignored(self):
+        _, options = image_mod.PromptProcessor.parse_options("[ratio:abc] 橘猫")
+        assert options["ratio"] == "11:16"
+
+    def test_orientation_landscape_swaps(self):
+        _, options = image_mod.PromptProcessor.parse_options("[ratio:9:16 landscape] 橘猫")
+        assert options["ratio"] == "16:9"
+
+    def test_orientation_portrait_keeps(self):
+        _, options = image_mod.PromptProcessor.parse_options("[ratio:9:16 portrait] 橘猫")
+        assert options["ratio"] == "9:16"
+
+    def test_orientation_square(self):
+        _, options = image_mod.PromptProcessor.parse_options("[square] 橘猫")
+        assert options["ratio"] == "1:1"
+
+    def test_legacy_size_converted(self):
+        """旧版 size:WxH 自动换算为 mp + 约简比例。"""
+        _, options = image_mod.PromptProcessor.parse_options("[size:1024x1280] 橘猫")
+        assert options["mp"] == 1.31
+        assert options["ratio"] == "4:5"
+
+    def test_legacy_size_preset(self):
+        _, options = image_mod.PromptProcessor.parse_options("[size:small] 橘猫")
+        assert options["mp"] == 0.59
+        assert options["ratio"] == "1:1"
 
     def test_other_models_keep_global_default(self):
         _, options = image_mod.PromptProcessor.parse_options("[model:zimage] 橘猫")
-        assert options["size"] == "836x1216"
+        assert options["mp"] == 1.0
+        assert options["ratio"] == "11:16"

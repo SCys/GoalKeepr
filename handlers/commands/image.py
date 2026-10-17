@@ -6,6 +6,7 @@ import time
 from configparser import ConfigParser
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from math import gcd
 from typing import Optional, List, Dict, Any, Tuple
 import uuid
 
@@ -57,24 +58,24 @@ IMG_BYTES_TTL = 3600                     # 完成图字节在 Redis 的保留时
 PROGRESS_BAR_LEN = 14                    # 进度条长度（字符数）
 
 # 图像生成配置（LLM 优化模型从 [ai] image_optimize_models 读取，回退见 get_image_optimize_models）
-DEFAULT_SIZE = "836x1216"
-# 按模型的默认尺寸：qwen turbo 原生 ~0.6MP（与 workflow 的 FluxResolutionNode 默认一致），
-# 显式 [size:] 选项优先
-MODEL_DEFAULT_SIZE = {"qwen": "576x1024"}
+# 分辨率统一用 像素量(MP) + 宽高比 控制，与 workflow 的 FluxResolutionNode 口径一致
+DEFAULT_MP = 1.0       # 全局默认像素量（约等于旧默认 836x1216）
+DEFAULT_RATIO = "11:16"  # 全局默认宽高比（与旧默认 836x1216 同形状）
+MODEL_DEFAULT_MP = {"qwen": 0.6}  # qwen turbo 原生 0.6MP，出图更快
 DEFAULT_STEP = 8
 DEFAULT_MODEL = "qwen"
 DEFAULT_CFG = 1
 MAX_CFG = 20.0
 MAX_STEPS = 50
 MIN_STEPS = 2
-MAX_SIZE_EDGE = 4096
-MIN_SIZE_EDGE = 64
+MIN_MP = 0.02
+MAX_MP = 8.0
 
-# 尺寸映射
+# 尺寸预设（mp + 宽高比）
 SIZE_MAPPING = {
-    "mini": "128x128",
-    "small": "768x768",
-    "large": "1024x1280",
+    "mini": (0.02, "1:1"),     # ~128x128
+    "small": (0.59, "1:1"),    # ~768x768
+    "large": (1.31, "4:5"),    # ~1024x1280
 }
 IMAGE_OPTIMIZE_PROMPT = """你是文生图提示词优化专家。用户给你一句简短的绘画描述，你要把它改写成一条高质量提示词，直接交给图像生成模型（Z-Image Turbo / Krea / Flux）使用。
 
@@ -102,16 +103,29 @@ def looks_like_refusal(text: str) -> bool:
     return any(m in t for m in REFUSAL_MARKERS)
 
 
-def _is_valid_size(size: str) -> bool:
+def _reduce_ratio(w: int, h: int) -> str:
+    g = gcd(w, h)
+    return f"{w // g}:{h // g}"
+
+
+def _parse_ratio_option(text: str) -> Optional[str]:
+    """解析 "W:H" 比例（每边 1~64），返回约简后的字符串；非法返回 None。"""
+    if not re.match(r"^\d{1,2}:\d{1,2}$", text):
+        return None
+    w, h = map(int, text.split(":"))
+    if not (1 <= w <= 64 and 1 <= h <= 64):
+        return None
+    return _reduce_ratio(w, h)
+
+
+def _size_to_mp_ratio(size: str) -> Optional[Tuple[float, str]]:
+    """旧版 size:WxH 选项换算为 mp + 比例（向后兼容）。"""
     if not re.match(r"^\d{2,4}x\d{2,4}$", size):
-        return False
-    width, height = size.lower().split("x")
-    try:
-        w = int(width)
-        h = int(height)
-    except ValueError:
-        return False
-    return MIN_SIZE_EDGE <= w <= MAX_SIZE_EDGE and MIN_SIZE_EDGE <= h <= MAX_SIZE_EDGE
+        return None
+    w, h = map(int, size.lower().split("x"))
+    if not (64 <= w <= 4096 and 64 <= h <= 4096):
+        return None
+    return round(w * h / 1_000_000, 2), _reduce_ratio(w, h)
 
 
 def _allowed_models() -> set:
@@ -503,7 +517,8 @@ def render_status_message(
 ) -> str:
     """渲染任务状态消息。phase: queued/submitted/running/delivering/failed/expired"""
     model = task.options.get("model", DEFAULT_MODEL)
-    size = task.options.get("size", DEFAULT_SIZE)
+    mp = task.options.get("mp", MODEL_DEFAULT_MP.get(model, DEFAULT_MP))
+    ratio = task.options.get("ratio", DEFAULT_RATIO)
     step = task.options.get("step", DEFAULT_STEP)
     prompt_lines = (task.msg.reply_content or task.prompt or "").strip().splitlines()
     prompt_preview = prompt_lines[0][:80] if prompt_lines and prompt_lines[0] else "(empty)"
@@ -550,7 +565,7 @@ def render_status_message(
 
     lines.insert(0, head)
     lines.append("")
-    lines.append(f"🤖 {model} · {size} · {step} steps")
+    lines.append(f"🤖 {model} · {mp}MP · {ratio} · {step} steps")
     lines.append(f"📝 {prompt_preview}")
     lines.append("")
     lines.append(en)
@@ -558,16 +573,17 @@ def render_status_message(
 
 
 def build_caption(task: "Task") -> str:
-    """完成图 caption：模型/尺寸/步数/cfg/seed/耗时 + 提示词。"""
+    """完成图 caption：模型/像素量/比例/步数/cfg/seed/耗时 + 提示词。"""
     model = task.options.get("model", DEFAULT_MODEL)
-    size = task.options.get("size", DEFAULT_SIZE)
+    mp = task.options.get("mp", MODEL_DEFAULT_MP.get(model, DEFAULT_MP))
+    ratio = task.options.get("ratio", DEFAULT_RATIO)
     step = task.options.get("step", DEFAULT_STEP)
     cfg = task.options.get("cfg", DEFAULT_CFG)
     seed = task.options.get("seed", "?")
     cost = (datetime.now() - datetime.fromtimestamp(task.created_at)).total_seconds()
     prompt = (task.msg.reply_content or task.prompt or "").strip()
     caption = (
-        f"🤖 {model} · {size} · {step} steps · cfg {cfg}\n"
+        f"🤖 {model} · {mp}MP · {ratio} · {step} steps · cfg {cfg}\n"
         f"🎲 seed {seed} · ⏱ {cost:.1f}s\n\n"
         f"📝 {prompt}"
     )
@@ -644,35 +660,64 @@ class PromptProcessor:
 
     @staticmethod
     def parse_options(prompt: str) -> Tuple[str, Dict[str, Any]]:
-        """解析高级选项"""
-        options = {
-            "size": DEFAULT_SIZE,
+        """解析高级选项。
+
+        分辨率统一用 mp（像素量，百万像素）+ ratio（宽高比 W:H）+ 方向修饰
+        （portrait/landscape/square）控制；旧版 size:WxH / size:small 等仍兼容，
+        内部自动换算为 mp + ratio。
+        """
+        options: Dict[str, Any] = {
+            "mp": None,  # 解析结束后按模型填默认
+            "ratio": DEFAULT_RATIO,
             "step": DEFAULT_STEP,
             "model": DEFAULT_MODEL,
             "cfg": DEFAULT_CFG,
         }
 
         if not prompt.startswith("["):
-            # 无选项时同样按模型取默认尺寸（qwen 用原生 0.6MP）
-            options["size"] = MODEL_DEFAULT_SIZE.get(options["model"], DEFAULT_SIZE)
+            options["mp"] = MODEL_DEFAULT_MP.get(options["model"], DEFAULT_MP)
             return prompt, options
 
         try:
             end = prompt.index("]")
             options_str = prompt[1:end]
             prompt = prompt[end + 1 :].strip()
-            explicit_size = False
+            orientation: Optional[str] = None
 
             for opt in options_str.split():
                 opt = opt.lower().strip()
 
                 if opt.startswith("size:"):
-                    size = SIZE_MAPPING.get(opt[5:], opt[5:])
-                    if _is_valid_size(size):
-                        options["size"] = size
-                        explicit_size = True
+                    # 旧版兼容：size:mini/small/large 或 size:WxH → mp + ratio
+                    val = opt[5:]
+                    if val in SIZE_MAPPING:
+                        options["mp"], options["ratio"] = SIZE_MAPPING[val]
                     else:
-                        logger.warning(f"Invalid size option: {size}")
+                        conv = _size_to_mp_ratio(val)
+                        if conv:
+                            options["mp"], options["ratio"] = conv
+                        else:
+                            logger.warning(f"Invalid size option: {val}")
+                elif opt.startswith("mp:"):
+                    # 像素量（百万像素），如 mp:0.6 / mp:1.2
+                    try:
+                        v = round(float(opt[3:]), 2)
+                        if MIN_MP <= v <= MAX_MP:
+                            options["mp"] = v
+                        else:
+                            logger.warning(f"mp out of range [{MIN_MP}, {MAX_MP}]: {v}")
+                    except ValueError:
+                        logger.warning(f"Invalid mp option: {opt}")
+                elif opt.startswith("ratio:"):
+                    # 宽高比，如 ratio:9:16 / ratio:3:4
+                    r = _parse_ratio_option(opt[6:])
+                    if r:
+                        options["ratio"] = r
+                    else:
+                        logger.warning(f"Invalid ratio option: {opt}")
+                elif opt in ("portrait", "landscape", "square"):
+                    # 方向修饰：在 ratio 基础上调整（square 直接 1:1）
+                    orientation = opt
                 elif opt.startswith("step:"):
                     try:
                         step = int(opt[5:])
@@ -705,15 +750,26 @@ class PromptProcessor:
                     except ValueError:
                         logger.warning(f"Invalid seed option: {opt}")
 
-            if not explicit_size:
-                # 未显式指定尺寸时按模型取默认（qwen 用原生 0.6MP，其余用全局默认）
-                options["size"] = MODEL_DEFAULT_SIZE.get(options["model"], DEFAULT_SIZE)
+            # 方向修饰最后应用，与选项书写顺序无关
+            rw, rh = map(int, options["ratio"].split(":"))
+            lo, hi = min(rw, rh), max(rw, rh)
+            if orientation == "square":
+                options["ratio"] = "1:1"
+            elif orientation == "portrait":
+                options["ratio"] = f"{lo}:{hi}"
+            elif orientation == "landscape":
+                options["ratio"] = f"{hi}:{lo}"
+
+            if options["mp"] is None:
+                # 未显式指定像素量时按模型取默认（qwen 用原生 0.6MP，其余用全局默认）
+                options["mp"] = MODEL_DEFAULT_MP.get(options["model"], DEFAULT_MP)
 
             logger.info(f"Parsed options: {options}, prompt: {prompt}")
             return prompt, options
 
         except (ValueError, IndexError) as e:
             logger.warning(f"Failed to parse prompt options: {e}")
+            options["mp"] = options["mp"] or MODEL_DEFAULT_MP.get(options["model"], DEFAULT_MP)
             return prompt, options
 
     @staticmethod
@@ -964,16 +1020,17 @@ async def handle_queued_task(task: Task, endpoint: str, prefix: str):
     logger.info(f"{prefix} is processing task(cost {cost.total_seconds():.1f}s)")
 
     prompt = task.prompt.strip()
-    size = task.options.get("size", DEFAULT_SIZE)
-    step = task.options.get("step", DEFAULT_STEP)
     model = task.options.get("model", DEFAULT_MODEL)
+    mp = task.options.get("mp", MODEL_DEFAULT_MP.get(model, DEFAULT_MP))
+    ratio = task.options.get("ratio", DEFAULT_RATIO)
+    step = task.options.get("step", DEFAULT_STEP)
     cfg = task.options.get("cfg", DEFAULT_CFG)
     # seed 在提交前生成并持久化到 options，caption 里展示给用户用于复现
     seed = task.options.setdefault("seed", random.randint(0, 0xFFFFFFFFFFFFFFFF))
 
     try:
         job_id = await asyncio.wait_for(
-            comfy_api.generate_image(endpoint, model, prompt, size, step, cfg, seed=seed),
+            comfy_api.generate_image(endpoint, model, prompt, mp, ratio, step, cfg, seed=seed),
             timeout=DEFAULT_GENERATION_TIMEOUT,
         )
 
