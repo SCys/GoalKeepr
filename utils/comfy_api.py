@@ -192,7 +192,10 @@ def create_workflow(
         # 分辨率走 FluxResolutionNode：megapixel + 宽高比，latent 宽高由它按
         # divisible_by=64 计算，与 ComfyUI 里的原生控制方式一致（不写死 latent 宽高）
         res = workflow["17"]["inputs"]
-        res["megapixel"] = f"{mp:.2f}"
+        # megapixel 是下拉枚举（0.1~2.5，步进 0.1，共 25 项），任意值会被
+        # ComfyUI 校验拒绝（prompt_outputs_failed_validation），必须吸附到最近档位
+        mp_snapped = min(2.5, max(0.1, round(mp * 10) / 10))
+        res["megapixel"] = f"{mp_snapped:.1f}"
         res["custom_ratio"] = True
         res["custom_aspect_ratio"] = ratio
         return workflow

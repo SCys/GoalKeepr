@@ -110,18 +110,28 @@ class TestQwenWorkflow:
         assert wf["15:6"]["inputs"]["steps"] == 8
         assert wf["15:6"]["inputs"]["cfg"] == 1.5
         assert wf["15:4"]["inputs"]["prompt"] == "一只橘猫"
-        # 分辨率走 FluxResolutionNode：megapixel + 宽高比，latent 节点保持链接不动
+        # 分辨率走 FluxResolutionNode：megapixel（吸附到 0.1 档位）+ 宽高比，
+        # latent 节点保持链接不动
         res = wf["17"]["inputs"]
-        assert res["megapixel"] == "1.31"
+        assert res["megapixel"] == "1.3"  # 1.31 吸附到最近档位
         assert res["custom_ratio"] is True
         assert res["custom_aspect_ratio"] == "4:5"
         assert wf["16"]["inputs"]["width"] == ["17", 0]
         assert wf["16"]["inputs"]["height"] == ["17", 1]
 
+    def test_megapixel_snapped_to_dropdown(self):
+        """megapixel 是 0.1~2.5 步进 0.1 的枚举，任意值必须吸附（否则 ComfyUI 拒收）。"""
+        wf = comfy_api.create_workflow("qwen", "cat", 0.59, "1:1", 8, 1)
+        assert wf["17"]["inputs"]["megapixel"] == "0.6"
+        wf = comfy_api.create_workflow("qwen", "cat", 8.0, "1:1", 8, 1)
+        assert wf["17"]["inputs"]["megapixel"] == "2.5"  # 超上限夹紧
+        wf = comfy_api.create_workflow("qwen", "cat", 0.02, "1:1", 8, 1)
+        assert wf["17"]["inputs"]["megapixel"] == "0.1"  # 低下限夹紧
+
     def test_create_workflow_megapixel_default(self):
         """qwen 默认 0.6MP / 9:16，与 workflow 原生默认对齐。"""
         wf = comfy_api.create_workflow("qwen", "cat", 0.6, "9:16", 8, 1)
-        assert wf["17"]["inputs"]["megapixel"] == "0.60"
+        assert wf["17"]["inputs"]["megapixel"] == "0.6"
         assert wf["17"]["inputs"]["custom_aspect_ratio"] == "9:16"
 
     def test_create_workflow_clamps_steps(self):
