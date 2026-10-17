@@ -110,9 +110,19 @@ class TestQwenWorkflow:
         assert wf["15:6"]["inputs"]["steps"] == 8
         assert wf["15:6"]["inputs"]["cfg"] == 1.5
         assert wf["15:4"]["inputs"]["prompt"] == "一只橘猫"
-        # 显式尺寸写入 latent 节点，绕过 FluxResolutionNode
-        assert wf["16"]["inputs"]["width"] == 1024
-        assert wf["16"]["inputs"]["height"] == 1280
+        # 分辨率走 FluxResolutionNode：megapixel + 约简宽高比，latent 节点保持链接不动
+        res = wf["17"]["inputs"]
+        assert res["megapixel"] == "1.31"
+        assert res["custom_ratio"] is True
+        assert res["custom_aspect_ratio"] == "4:5"
+        assert wf["16"]["inputs"]["width"] == ["17", 0]
+        assert wf["16"]["inputs"]["height"] == ["17", 1]
+
+    def test_create_workflow_megapixel_default_size(self):
+        """qwen 默认 576x1024 ≈ 0.59MP，与 workflow 原生 0.6MP 对齐。"""
+        wf = comfy_api.create_workflow("qwen", "cat", 576, 1024, 8, 1)
+        assert wf["17"]["inputs"]["megapixel"] == "0.59"
+        assert wf["17"]["inputs"]["custom_aspect_ratio"] == "9:16"
 
     def test_create_workflow_clamps_steps(self):
         """turbo LoRA 至少 6 步。"""

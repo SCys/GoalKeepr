@@ -3,6 +3,7 @@ import copy
 import random
 import re
 import uuid
+from math import gcd
 from typing import Optional, Dict, Any, Tuple
 
 from aiohttp import ClientSession, ClientTimeout, ClientError, WSMsgType
@@ -201,9 +202,13 @@ def create_workflow(
         workflow["15:6"]["inputs"]["steps"] = max(steps, 6)
         workflow["15:6"]["inputs"]["cfg"] = max(cfg, 1)
         workflow["15:4"]["inputs"]["prompt"] = prompt
-        # 显式尺寸：直接写 latent 宽高，绕过 FluxResolutionNode 的固定比例计算
-        workflow["16"]["inputs"]["width"] = width
-        workflow["16"]["inputs"]["height"] = height
+        # 分辨率走 FluxResolutionNode：megapixel + 自定义宽高比，latent 宽高由它按
+        # divisible_by=64 计算，与 ComfyUI 里的原生控制方式一致（不写死 latent 宽高）
+        res = workflow["17"]["inputs"]
+        res["megapixel"] = f"{width * height / 1_000_000:.2f}"
+        res["custom_ratio"] = True
+        g = gcd(width, height)
+        res["custom_aspect_ratio"] = f"{width // g}:{height // g}"
     elif checkpoint == "krea":
         workflow["3"]["inputs"]["seed"] = seed
         workflow["3"]["inputs"]["steps"] = max(steps, 4)

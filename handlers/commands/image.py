@@ -58,6 +58,9 @@ PROGRESS_BAR_LEN = 14                    # 进度条长度（字符数）
 
 # 图像生成配置（LLM 优化模型从 [ai] image_optimize_models 读取，回退见 get_image_optimize_models）
 DEFAULT_SIZE = "836x1216"
+# 按模型的默认尺寸：qwen turbo 原生 ~0.6MP（与 workflow 的 FluxResolutionNode 默认一致），
+# 显式 [size:] 选项优先
+MODEL_DEFAULT_SIZE = {"qwen": "576x1024"}
 DEFAULT_STEP = 8
 DEFAULT_MODEL = "qwen"
 DEFAULT_CFG = 1
@@ -650,12 +653,15 @@ class PromptProcessor:
         }
 
         if not prompt.startswith("["):
+            # 无选项时同样按模型取默认尺寸（qwen 用原生 0.6MP）
+            options["size"] = MODEL_DEFAULT_SIZE.get(options["model"], DEFAULT_SIZE)
             return prompt, options
 
         try:
             end = prompt.index("]")
             options_str = prompt[1:end]
             prompt = prompt[end + 1 :].strip()
+            explicit_size = False
 
             for opt in options_str.split():
                 opt = opt.lower().strip()
@@ -664,6 +670,7 @@ class PromptProcessor:
                     size = SIZE_MAPPING.get(opt[5:], opt[5:])
                     if _is_valid_size(size):
                         options["size"] = size
+                        explicit_size = True
                     else:
                         logger.warning(f"Invalid size option: {size}")
                 elif opt.startswith("step:"):
@@ -697,6 +704,10 @@ class PromptProcessor:
                             logger.warning(f"Seed out of range: {seed}")
                     except ValueError:
                         logger.warning(f"Invalid seed option: {opt}")
+
+            if not explicit_size:
+                # 未显式指定尺寸时按模型取默认（qwen 用原生 0.6MP，其余用全局默认）
+                options["size"] = MODEL_DEFAULT_SIZE.get(options["model"], DEFAULT_SIZE)
 
             logger.info(f"Parsed options: {options}, prompt: {prompt}")
             return prompt, options

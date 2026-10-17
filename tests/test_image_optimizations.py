@@ -325,3 +325,23 @@ class TestActiveTaskHandler:
 
         await image_mod.handle_active_task(task, "http://comfy", "test", fake_redis)
         assert task.status == "completed"
+
+
+class TestModelDefaultSize:
+    """未显式指定尺寸时按模型取默认（qwen 0.6MP），显式 size 优先。"""
+
+    def test_qwen_default_size_without_options(self):
+        _, options = image_mod.PromptProcessor.parse_options("橘猫")
+        assert options["size"] == "576x1024"
+
+    def test_qwen_default_size_with_other_options(self):
+        _, options = image_mod.PromptProcessor.parse_options("[model:qwen raw] 橘猫")
+        assert options["size"] == "576x1024"
+
+    def test_explicit_size_wins(self):
+        _, options = image_mod.PromptProcessor.parse_options("[size:1024x1024] 橘猫")
+        assert options["size"] == "1024x1024"
+
+    def test_other_models_keep_global_default(self):
+        _, options = image_mod.PromptProcessor.parse_options("[model:zimage] 橘猫")
+        assert options["size"] == "836x1216"
