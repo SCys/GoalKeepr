@@ -186,7 +186,8 @@ def create_workflow(
 
     if checkpoint == "qwen":
         workflow["15:6"]["inputs"]["seed"] = seed
-        workflow["15:6"]["inputs"]["steps"] = max(steps, 6)
+        # 8 步 turbo LoRA（p_qwen_image_2.1_8step），步数下限对齐
+        workflow["15:6"]["inputs"]["steps"] = max(steps, 8)
         workflow["15:6"]["inputs"]["cfg"] = max(cfg, 1)
         workflow["15:4"]["inputs"]["prompt"] = prompt
         # 分辨率走 FluxResolutionNode：megapixel + 宽高比，latent 宽高由它按

@@ -135,9 +135,16 @@ class TestQwenWorkflow:
         assert wf["17"]["inputs"]["custom_aspect_ratio"] == "9:16"
 
     def test_create_workflow_clamps_steps(self):
-        """turbo LoRA 至少 6 步。"""
+        """8 步 turbo LoRA（p_qwen_image_2.1_8step），步数下限 8。"""
         wf = comfy_api.create_workflow("qwen", "cat", 0.26, "1:1", 2, 1)
-        assert wf["15:6"]["inputs"]["steps"] == 6
+        assert wf["15:6"]["inputs"]["steps"] == 8
+
+    def test_qwen_uses_cache_node(self):
+        """KSampler 走 QwenImage21Cache（int8 缓存加速）。"""
+        wf = comfy_api.create_workflow("qwen", "cat", 0.6, "9:16", 8, 1)
+        assert wf["15:6"]["inputs"]["model"] == ["15:37", 0]
+        assert wf["15:37"]["class_type"] == "QwenImage21Cache"
+        assert wf["15:37"]["inputs"]["model"] == ["15:29", 0]
 
     def test_mp_ratio_to_pixels(self):
         """mp+比例按 64 对齐换算显式宽高（非 qwen 模型用）。"""
