@@ -10,14 +10,13 @@ logger = manager.logger
 
 DELETED_AFTER = 60  # 无权限提示的自动删除时间（秒）
 
-
 def _is_global_admin(user_id: int) -> bool:
     """全局 admin（[telegram] admin 配置的单个用户 ID）。"""
     admin_raw = manager.config["telegram"].get("admin", "").strip()
     return admin_raw.isdigit() and user_id == int(admin_raw)
 
 
-@manager.register("message", pattern=r"(?i)^/captcha_stats(\s+-?\d+)?$")
+@manager.register("message", pattern=r"(?i)^/captcha_stats(?:@[a-zA-Z0-9_]+)?(?:\s+-?\d+)?$")
 async def captcha_stats(event: events.NewMessage.Event):
     """查看验证统计。用法: /captcha_stats [群ID]
 
@@ -25,8 +24,8 @@ async def captcha_stats(event: events.NewMessage.Event):
     （群内不带参数时默认本群）；其他人一律拒绝。
     """
     text = event.raw_text.strip()
-    # 群 ID 是负数（-100...），必须允许前导负号
-    m = re.match(r"(?i)^/captcha_stats(?:\s+(-?\d+))?\s*$", text)
+    # 群 ID 是负数（-100...），必须允许前导负号，同时支持 @bot 形式
+    m = re.match(r"(?i)^/captcha_stats(?:@[a-zA-Z0-9_]+)?(?:\s+(-?\d+))?\s*$", text)
     group_id = int(m.group(1)) if m and m.group(1) else None
 
     sender = await event.get_sender()

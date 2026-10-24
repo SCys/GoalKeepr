@@ -45,6 +45,13 @@ class TestPermission:
         event.reply.assert_called_once()
         assert "群 ID: -100123456" in event.reply.call_args[0][0]
 
+    async def test_global_admin_queries_with_bot_mention(self, admin_config, fake_redis):
+        """支持带有 @bot_username 的命令形式。"""
+        event = _make_event("/captcha_stats@my_bot -100123456", sender_id=777)
+        await cs_mod.captcha_stats(event)
+        event.reply.assert_called_once()
+        assert "群 ID: -100123456" in event.reply.call_args[0][0]
+
     async def test_group_admin_defaults_to_own_group(self, admin_config, fake_redis):
         """群管理员在群内不带参数 → 默认查本群（不再是全局）。"""
         admin_config.is_admin = AsyncMock(return_value=True)

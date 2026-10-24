@@ -6,7 +6,7 @@ from manager import manager
 logger = manager.logger
 
 
-@manager.register("message", pattern="/id")
+@manager.register("message", pattern=r"(?i)^/id(?:@[a-zA-Z0-9_]+)?(?:\s|$)")
 async def whoami(event: events.NewMessage.Event):
     """我的信息"""
     if event.is_reply:

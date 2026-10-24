@@ -141,6 +141,10 @@ cython_debug/
 /.vscode
 
 /main.ini
+data/*.db
+data/*.session*
+*.session
+*.session-journal
 
 # ai commands
 .gemini/

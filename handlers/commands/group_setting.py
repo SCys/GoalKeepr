@@ -177,6 +177,9 @@ async def handle_pending_input(event: events.NewMessage.Event):
     chat = await event.get_chat()
     user = await event.get_sender()
 
+    if not chat or not user:
+        return
+
     rdb = await manager.get_redis()
     if not rdb:
         return

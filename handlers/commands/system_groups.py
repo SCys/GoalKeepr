@@ -38,8 +38,8 @@ async def _build_page(page: int) -> tuple:
     tasks = []
     chat_ids = []
 
-    for chat_id_bytes in names_raw:
-        cid = int(chat_id_bytes.decode())
+    for chat_id_key in names_raw:
+        cid = int(chat_id_key.decode() if isinstance(chat_id_key, bytes) else chat_id_key)
         chat_ids.append(cid)
         tasks.append(
             asyncio.wait_for(
@@ -54,14 +54,15 @@ async def _build_page(page: int) -> tuple:
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     for i, cid in enumerate(chat_ids):
-        title = names_raw[str(cid).encode()].decode() if isinstance(names_raw.get(str(cid).encode()), bytes) else str(cid)
+        title_raw = names_raw.get(str(cid).encode()) or names_raw.get(str(cid)) or str(cid)
+        title = title_raw.decode() if isinstance(title_raw, bytes) else str(title_raw)
         if isinstance(results[i], BaseException) or results[i] is None:
             continue
         raw, persons_count = results[i]
-        joins = int(raw.get(FIELD_GROUP_JOINS.encode(), b"0"))
-        verifications = int(raw.get(FIELD_VERIFICATIONS.encode(), b"0"))
-        success = int(raw.get(FIELD_SUCCESS.encode(), b"0"))
-        failed = int(raw.get(FIELD_FAILED.encode(), b"0"))
+        joins = int(raw.get(FIELD_GROUP_JOINS.encode(), raw.get(FIELD_GROUP_JOINS, 0)))
+        verifications = int(raw.get(FIELD_VERIFICATIONS.encode(), raw.get(FIELD_VERIFICATIONS, 0)))
+        success = int(raw.get(FIELD_SUCCESS.encode(), raw.get(FIELD_SUCCESS, 0)))
+        failed = int(raw.get(FIELD_FAILED.encode(), raw.get(FIELD_FAILED, 0)))
         total = success + failed
         rate = f"{success / total * 100:.1f}%" if total > 0 else "N/A"
         groups.append((joins, cid, title, verifications, success, failed, persons_count, rate))

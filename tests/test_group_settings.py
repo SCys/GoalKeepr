@@ -181,3 +181,25 @@ async def test_handle_silence_mode_sleep_2weeks_restricts_14_days(monkeypatch, m
     restrict.assert_awaited_once_with(chat, 42, timedelta(days=14))
     # 通知目标应是 chat 实体，而不是裸 int id
     assert send.await_args.args[0] is chat
+
+
+@pytest.mark.asyncio
+async def test_handle_pending_input_ignores_none_user(fake_redis, mock_manager):
+    from handlers.commands.group_setting import handle_pending_input, PENDING_KEY_PREFIX
+
+    mock_manager.get_redis = AsyncMock(return_value=fake_redis)
+    await fake_redis.hset(
+        f"{PENDING_KEY_PREFIX}{BARE_CHANNEL_ID}",
+        mapping={"type": "sleep_custom", "user_id": "42", "msg_id": "100"},
+    )
+
+    event = SimpleNamespace(
+        get_chat=AsyncMock(return_value=SimpleNamespace(id=BARE_CHANNEL_ID)),
+        get_sender=AsyncMock(return_value=None),
+        delete=AsyncMock(),
+        text="7",
+    )
+
+    # Should safely return without raising AttributeError
+    await handle_pending_input(event)
+    event.delete.assert_not_awaited()

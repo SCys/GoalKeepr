@@ -90,11 +90,11 @@ async def lazy_messages() -> int:
                         task = task.decode()
                     try:
                         chat_id, msg_id = map(int, task.split(":"))
-                        if await manager.delete_message(chat_id, msg_id):
-                            await rdb.zrem("lazy_delete_messages", task)
-                            processed += 1
-                        else:
-                            logger.warning(f"lazy_messages delete failed: {task}")
+                        deleted = await manager.delete_message(chat_id, msg_id)
+                        if not deleted:
+                            logger.warning(f"lazy_messages delete failed (message missing or forbidden), task removed: {task}")
+                        await rdb.zrem("lazy_delete_messages", task)
+                        processed += 1
                     except Exception as e:
                         logger.exception(f"lazy_messages redis task {task} error: {e}")
                         await rdb.zrem("lazy_delete_messages", task)
@@ -107,9 +107,14 @@ async def lazy_messages() -> int:
         
         for row in rows:
             # row: id, chat, msg
-            if await manager.delete_message(row[1], row[2]):
-                await database.execute("delete from lazy_delete_messages where id=?", (row[0],))
-                processed += 1
+            try:
+                deleted = await manager.delete_message(row[1], row[2])
+                if not deleted:
+                    logger.warning(f"lazy_messages sqlite delete failed, row removed: {row[0]}")
+            except Exception as e:
+                logger.exception(f"lazy_messages sqlite task {row[0]} error: {e}")
+            await database.execute("delete from lazy_delete_messages where id=?", (row[0],))
+            processed += 1
     except Exception as e:
         logger.error(f"lazy_messages error: {e}")
     return processed
@@ -150,9 +155,9 @@ async def lazy_sessions() -> int:
                             else:
                                 try:
                                     await func(manager.client, chat, msg, member)
-                                    remove_task = True
                                 except Exception as e:
                                     logger.error(f"lazy_session func {session_type} error: {e}")
+                                remove_task = True
                     except Exception as e:
                         logger.error(f"lazy_sessions redis task {task} error: {e}")
                         remove_task = True
@@ -190,7 +195,6 @@ async def lazy_sessions() -> int:
                     await func(manager.client, chat, msg, member)
                 except Exception as e:
                     logger.error(f"lazy_session func {session_type} error: {e}")
-                    continue
             else:
                 logger.error(f"lazy_session handler missing: {session_type}")
             

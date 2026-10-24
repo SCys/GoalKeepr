@@ -543,10 +543,44 @@ class Manager:
 
     async def create_session(self) -> aiohttp.ClientSession:
         """
-        创建或复用 HTTP 会话
+        创建或复用 HTTP 会话，支持配置中的代理设置
         """
         if self.http_session is None or self.http_session.closed:
-            self.http_session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30))
+            connector = None
+            proxy_url = self.config["telegram"].get("proxy", "").strip() if "telegram" in self.config else ""
+            if proxy_url:
+                try:
+                    from python_socks.async_.asyncio import Proxy
+
+                    class _ProxyConnector(aiohttp.TCPConnector):
+                        def __init__(self, p_url: str, **kwargs):
+                            super().__init__(**kwargs)
+                            self._proxy = Proxy.from_url(p_url)
+
+                        async def _create_connection(self, req, traces, timeout):
+                            sslcontext = self._get_ssl_context(req)
+                            sock = await self._proxy.connect(
+                                dest_host=req.host,
+                                dest_port=req.port,
+                                timeout=timeout.sock_connect,
+                            )
+                            transport, protocol = await self._loop.create_connection(
+                                self._factory,
+                                ssl=sslcontext,
+                                sock=sock,
+                                server_hostname=req.host if sslcontext else None,
+                            )
+                            return transport, protocol
+
+                    connector = _ProxyConnector(proxy_url)
+                except Exception as e:
+                    logger.warning(f"failed to initialize proxy connector for aiohttp: {e}")
+
+            self.http_session = aiohttp.ClientSession(
+                connector=connector,
+                trust_env=True,
+                timeout=aiohttp.ClientTimeout(total=30),
+            )
         return self.http_session
 
     async def close_http_session(self) -> None:

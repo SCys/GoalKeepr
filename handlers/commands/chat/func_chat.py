@@ -52,52 +52,39 @@ async def _extract_media(event, reply_msg) -> List[Tuple[str, str]]:
 
 
 async def _reply_response(event, text_resp: str, prefix: str) -> bool:
-    """Send raw Markdown as Rich Messages through the Bot API."""
-    sent_chunks = 0
+    """Send reply through the Bot API with fallback to plain text and Telethon."""
     try:
         session = await manager.create_session()
         token = manager.config["telegram"]["token"]
-        url = f"https://api.telegram.org/bot{token}/sendRichMessage"
-        chunks = telegramify_markdown.telegramify_rich(text_resp, mode="html")
-        if not chunks:
-            raise ValueError("empty Rich Message response")
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {
+            "chat_id": event.chat_id,
+            "text": text_resp,
+            "parse_mode": "Markdown",
+        }
+        if event.id is not None:
+            payload["reply_parameters"] = {"message_id": event.id}
 
-        for chunk in chunks:
-            payload = {
-                "chat_id": event.chat_id,
-                "rich_message": chunk.to_dict(),
-            }
-            if event.id is not None:
-                payload["reply_parameters"] = {"message_id": event.id}
-            async with session.post(url, json=payload) as response:
-                result = await response.json()
-                if response.status != 200 or not result.get("ok"):
-                    raise RuntimeError(result.get("description", f"HTTP {response.status}"))
-            sent_chunks += 1
-    except Exception:
-        logger.exception(f"{prefix} Rich Message reply failed")
-        if sent_chunks:
-            return False
+        async with session.post(url, json=payload) as response:
+            result = await response.json()
+            if response.status == 200 and result.get("ok"):
+                return True
 
-        logger.warning(f"{prefix} no Rich Message chunk was sent, falling back to plain Bot API")
+        # Fallback to plain text if Markdown parsing fails
+        payload.pop("parse_mode", None)
+        async with session.post(url, json=payload) as response:
+            result = await response.json()
+            if response.status == 200 and result.get("ok"):
+                return True
+            raise RuntimeError(result.get("description", f"HTTP {response.status}"))
+    except Exception as e:
+        logger.warning(f"{prefix} Bot API reply failed, falling back to Telethon: {e}")
         try:
-            session = await manager.create_session()
-            token = manager.config["telegram"]["token"]
-            url = f"https://api.telegram.org/bot{token}/sendMessage"
-            payload = {
-                "chat_id": event.chat_id,
-                "text": text_resp,
-            }
-            if event.id is not None:
-                payload["reply_parameters"] = {"message_id": event.id}
-            async with session.post(url, json=payload) as response:
-                result = await response.json()
-                if response.status != 200 or not result.get("ok"):
-                    raise RuntimeError(result.get("description", f"HTTP {response.status}"))
-        except Exception:
-            logger.exception(f"{prefix} plain Bot API reply failed")
+            await event.reply(text_resp)
+            return True
+        except Exception as telethon_err:
+            logger.error(f"{prefix} Telethon reply fallback failed: {telethon_err}")
             return False
-    return True
 
 
 @manager.register("message", pattern=r"(?i)^/chat(?:\s|$)|^/chat@[a-zA-Z0-9_]+(?:\s|$)")

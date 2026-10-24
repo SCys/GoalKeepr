@@ -81,6 +81,7 @@ async def test_lurk_timeout_kicks_inactive_user(mock_manager, fake_redis):
         await first_msg_timeout(mock_manager.client, CHAT_ID, 0, USER_ID)
 
     mock_manager.ban_member.assert_awaited()
+    mock_manager.send.assert_awaited()
     # Watch key deleted
     assert await fake_redis.get(f"first_msg_watch:{CHAT_ID}:{USER_ID}") is None
 
