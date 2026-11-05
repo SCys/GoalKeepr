@@ -124,3 +124,59 @@ async def test_group_setting_toggle_callbacks(mock_manager, fake_redis):
     await group_setting_callback(event2)
     val2 = await settings_get(fake_redis, CHAT_ID, "lurk_check_5min")
     assert val2 == "on"
+
+
+@pytest.mark.asyncio
+async def test_first_message_llm_spam_detected(mock_manager, fake_redis, mock_advertising_config):
+    from handlers.utils.llm import LLMUserEvaluation
+    await fake_redis.set(f"first_msg_watch:{CHAT_ID}:{USER_ID}", "1")
+    await settings_set(fake_redis, CHAT_ID, {"first_msg_check": "on"})
+
+    msg = _make_msg(text="点击链接领取免费USDT https://t.me/fake_airdrop")
+    with patch("handlers.default.check_spams_with_llm", new=AsyncMock()) as mock_llm:
+        mock_llm.return_value = [
+            LLMUserEvaluation(id=USER_ID, score=95, is_spam=True, reason="虚假空投引流")
+        ]
+        await default_handler(msg)
+        mock_llm.assert_awaited_once()
+        assert mock_llm.await_args.kwargs.get("message") == "点击链接领取免费USDT https://t.me/fake_airdrop"
+
+    msg.delete.assert_awaited()
+    mock_manager.ban_member.assert_awaited()
+    mock_manager.send.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_first_message_llm_clean_passed(mock_manager, fake_redis, mock_advertising_config):
+    from handlers.utils.llm import LLMUserEvaluation
+    await fake_redis.set(f"first_msg_watch:{CHAT_ID}:{USER_ID}", "1")
+    await settings_set(fake_redis, CHAT_ID, {"first_msg_check": "on"})
+
+    msg = _make_msg(text="请问这个项目的最新文档在哪里可以查看？")
+    with patch("handlers.default.check_spams_with_llm", new=AsyncMock()) as mock_llm:
+        mock_llm.return_value = [
+            LLMUserEvaluation(id=USER_ID, score=10, is_spam=False, reason="普通技术探讨")
+        ]
+        await default_handler(msg)
+        mock_llm.assert_awaited_once()
+
+    assert await fake_redis.get(f"first_msg_watch:{CHAT_ID}:{USER_ID}") is None
+    mock_manager.lazy_session_delete.assert_awaited_with(CHAT_ID, USER_ID, "first_msg_timeout")
+    msg.delete.assert_not_awaited()
+    mock_manager.ban_member.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_check_spams_with_llm_includes_first_message():
+    from handlers.utils.llm import check_spams_with_llm
+    sender = SimpleNamespace(id=12345, first_name="Spam", last_name="Bot", username="spambot")
+    with patch("handlers.utils.llm.chat_completions", new=AsyncMock()) as mock_chat:
+        mock_chat.return_value = '{"evaluations": [{"id": 12345, "score": 90, "is_spam": true, "reason": "引流"}]}'
+        results = await check_spams_with_llm([sender], message="加微信号领福利")
+        assert len(results) == 1
+        assert results[0].id == 12345
+        assert results[0].is_spam is True
+        call_messages = mock_chat.await_args.args[0]
+        user_prompt = call_messages[1]["content"]
+        assert "加微信号领福利" in user_prompt
+        assert "first_message" in user_prompt

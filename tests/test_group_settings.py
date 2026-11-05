@@ -203,3 +203,28 @@ async def test_handle_pending_input_ignores_none_user(fake_redis, mock_manager):
     # Should safely return without raising AttributeError
     await handle_pending_input(event)
     event.delete.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_handle_pending_input_non_text_message(fake_redis, mock_manager):
+    from handlers.commands.group_setting import handle_pending_input, PENDING_KEY_PREFIX
+
+    mock_manager.get_redis = AsyncMock(return_value=fake_redis)
+    await fake_redis.hset(
+        f"{PENDING_KEY_PREFIX}{BARE_CHANNEL_ID}",
+        mapping={"type": "sleep_custom", "user_id": "42", "msg_id": "100"},
+    )
+
+    # Simulate non-text message (e.g. photo or sticker where text is None)
+    event = SimpleNamespace(
+        get_chat=AsyncMock(return_value=SimpleNamespace(id=BARE_CHANNEL_ID)),
+        get_sender=AsyncMock(return_value=SimpleNamespace(id=42)),
+        delete=AsyncMock(),
+        text=None,
+    )
+
+    await handle_pending_input(event)
+    event.delete.assert_awaited_once()
+    mock_manager.edit_text.assert_awaited()
+    args = mock_manager.edit_text.await_args.args
+    assert "必须是 1 到 365 之间的纯数字天数" in args[2]

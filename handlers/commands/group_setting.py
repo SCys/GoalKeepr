@@ -201,7 +201,7 @@ async def handle_pending_input(event: events.NewMessage.Event):
 
     await rdb.delete(pending_key)
 
-    text = event.text.strip()
+    text = (event.text or "").strip()
     msg_id = int(saved.get("msg_id", 0))
 
     if not text.isdigit() or not (1 <= int(text) <= 365):

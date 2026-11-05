@@ -5,6 +5,7 @@ Advertising words detection module
 """
 
 import re
+import functools
 from typing import List, Tuple, Optional, Dict, Any, Union
 
 from manager import manager
@@ -38,6 +39,32 @@ def load_advertising_words() -> List[str]:
     return words
 
 
+@functools.lru_cache(maxsize=64)
+def _compile_advertising_patterns(patterns_str: str) -> List[Dict[str, Any]]:
+    patterns = []
+    pattern_items = [p.strip() for p in patterns_str.split(";") if p.strip()]
+
+    for i, pattern_str in enumerate(pattern_items):
+        parts = pattern_str.split(":", 1)
+        if len(parts) == 2:
+            name, pattern = parts[0].strip(), parts[1].strip()
+        else:
+            name, pattern = f"pattern_{i+1}", pattern_str.strip()
+
+        try:
+            compiled = re.compile(pattern, re.IGNORECASE)
+            patterns.append({
+                "pattern": pattern,
+                "compiled": compiled,
+                "name": name,
+            })
+        except re.error as e:
+            logger.error(f"Failed to compile regex pattern '{pattern}': {e}")
+
+    logger.debug(f"Compiled {len(patterns)} advertising regex patterns")
+    return patterns
+
+
 def load_advertising_patterns() -> List[Dict[str, Any]]:
     """
     从配置中加载广告词正则表达式模式
@@ -63,34 +90,8 @@ def load_advertising_patterns() -> List[Dict[str, Any]]:
     patterns_str = config["advertising"].get("regex_patterns", "")
     if not patterns_str:
         return []
-    
-    patterns = []
-    
-    # Split by semicolon for different patterns
-    pattern_items = [p.strip() for p in patterns_str.split(";") if p.strip()]
-    
-    for i, pattern_str in enumerate(pattern_items):
-        # Split by colon for pattern name and pattern
-        parts = pattern_str.split(":", 1)
-        
-        if len(parts) == 2:
-            name, pattern = parts[0].strip(), parts[1].strip()
-        else:
-            name, pattern = f"pattern_{i+1}", pattern_str.strip()
-        
-        try:
-            compiled = re.compile(pattern, re.IGNORECASE)
-            patterns.append({
-                "pattern": pattern,
-                "compiled": compiled,
-                "name": name
-            })
-            # logger.info(f"Loaded advertising regex pattern: {name}")
-        except re.error as e:
-            logger.error(f"Failed to compile regex pattern '{pattern}': {e}")
-    
-    logger.debug(f"Loaded {len(patterns)} advertising regex patterns from configuration")
-    return patterns
+
+    return _compile_advertising_patterns(patterns_str)
 
 
 def check_advertising(text: Optional[str]) -> Tuple[bool, Optional[str]]:

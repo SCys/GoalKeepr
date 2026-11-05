@@ -177,7 +177,11 @@ async def member_captcha(event: events.ChatAction.Event):
     check_list = await get_member_info_for_check(user, session)
 
     # 执行安全检查；广告命中直接长期封禁，其他结果保留验证码流程。
-    security_reason = await perform_security_checks(user, session, check_list, log_context, now)
+    try:
+        security_reason = await perform_security_checks(user, session, check_list, log_context, now)
+    except Exception as e:
+        logger.exception(f"{log_context.log_prefix} | security check exception: {e}")
+        security_reason = None
     if security_reason:
         logger.warning(f"{log_context.log_prefix} | 安全检查未通过 | reason:{security_reason}")
         await CaptchaSession.flag(chat.id, user.id, security_reason)

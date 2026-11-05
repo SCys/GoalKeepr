@@ -1,6 +1,6 @@
 """/chat 预设模型表与多模态输入测试。"""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from orjson import loads
 
@@ -86,3 +86,79 @@ async def test_unknown_model_falls_back_to_conservative_limits(mock_manager, fak
     assert captured["data"]["model"] == "some-new-model"
     assert captured["data"]["max_tokens"] == 4096
     assert "some-new-model" in out  # Powered by 原始名
+
+
+async def test_chat_reset_uses_current_utc_for_deletion(mock_manager, fake_redis):
+    """Verify /chat reset calculates deletion time from current UTC, not stale event.date."""
+    from datetime import datetime, timezone, timedelta
+    from types import SimpleNamespace
+    from handlers.commands.chat.func_chat import chat
+
+    stale_date = datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    event = SimpleNamespace(
+        chat_id=-1001,
+        id=10,
+        text="/chat reset",
+        date=stale_date,
+        is_reply=False,
+        message=None,
+        get_chat=AsyncMock(return_value=SimpleNamespace(id=-1001)),
+        get_sender=AsyncMock(return_value=SimpleNamespace(id=999, first_name="U")),
+        get_reply_message=AsyncMock(return_value=None),
+        reply=AsyncMock(return_value=SimpleNamespace(id=101)),
+    )
+    mock_manager.get_redis = AsyncMock(return_value=fake_redis)
+    await fake_redis.set("chat:history:999", "some_history")
+
+    with patch.object(mock_manager, "reply", new=AsyncMock()) as mock_reply:
+        await chat(event)
+        mock_reply.assert_awaited_once()
+        auto_del = mock_reply.await_args.kwargs.get("auto_deleted_at")
+        assert auto_del is not None
+        assert auto_del > datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    assert await fake_redis.get("chat:history:999") is None
+    mock_manager.delete_message.assert_awaited()
+    auto_del = mock_manager.delete_message.await_args.args[2]
+    assert auto_del is not None
+    assert auto_del > datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
+async def test_translate_uses_to_thread(mock_manager, monkeypatch):
+    """Verify translate calls ts.translate_text asynchronously via asyncio.to_thread."""
+    import asyncio
+    import sys
+    from unittest.mock import MagicMock, patch
+    from types import SimpleNamespace
+    from datetime import datetime, timezone
+
+    # pydub requires audioop which was removed in Python 3.14
+    monkeypatch.setitem(sys.modules, "pydub", MagicMock())
+    monkeypatch.setitem(sys.modules, "pydub.audio_segment", MagicMock())
+    monkeypatch.setitem(sys.modules, "utils.tts", MagicMock())
+
+    from handlers.commands.translate import translate
+
+    thread_called = False
+
+    async def spy_to_thread(func, *args, **kwargs):
+        nonlocal thread_called
+        thread_called = True
+        return "你好世界"
+
+    monkeypatch.setattr(asyncio, "to_thread", spy_to_thread)
+
+    event = SimpleNamespace(
+        id=10,
+        text="/tr Hello world",
+        date=datetime.now(timezone.utc),
+        is_reply=False,
+        reply_to_msg_id=None,
+        get_sender=AsyncMock(return_value=SimpleNamespace(id=999, first_name="U")),
+        respond=AsyncMock(),
+    )
+
+    with patch("handlers.commands.translate.reply_tts", new=AsyncMock()) as mock_tts:
+        await translate(event)
+        assert thread_called is True
+        mock_tts.assert_awaited_once()

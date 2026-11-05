@@ -95,7 +95,7 @@ async def _build_page(page: int) -> tuple:
     return "\n".join(lines), buttons, total_pages
 
 
-@manager.register("message", pattern=r"(?i)^/system_groups$")
+@manager.register("message", pattern=r"(?i)^/system_groups(?:@[a-zA-Z0-9_]+)?$")
 async def system_groups(event: events.NewMessage.Event):
     """查看所有使用中的群组统计（仅全局管理员）。"""
     sender = await event.get_sender()

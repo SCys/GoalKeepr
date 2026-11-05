@@ -1,4 +1,5 @@
-from datetime import timedelta
+import asyncio
+from datetime import datetime, timedelta, timezone
 from telethon import events
 
 import translators as ts
@@ -45,7 +46,7 @@ async def translate(event: events.NewMessage.Event):
         content = parts[1]
 
     try:
-        result = ts.translate_text(content, to_language=to_language, translator="google")
+        result = await asyncio.to_thread(ts.translate_text, content, to_language=to_language, translator="google")
         if isinstance(result, str):
             await reply_tts(target, result, show_original=True, lang=to_language)
     except Exception as e:
@@ -53,7 +54,7 @@ async def translate(event: events.NewMessage.Event):
         await manager.reply(
             event,
             "Translate failed, please try again later.",
-            auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
+            auto_deleted_at=datetime.now(timezone.utc) + timedelta(seconds=DELETED_AFTER),
         )
 
     name = getattr(user, "first_name", "") or ""

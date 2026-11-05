@@ -98,3 +98,14 @@ def test_load_advertising_words():
     assert "广告" in words
     assert "spam" in words
     assert "test_word" in words
+
+
+def test_compiled_patterns_cached():
+    """Verify _compile_advertising_patterns caches compiled patterns across calls."""
+    from utils.advertising import _compile_advertising_patterns
+
+    _compile_advertising_patterns.cache_clear()
+    p1 = _compile_advertising_patterns("pat1:foo.*bar;pat2:spam[0-9]+")
+    p2 = _compile_advertising_patterns("pat1:foo.*bar;pat2:spam[0-9]+")
+    assert p1 is p2
+    assert _compile_advertising_patterns.cache_info().hits >= 1

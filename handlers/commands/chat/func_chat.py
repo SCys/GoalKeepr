@@ -1,6 +1,6 @@
 import base64
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Tuple
 
 import telegramify_markdown
@@ -137,12 +137,13 @@ async def chat(event: events.NewMessage.Event):
 
     if subcommand == "reset":
         await rdb.delete(f"chat:history:{user.id}")
+        del_time = datetime.now(timezone.utc) + timedelta(seconds=DELETED_AFTER)
         await manager.reply(
             event,
             "会话已经重置\nYour chat history has been reset.",
-            auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
+            auto_deleted_at=del_time,
         )
-        await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(event.chat_id, event, del_time)
         return
 
     if len(text) < 3 and not media:
@@ -156,12 +157,13 @@ async def chat(event: events.NewMessage.Event):
         )
         if not text_resp:
             logger.warning(f"{prefix} generate text returned no response")
+            del_time = datetime.now(timezone.utc) + timedelta(seconds=DELETED_AFTER)
             await manager.reply(
                 event,
                 "生成回复失败，请稍后再试。| Failed to generate response, please try again later.",
-                auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
+                auto_deleted_at=del_time,
             )
-            await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
+            await manager.delete_message(event.chat_id, event, del_time)
             return
     except Exception:
         logger.exception(f"{prefix} generate text failed")
@@ -170,17 +172,18 @@ async def chat(event: events.NewMessage.Event):
         )
 
     success = await _reply_response(event, text_resp, prefix)
+    del_time = datetime.now(timezone.utc) + timedelta(seconds=DELETED_AFTER)
     if not success:
         await manager.reply(
             event,
             "生成回复失败，请稍后再试。| Failed to generate response, please try again later.",
-            auto_deleted_at=event.date + timedelta(seconds=DELETED_AFTER),
+            auto_deleted_at=del_time,
         )
 
     if not success:
-        await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
+        await manager.delete_message(event.chat_id, event, del_time)
         return
 
     # Delete the trigger command message (group hygiene, same as other admin commands).
-    await manager.delete_message(event.chat_id, event, event.date + timedelta(seconds=DELETED_AFTER))
+    await manager.delete_message(event.chat_id, event, del_time)
     logger.info(f"{prefix} do chat command, send token {count_tokens(text)}, response token {count_tokens(text_resp)}")

@@ -7,7 +7,7 @@ from ..member_captcha.stats import STATS_KEY, FIELD_GROUP_JOINS, FIELD_VERIFICAT
 logger = manager.logger
 
 
-@manager.register("message", pattern=r"(?i)^/system_usage$")
+@manager.register("message", pattern=r"(?i)^/system_usage(?:@[a-zA-Z0-9_]+)?$")
 async def system_usage(event: events.NewMessage.Event):
     """查看系统使用统计（仅限管理员）。"""
     chat_id = event.chat_id

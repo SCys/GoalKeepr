@@ -97,7 +97,7 @@ async def perform_security_checks(
         return None
     except Exception as e:
         logger.exception(f"{log_context.log_prefix} | security check failed | error:{e}")
-        raise SecurityCheckError(f"安全检查失败: {e}", log_context.chat.id, user.id)
+        return None
 
 
 async def _perform_llm_check(
@@ -166,4 +166,3 @@ async def _handle_advertising_violation(
 
     except Exception as e:
         logger.error(f"{log_context.log_prefix} | failed to handle advertising violation | error:{e}")
-        raise SecurityCheckError(f"处理广告违规失败: {e}", log_context.chat.id, log_context.member_id)

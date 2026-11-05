@@ -104,3 +104,59 @@ async def test_timeout_skips_already_banned_no_unban(monkeypatch, mock_manager):
 
     mock_manager.client.edit_permissions.assert_not_called()
     mock_manager.lazy_session.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_timeout_skips_already_accepted_user(monkeypatch, mock_manager):
+    """Telethon ParticipantPermissions has has_default_permissions=True, no top-level send_messages."""
+    import handlers.member_captcha.events  # noqa: F401
+    new_member_check = mock_manager.events["new_member_check"]
+
+    chat = SimpleNamespace(id=-1001445219041, title="g")
+    mock_manager.client.get_entity = AsyncMock(return_value=chat)
+    accepted_perms = SimpleNamespace(
+        participant=SimpleNamespace(banned_rights=None),
+        is_admin=False,
+        is_creator=False,
+        is_banned=False,
+        has_left=False,
+        has_default_permissions=True,
+    )
+    mock_manager.client.get_permissions = AsyncMock(return_value=accepted_perms)
+
+    from handlers.member_captcha.session import CaptchaSession
+    monkeypatch.setattr(CaptchaSession, "is_flagged", AsyncMock(return_value=None))
+    monkeypatch.setattr(CaptchaSession, "is_restricted", AsyncMock(return_value=False))
+
+    await new_member_check(mock_manager.client, -1001445219041, 10, 42)
+
+    mock_manager.ban_member.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_timeout_skips_user_with_send_messages_unrestricted(monkeypatch, mock_manager):
+    """User whose send_messages restriction was lifted (banned_rights.send_messages is False)."""
+    import handlers.member_captcha.events  # noqa: F401
+    new_member_check = mock_manager.events["new_member_check"]
+
+    chat = SimpleNamespace(id=-1001445219041, title="g")
+    mock_manager.client.get_entity = AsyncMock(return_value=chat)
+    rights = SimpleNamespace(view_messages=False, send_messages=False)
+    participant = SimpleNamespace(banned_rights=rights)
+    unrestricted_perms = SimpleNamespace(
+        participant=participant,
+        is_admin=False,
+        is_creator=False,
+        is_banned=True,
+        has_left=False,
+        has_default_permissions=False,
+    )
+    mock_manager.client.get_permissions = AsyncMock(return_value=unrestricted_perms)
+
+    from handlers.member_captcha.session import CaptchaSession
+    monkeypatch.setattr(CaptchaSession, "is_flagged", AsyncMock(return_value=None))
+    monkeypatch.setattr(CaptchaSession, "is_restricted", AsyncMock(return_value=False))
+
+    await new_member_check(mock_manager.client, -1001445219041, 10, 42)
+
+    mock_manager.ban_member.assert_not_awaited()

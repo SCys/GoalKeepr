@@ -293,7 +293,7 @@ class Manager:
                 user_id = member.id
 
             perms = await self.client.get_permissions(chat_id, user_id)
-            return not perms or perms.is_admin or perms.is_creator
+            return bool(perms and (perms.is_admin or perms.is_creator))
         except Exception as e:
             logger.error(f"check admin failed: {e}")
         return False
@@ -432,11 +432,10 @@ class Manager:
                 async for member_val, _ in rdb.zscan_iter("lazy_sessions", match=pattern):
                     await rdb.zrem("lazy_sessions", member_val)
                 logger.debug(f"chat {chat} member {member} lazy session {type} is deleted (redis)")
-                return
             except Exception as e:
                 logger.error(f"lazy session delete failed (redis): {e}")
                 self.rdb = None  # force re-validation on next use
-        # fallback
+        # fallback / SQLite 清理：即使 Redis 删除成功，也防御性清理 SQLite 中可能的降级遗留任务
         try:
             await database.execute(
                 "delete from lazy_sessions where chat=? and member=? and type=?",

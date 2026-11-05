@@ -139,6 +139,19 @@ class TestSecurityChecks:
             reason = await perform_security_checks(user, session, ["John Doe"], log_ctx, NOW)
             assert reason is None, "clean user should pass even if LLM fails"
 
+    async def test_unexpected_error_fails_open(self, mock_manager, mock_advertising_config):
+        """If unexpected error occurs during security check, fail open and return None."""
+        from handlers.member_captcha.security import perform_security_checks
+        from handlers.member_captcha.exceptions import LogContext
+
+        user = _make_user(first_name="John", last_name="Doe")
+        session = _make_session()
+        log_ctx = LogContext(chat=_make_user(user_id=-100, username="__log_ctx_chat__"), member_id=user.id, member_name=user.username)
+
+        with patch("handlers.member_captcha.security._perform_advertising_check", side_effect=RuntimeError("unexpected DB crash")):
+            reason = await perform_security_checks(user, session, ["John Doe"], log_ctx, NOW)
+            assert reason is None, "unexpected error should fail open and return None"
+
 
 class TestGetMemberInfo:
     async def test_with_username_and_bio(self, mock_manager):
