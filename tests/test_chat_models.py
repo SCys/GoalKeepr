@@ -162,3 +162,146 @@ async def test_translate_uses_to_thread(mock_manager, monkeypatch):
         await translate(event)
         assert thread_called is True
         mock_tts.assert_awaited_once()
+
+
+async def test_tg_generate_text_extracts_reasoning_content(mock_manager, fake_redis, monkeypatch):
+    """Verify tg_generate_text extracts reasoning_content and preserves clean text in Redis."""
+    mock_manager.config["ai"] = {"proxy_host": "http://proxy", "proxy_token": "t"}
+
+    async def fake_api(url, data, token):
+        return {
+            "choices": [{
+                "message": {
+                    "content": "42 is the answer",
+                    "reasoning_content": "Deep thought computed for 7.5 million years",
+                }
+            }]
+        }
+
+    monkeypatch.setattr(txt_mod, "_api_request", fake_api)
+
+    resp = await txt_mod.tg_generate_text(1, 100, "What is the answer?")
+    assert "42 is the answer" in resp
+    assert resp.reasoning == "Deep thought computed for 7.5 million years"
+
+    # Verify Redis stores clean content only
+    history = loads(await fake_redis.get("chat:history:100"))
+    assert history[-1]["content"] == "42 is the answer"
+
+
+async def test_tg_generate_text_extracts_think_tag(mock_manager, fake_redis, monkeypatch):
+    """Verify tg_generate_text extracts think tags when reasoning_content is absent."""
+    mock_manager.config["ai"] = {"proxy_host": "http://proxy", "proxy_token": "t"}
+
+    async def fake_api(url, data, token):
+        tag_open = chr(60) + "think" + chr(62)
+        tag_close = chr(60) + "/think" + chr(62)
+        return {
+            "choices": [{
+                "message": {
+                    "content": tag_open + "\nAnalyzing numbers...\n" + tag_close + "\n\n9.8 is larger than 9.11",
+                }
+            }]
+        }
+
+    monkeypatch.setattr(txt_mod, "_api_request", fake_api)
+
+    resp = await txt_mod.tg_generate_text(1, 101, "Compare 9.11 and 9.8")
+    assert "9.8 is larger than 9.11" in resp
+    assert resp.reasoning == "Analyzing numbers..."
+
+    history = loads(await fake_redis.get("chat:history:101"))
+    assert history[-1]["content"] == "9.8 is larger than 9.11"
+
+
+async def test_reply_response_rich_message_with_thinking(mock_manager):
+    """Verify _reply_response sends rich message with expandable blockquote for thinking."""
+    from types import SimpleNamespace
+    from handlers.commands.chat.func_chat import _reply_response
+
+    mock_manager.config["telegram"] = {"token": "dummy_token"}
+    event = SimpleNamespace(
+        chat_id=12345,
+        id=777,
+        reply=AsyncMock(),
+    )
+
+    sent_payloads = []
+
+    class FakeResponse:
+        status = 200
+        async def json(self):
+            return {"ok": True, "result": {"message_id": 888}}
+
+    class FakeSession:
+        def post(self, url, json=None, **kwargs):
+            sent_payloads.append((url, json))
+            class Context:
+                async def __aenter__(self):
+                    return FakeResponse()
+                async def __aexit__(self, *args):
+                    pass
+            return Context()
+
+    mock_manager.create_session = AsyncMock(return_value=FakeSession())
+
+    success = await _reply_response(
+        event,
+        "Here is the result.",
+        "prefix",
+        reasoning="Step by step calculation",
+    )
+    assert success is True
+    assert len(sent_payloads) == 1
+    url, payload = sent_payloads[0]
+    assert "sendRichMessage" in url
+    assert payload["chat_id"] == 12345
+    assert payload["reply_parameters"] == {"message_id": 777}
+    html = payload["rich_message"]["html"]
+    assert "<blockquote expandable>" in html
+    assert "Step by step calculation" in html
+    assert "Here is the result." in html
+
+
+async def test_reply_response_fallback_to_send_message(mock_manager):
+    """Verify _reply_response falls back to sendMessage when sendRichMessage fails."""
+    from types import SimpleNamespace
+    from handlers.commands.chat.func_chat import _reply_response
+
+    mock_manager.config["telegram"] = {"token": "dummy_token"}
+    event = SimpleNamespace(
+        chat_id=12345,
+        id=777,
+        reply=AsyncMock(),
+    )
+
+    calls = []
+
+    class FakeSession:
+        def post(self, url, json=None, **kwargs):
+            calls.append((url, json))
+            class Context:
+                async def __aenter__(self):
+                    if "sendRichMessage" in url:
+                        resp = SimpleNamespace(status=400, json=AsyncMock(return_value={"ok": False, "description": "unsupported"}))
+                    else:
+                        resp = SimpleNamespace(status=200, json=AsyncMock(return_value={"ok": True, "result": {"message_id": 999}}))
+                    return resp
+                async def __aexit__(self, *args):
+                    pass
+            return Context()
+
+    mock_manager.create_session = AsyncMock(return_value=FakeSession())
+
+    success = await _reply_response(
+        event,
+        "Fallback answer.",
+        "prefix",
+        reasoning="Some reasoning",
+    )
+    assert success is True
+    assert len(calls) == 2
+    assert "sendRichMessage" in calls[0][0]
+    assert "sendMessage" in calls[1][0]
+    assert "**Thinking Process:**" in calls[1][1]["text"]
+    assert "Fallback answer." in calls[1][1]["text"]

@@ -5,6 +5,7 @@ import time
 
 from aiohttp import ClientTimeout, ClientResponse, ClientError, ServerTimeoutError, ClientConnectorError
 from aiohttp.client_exceptions import ClientResponseError, ClientPayloadError, ServerDisconnectedError
+import re
 from orjson import dumps, loads
 
 from manager import manager
@@ -12,6 +13,15 @@ from manager import manager
 from .base import count_tokens
 
 logger = manager.logger
+
+
+class ChatResponse(str):
+    reasoning: Optional[str] = None
+
+    def __new__(cls, content: str, reasoning: Optional[str] = None):
+        obj = super().__new__(cls, content)
+        obj.reasoning = reasoning
+        return obj
 
 
 @dataclass
@@ -409,16 +419,33 @@ async def tg_generate_text(
 
     try:
         response_data = await _api_request(url, data, proxy_token)
-        text = response_data["choices"][0]["message"]["content"]
+        choice_msg = response_data["choices"][0]["message"]
+        raw_content = choice_msg.get("content") or ""
+        raw_reasoning = choice_msg.get("reasoning_content") or ""
+
+        if raw_reasoning and str(raw_reasoning).strip():
+            reasoning = str(raw_reasoning).strip()
+            text = raw_content
+        else:
+            tag_open = chr(60) + "think" + chr(62)
+            tag_close = chr(60) + "/think" + chr(62)
+            match = re.search(re.escape(tag_open) + r"(.*?)" + re.escape(tag_close), raw_content, re.DOTALL)
+            if match:
+                reasoning = match.group(1).strip()
+                text = (raw_content[:match.start()] + raw_content[match.end():]).strip()
+            else:
+                reasoning = None
+                text = raw_content
 
         if rdb:
-            # Save full history (incl. system) back with the 30min TTL.
+            # Save full history (clean assistant text only) back with the 30min TTL.
             chat_history.append({"role": "assistant", "content": text})
             await rdb.set(f"chat:history:{member_id}", dumps(chat_history), ex=CONVERSATION_TTL)
 
-        return text + f"\n\nPowered by **{display_name}**"
+        full_text = text + f"\n\nPowered by **{display_name}**"
+        return ChatResponse(full_text, reasoning=reasoning if reasoning else None)
     except ValueError as e:
-        return str(e)
+        return ChatResponse(str(e))
 
 
 async def chat_completions(messages: List[Dict[str, Any]], model_name: Optional[str] = None, **kwargs) -> Optional[str]:
