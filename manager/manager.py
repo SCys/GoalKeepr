@@ -569,7 +569,7 @@ class Manager:
                                 sock=sock,
                                 server_hostname=req.host if sslcontext else None,
                             )
-                            return transport, protocol
+                            return protocol
 
                     connector = _ProxyConnector(proxy_url)
                 except Exception as e:
