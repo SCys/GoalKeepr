@@ -6,16 +6,17 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "aiosqlite>=0.22.1",
-    "aiohttp>=3.14.1",
+    "aiohttp>=3.14.5",
     "redis>=5.0.0",
     "beautifulsoup4>=4.14.3",
     "edge-tts>=7.2.7",
     "loguru>=0.7.3",
     "orjson>=3.11.6",
     "pydub>=0.25.1",
-    "telegramify-markdown>=1.2.0",
+    "audioop-lts>=0.2.2; python_version >= '3.13'",
+    "telegramify-markdown>=1.4.2",
     "telethon>=1.36.0",
-    "Pillow>=10.0.0",  # webp 完成图转 png 后再发送（Telegram 不支持 webp 照片）
+    "Pillow>=12.0.0",  # webp 完成图转 png 后再发送（Telegram 不支持 webp 照片）
     "PySocks>=1.7.1",  # Telegram 代理（socks5/http）时 Telethon 需要
     "tiktoken>=0.12.0",
     "translators>=6.0.2,<6.0.4",
